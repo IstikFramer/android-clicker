@@ -442,4 +442,3 @@ class FileSearchPage(QWidget):
             self.status_message.emit(T["delete_trash"])
         except (OSError, RuntimeError) as error:
             self.status_message.emit(f"{T['status_error']}: {error}")
-PY
