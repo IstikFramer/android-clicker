@@ -15,4 +15,3 @@ class AppSignals(QObject):
 
 
 app_signals = AppSignals()
-"

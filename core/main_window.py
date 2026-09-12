@@ -216,9 +216,14 @@ class MainWindow(QMainWindow):
 
     def _setup_tray(self) -> None:
         """Create the tray icon and its context menu when supported."""
+        application = QApplication.instance()
         if not QSystemTrayIcon.isSystemTrayAvailable():
             self._logger.info("System tray is not available")
+            if application is not None:
+                application.setQuitOnLastWindowClosed(True)
             return
+        if application is not None:
+            application.setQuitOnLastWindowClosed(False)
         self.tray_icon = QSystemTrayIcon(load_icon("app_icon.svg"), self)
         self.tray_icon.setToolTip(APP_NAME)
         menu = QMenu(self)
@@ -226,7 +231,7 @@ class MainWindow(QMainWindow):
         settings_action = QAction("Настройки", self)
         quit_action = QAction("Выход", self)
         show_action.triggered.connect(self.show_window)
-        settings_action.triggered.connect(lambda: self.navigate_to(1))
+        settings_action.triggered.connect(self.show_settings_from_tray)
         quit_action.triggered.connect(self.quit_from_tray)
         menu.addAction(show_action)
         menu.addAction(settings_action)
@@ -248,12 +253,20 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
 
+    def show_settings_from_tray(self) -> None:
+        """Show the window and open the settings page from the tray."""
+        self.show_window()
+        self.navigate_to(1)
+
     def quit_from_tray(self) -> None:
         """Close the application explicitly from the tray menu."""
         self._force_close = True
         if self.tray_icon is not None:
             self.tray_icon.hide()
         self.close()
+        application = QApplication.instance()
+        if application is not None:
+            application.quit()
 
     def _load_plugins(self) -> None:
         """Load plugin pages and add their navigation entries."""
@@ -303,8 +316,14 @@ class MainWindow(QMainWindow):
     def _restore_geometry(self) -> None:
         """Restore a valid saved geometry or center the default size."""
         window = self.config.get_section("window")
-        width = max(900, int(window.get("width", 1200)))
-        height = max(550, int(window.get("height", 750)))
+        try:
+            width = max(900, int(window.get("width", 1200)))
+        except (TypeError, ValueError):
+            width = 1200
+        try:
+            height = max(550, int(window.get("height", 750)))
+        except (TypeError, ValueError):
+            height = 750
         self.resize(width, height)
         x, y = window.get("x"), window.get("y")
         if isinstance(x, int) and isinstance(y, int) and self._point_is_visible(x, y):

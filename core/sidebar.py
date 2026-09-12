@@ -151,6 +151,7 @@ class Sidebar(QWidget):
 
     def toggle_collapsed(self) -> None:
         """Animate between the expanded and compact sidebar widths."""
+        self._collapsed = not self._collapsed
         self._apply_collapsed_state(animate=True)
 
     def _apply_collapsed_state(self, animate: bool) -> None:

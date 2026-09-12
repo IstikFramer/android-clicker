@@ -25,7 +25,6 @@ class ShellApplication(QApplication):
         self.setApplicationName(APP_NAME)
         self.setApplicationDisplayName(APP_NAME)
         self.setApplicationVersion(APP_VERSION)
-        self.setQuitOnLastWindowClosed(False)
         self.setWindowIcon(load_icon("app_icon.svg"))
         self.setFont(application_font())
         self.setStyleSheet(generate_stylesheet())
@@ -49,14 +48,17 @@ def configure_logging(data_dir: Path | None = None) -> None:
         return
     root_logger.setLevel(logging.INFO)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
-    file_handler = RotatingFileHandler(
-        log_path,
-        maxBytes=5 * 1024 * 1024,
-        backupCount=2,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(formatter)
+    try:
+        file_handler = RotatingFileHandler(
+            log_path,
+            maxBytes=5 * 1024 * 1024,
+            backupCount=2,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+    except OSError:
+        root_logger.warning("Could not open log file: %s", log_path)
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
-    root_logger.addHandler(file_handler)
     root_logger.addHandler(console_handler)
