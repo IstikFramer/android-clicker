@@ -1,0 +1,26 @@
+{
+  "window": {
+    "width": 1200,
+    "height": 750,
+    "x": null,
+    "y": null,
+    "maximized": false
+  },
+  "general": {
+    "autostart": false,
+    "tray_on_close": true,
+    "start_minimized": false,
+    "language": "ru"
+  },
+  "appearance": {
+    "theme": "dark",
+    "scale": 100,
+    "animations": true
+  },
+  "updates": {
+    "check_on_start": true
+  },
+  "sidebar": {
+    "collapsed": false
+  }
+}
