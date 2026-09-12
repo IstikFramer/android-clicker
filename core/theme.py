@@ -9,11 +9,11 @@ class Colors:
     """Updated dark Fluent palette with glass surface colors."""
 
     BACKGROUND_WINDOW = "transparent"
-    BACKGROUND_SURFACE = "rgba(30, 30, 50, 0.65)"
-    BACKGROUND_CARD = "rgba(255, 255, 255, 0.05)"
-    BACKGROUND_CARD_HOVER = "rgba(255, 255, 255, 0.08)"
-    BORDER_SUBTLE = "rgba(255, 255, 255, 0.08)"
-    BORDER_DEFAULT = "rgba(255, 255, 255, 0.12)"
+    BACKGROUND_SURFACE = "rgba(16, 29, 57, 0.74)"
+    BACKGROUND_CARD = "rgba(255, 255, 255, 0.07)"
+    BACKGROUND_CARD_HOVER = "rgba(0, 173, 181, 0.16)"
+    BORDER_SUBTLE = "rgba(216, 255, 255, 0.12)"
+    BORDER_DEFAULT = "rgba(216, 255, 255, 0.22)"
     BORDER_FOCUS = "#00adb5"
     TEXT_PRIMARY = "#e8e8e8"
     TEXT_SECONDARY = "#9a9a9a"
@@ -80,10 +80,10 @@ def mono_font() -> QFont:
 
 
 def _surface_color(panel_opacity: int) -> str:
-    """Convert the panel setting to a stable translucent surface color."""
+    """Convert the panel setting to a stable translucent glass surface."""
     value = max(50, min(100, int(panel_opacity)))
-    alpha = 0.50 + ((value - 50) / 50) * 0.30
-    return f"rgba(30, 30, 50, {alpha:.2f})"
+    alpha = 0.48 + ((value - 50) / 50) * 0.26
+    return f"rgba(16, 29, 57, {alpha:.2f})"
 
 
 def generate_stylesheet(panel_opacity: int = 80) -> str:
@@ -132,7 +132,7 @@ def generate_stylesheet(panel_opacity: int = 80) -> str:
         border-radius: {s.LARGE_CARD_RADIUS}px;
     }}
     QFrame#windowFrame {{
-        background-color: {surface};
+        background-color: transparent;
         border: 1px solid {c.BORDER_SUBTLE};
         border-radius: {s.CARD_RADIUS}px;
     }}

@@ -10,7 +10,6 @@ from PySide6.QtCore import QEvent, QEasingCurve, QPoint, QPropertyAnimation, QRe
 from PySide6.QtGui import QAction, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
-    QFrame,
     QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
@@ -35,6 +34,7 @@ except Exception:  # noqa: BLE001 - the native helper is optional on unsupported
 
 from core.app import APP_NAME, APP_VERSION
 from core.config import ConfigManager
+from core.glass import GlassBackdrop
 from core.home_page import HomePage
 from core.plugin_loader import PluginLoader
 from core.settings_page import SettingsPage
@@ -170,8 +170,10 @@ class MainWindow(_FramelessMainWindow):
 
     def _build_shell(self) -> None:
         """Build the title bar, navigation area, page stack and status bar."""
-        frame = QFrame(self)
-        frame.setObjectName("windowFrame")
+        frame = GlassBackdrop(
+            self,
+            animated=bool(self.config.get("appearance.animations", True)),
+        )
         frame.setMouseTracking(True)
         root_layout = QVBoxLayout(frame)
         root_layout.setSpacing(0)

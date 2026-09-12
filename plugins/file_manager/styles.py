@@ -4,18 +4,18 @@ from __future__ import annotations
 
 
 COLORS: dict[str, str] = {
-    "background": "#1a1a2e",
-    "surface": "#16213e",
-    "accent_surface": "#0f3460",
-    "text": "#e0e0e0",
-    "muted": "#8a8a8a",
+    "background": "transparent",
+    "surface": "rgba(16, 29, 57, 0.76)",
+    "accent_surface": "rgba(0, 173, 181, 0.14)",
+    "text": "#e8f7f7",
+    "muted": "#9bb2ba",
     "accent": "#00adb5",
-    "accent_hover": "#00cfd8",
-    "error": "#e74c3c",
-    "success": "#2ecc71",
-    "warning": "#f39c12",
-    "border": "#2a2a4a",
-    "input": "#111a32",
+    "accent_hover": "#37d5db",
+    "error": "#ff6b6b",
+    "success": "#55d98b",
+    "warning": "#ffc857",
+    "border": "rgba(216, 255, 255, 0.16)",
+    "input": "rgba(7, 17, 36, 0.70)",
 }
 
 
@@ -149,7 +149,7 @@ def stylesheet() -> str:
     QFrame[fmRole="group"] {{
         background-color: {c['surface']};
         border: 1px solid {c['border']};
-        border-radius: 8px;
+        border-radius: 12px;
     }}
     QFrame[fmRole="header"] {{
         border: none;
@@ -157,10 +157,15 @@ def stylesheet() -> str:
         border-radius: 0px;
     }}
     QFrame[fmRole="sidebar"] {{
+        background-color: rgba(8, 20, 43, 0.72);
         border-top: none;
         border-bottom: none;
         border-left: none;
-        border-radius: 0px;
+        border-radius: 12px;
+    }}
+    QStackedWidget, QWidget#fileManagerStack {{
+        background-color: transparent;
+        border: none;
     }}
     QLabel[fmRole="title"] {{
         color: {c['text']};
@@ -235,7 +240,7 @@ def stylesheet() -> str:
         border-color: {c['accent']};
     }}
     QTableWidget, QListWidget, QTextEdit, QPlainTextEdit {{
-        background-color: {c['surface']};
+        background-color: rgba(11, 24, 49, 0.72);
         color: {c['text']};
         border: 1px solid {c['border']};
         border-radius: 6px;
@@ -243,7 +248,7 @@ def stylesheet() -> str:
         selection-color: {c['text']};
     }}
     QHeaderView::section {{
-        background-color: {c['accent_surface']};
+        background-color: rgba(0, 173, 181, 0.12);
         color: {c['text']};
         border: none;
         border-bottom: 1px solid {c['border']};

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QSize, QTimer, Qt, Signal
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.glass import paint_ambient_background
 from core.utils import load_icon
 from plugins.file_manager.styles import TEXTS as T, stylesheet
 from plugins.file_manager.utils import FileManagerConfig
@@ -34,9 +36,27 @@ class FileManagerWidget(QWidget):
         self.config = FileManagerConfig()
         self._page_animation: QPropertyAnimation | None = None
         self._nav_buttons: list[QPushButton] = []
+        self._ambient_phase = 0.0
         self.setObjectName("fileManagerRoot")
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setStyleSheet(stylesheet())
+        self._ambient_timer = QTimer(self)
+        self._ambient_timer.setInterval(42)
+        self._ambient_timer.timeout.connect(self._advance_ambient)
+        self._ambient_timer.start()
         self._build_ui()
+
+    def _advance_ambient(self) -> None:
+        """Move the ambient light behind the module surfaces."""
+        self._ambient_phase = (self._ambient_phase + 0.65) % 360.0
+        self.update()
+
+    def paintEvent(self, event: object) -> None:
+        """Paint the module background before its translucent panels."""
+        del event
+        painter = QPainter(self)
+        paint_ambient_background(painter, QRectF(self.rect()), self._ambient_phase)
+        painter.end()
 
     def _build_ui(self) -> None:
         """Build header, navigation, page stack and operation status area."""
