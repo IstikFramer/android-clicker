@@ -1,4 +1,4 @@
-"""Centralized visual language for the Shell application."""
+"""Centralized Fluent and glass visual language for the Shell application."""
 
 from __future__ import annotations
 
@@ -6,22 +6,32 @@ from PySide6.QtGui import QColor, QFont
 
 
 class Colors:
-    """Application color palette."""
+    """Updated dark Fluent palette with glass surface colors."""
 
-    BACKGROUND_PRIMARY = "#1a1a2e"
-    BACKGROUND_SECONDARY = "#16213e"
-    BACKGROUND_TERTIARY = "#0f3460"
-    TEXT_PRIMARY = "#e0e0e0"
-    TEXT_SECONDARY = "#8a8a8a"
+    BACKGROUND_WINDOW = "transparent"
+    BACKGROUND_SURFACE = "rgba(30, 30, 50, 0.65)"
+    BACKGROUND_CARD = "rgba(255, 255, 255, 0.05)"
+    BACKGROUND_CARD_HOVER = "rgba(255, 255, 255, 0.08)"
+    BORDER_SUBTLE = "rgba(255, 255, 255, 0.08)"
+    BORDER_DEFAULT = "rgba(255, 255, 255, 0.12)"
+    BORDER_FOCUS = "#00adb5"
+    TEXT_PRIMARY = "#e8e8e8"
+    TEXT_SECONDARY = "#9a9a9a"
     ACCENT = "#00adb5"
-    ACCENT_HOVER = "#00cfd8"
+    ACCENT_LIGHT = "#00cfd8"
     ERROR = "#e74c3c"
     SUCCESS = "#2ecc71"
     WARNING = "#f39c12"
-    BORDER = "#2a2a4a"
     WHITE = "#ffffff"
-    INPUT_BACKGROUND = "#111a32"
     SHADOW = "#000000"
+
+    # Compatibility names retained for future plugins built against v0.1.
+    BACKGROUND_PRIMARY = "#1a1a2e"
+    BACKGROUND_SECONDARY = BACKGROUND_SURFACE
+    BACKGROUND_TERTIARY = "rgba(255, 255, 255, 0.08)"
+    ACCENT_HOVER = ACCENT_LIGHT
+    BORDER = BORDER_DEFAULT
+    INPUT_BACKGROUND = "rgba(255, 255, 255, 0.05)"
 
 
 class Fonts:
@@ -69,14 +79,25 @@ def mono_font() -> QFont:
     return font
 
 
-def generate_stylesheet() -> str:
-    """Build and return the complete application stylesheet.
+def _surface_color(panel_opacity: int) -> str:
+    """Convert the panel setting to a stable translucent surface color."""
+    value = max(50, min(100, int(panel_opacity)))
+    alpha = 0.38 + ((value - 50) / 50) * 0.27
+    return f"rgba(30, 30, 50, {alpha:.2f})"
+
+
+def generate_stylesheet(panel_opacity: int = 80) -> str:
+    """Build and return the complete Fluent glass QSS stylesheet.
+
+    Args:
+        panel_opacity: User-selected surface opacity in the range 50 to 100.
 
     Returns:
-        A QSS string that is applied once to the QApplication instance.
+        A QSS string applied globally to the QApplication instance.
     """
     c = Colors
     s = Sizes
+    surface = _surface_color(panel_opacity)
     return f"""
     * {{
         font-family: "{Fonts.FAMILY}";
@@ -84,43 +105,53 @@ def generate_stylesheet() -> str:
         color: {c.TEXT_PRIMARY};
     }}
     QMainWindow, QDialog, QWidget {{
-        background-color: {c.BACKGROUND_PRIMARY};
+        background-color: {c.BACKGROUND_WINDOW};
         color: {c.TEXT_PRIMARY};
     }}
+    QMainWindow[windowEffect="qss"], QMainWindow[windowEffect="none"],
+    QDialog[windowEffect="qss"], QDialog[windowEffect="none"] {{
+        background-color: {c.BACKGROUND_PRIMARY};
+    }}
     QToolTip {{
-        background-color: {c.BACKGROUND_SECONDARY};
+        background-color: rgba(30, 30, 50, 0.94);
         color: {c.TEXT_PRIMARY};
-        border: 1px solid {c.BORDER};
+        border: 1px solid {c.BORDER_DEFAULT};
         padding: 6px 9px;
         border-radius: {s.INPUT_RADIUS}px;
     }}
-    QFrame[frameRole="card"] {{
-        background-color: {c.BACKGROUND_SECONDARY};
-        border: 1px solid {c.BORDER};
+    QFrame[frameRole="card"], QFrame[frameRole="large-card"] {{
+        background-color: {c.BACKGROUND_CARD};
+        border: 1px solid {c.BORDER_DEFAULT};
         border-radius: {s.CARD_RADIUS}px;
     }}
+    QFrame[frameRole="card"]:hover, QFrame[frameRole="large-card"]:hover {{
+        background-color: {c.BACKGROUND_CARD_HOVER};
+        border-color: rgba(255, 255, 255, 0.15);
+    }}
     QFrame[frameRole="large-card"] {{
-        background-color: {c.BACKGROUND_SECONDARY};
-        border: 1px solid {c.BORDER};
         border-radius: {s.LARGE_CARD_RADIUS}px;
     }}
     QFrame#windowFrame {{
-        background-color: {c.BACKGROUND_PRIMARY};
-        border: 1px solid {c.BORDER};
+        background-color: {surface};
+        border: 1px solid {c.BORDER_SUBTLE};
         border-radius: {s.CARD_RADIUS}px;
     }}
-    QWidget#titleBar {{
+    QFrame#windowFrame[windowEffect="none"], QFrame#windowFrame[windowEffect="qss"] {{
         background-color: {c.BACKGROUND_PRIMARY};
+    }}
+    QWidget#titleBar {{
+        background-color: rgba(30, 30, 50, 0.50);
         border-top-left-radius: {s.CARD_RADIUS}px;
         border-top-right-radius: {s.CARD_RADIUS}px;
     }}
     QWidget#sidebar {{
-        background-color: {c.BACKGROUND_SECONDARY};
+        background-color: {surface};
+        border-right: 1px solid {c.BORDER_SUBTLE};
         border-bottom-left-radius: {s.CARD_RADIUS}px;
     }}
     QFrame#userPanel {{
-        background-color: {c.BACKGROUND_PRIMARY};
-        border: 1px solid {c.BORDER};
+        background-color: {c.BACKGROUND_CARD};
+        border: 1px solid {c.BORDER_SUBTLE};
         border-radius: {s.CARD_RADIUS}px;
     }}
     QLabel#avatarLabel {{
@@ -135,7 +166,7 @@ def generate_stylesheet() -> str:
         font-weight: 600;
     }}
     QFrame#sidebarDivider {{
-        background-color: {c.BORDER};
+        background-color: {c.BORDER_SUBTLE};
         border: none;
     }}
     QLabel#sidebarVersion {{
@@ -151,7 +182,7 @@ def generate_stylesheet() -> str:
     QLabel {{
         background-color: transparent;
     }}
-    QLabel[role="page-title"] {{
+    QLabel[role="page-title"], QLabel[role="welcome-title"] {{
         font-family: "{Fonts.HEADING_FAMILY}";
         font-size: {Fonts.TITLE_SIZE}pt;
         font-weight: 600;
@@ -169,12 +200,6 @@ def generate_stylesheet() -> str:
         font-weight: 600;
         color: {c.TEXT_PRIMARY};
     }}
-    QLabel[role="welcome-title"] {{
-        font-family: "{Fonts.HEADING_FAMILY}";
-        font-size: {Fonts.TITLE_SIZE}pt;
-        font-weight: 600;
-        color: {c.TEXT_PRIMARY};
-    }}
     QLabel[role="update-text"] {{
         color: {c.TEXT_PRIMARY};
         line-height: 160%;
@@ -188,7 +213,7 @@ def generate_stylesheet() -> str:
     QLabel[role="muted"] {{
         color: {c.TEXT_SECONDARY};
     }}
-    QLabel[role="mono"] {{
+    QLabel[role="mono"], QLabel[role="about-value"] {{
         font-family: "{Fonts.MONO_FAMILY}";
         font-size: {Fonts.SMALL_SIZE}pt;
         color: {c.TEXT_PRIMARY};
@@ -196,52 +221,53 @@ def generate_stylesheet() -> str:
     QLabel[role="setting-label"] {{
         color: {c.TEXT_PRIMARY};
     }}
-    QLabel[role="about-value"] {{
-        color: {c.TEXT_PRIMARY};
-        font-family: "{Fonts.MONO_FAMILY}";
-        font-size: {Fonts.SMALL_SIZE}pt;
+    #updateAccentBar {{
+        background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+            stop:0 {c.ACCENT}, stop:0.7 rgba(0, 173, 181, 0.18), stop:1 transparent);
+        border: none;
+        border-radius: 1px;
     }}
-    QPushButton {{
+    QPushButton, PushButton, PrimaryPushButton, TransparentPushButton, ToggleButton {{
         background-color: transparent;
         color: {c.TEXT_PRIMARY};
-        border: 1px solid {c.BORDER};
+        border: 1px solid {c.BORDER_SUBTLE};
         border-radius: {s.BUTTON_RADIUS}px;
         padding: 8px 16px;
         min-height: 18px;
     }}
-    QPushButton:hover {{
-        background-color: {c.BACKGROUND_TERTIARY};
-        border-color: {c.ACCENT};
+    QPushButton:hover, PushButton:hover, TransparentPushButton:hover, ToggleButton:hover {{
+        background-color: {c.BACKGROUND_CARD_HOVER};
+        border-color: {c.BORDER_DEFAULT};
     }}
-    QPushButton:pressed {{
-        background-color: {c.BACKGROUND_PRIMARY};
+    QPushButton:pressed, PushButton:pressed, TransparentPushButton:pressed, ToggleButton:pressed {{
+        background-color: rgba(0, 173, 181, 0.16);
     }}
-    QPushButton:disabled {{
+    QPushButton:disabled, PushButton:disabled, PrimaryPushButton:disabled {{
         color: {c.TEXT_SECONDARY};
-        border-color: {c.BORDER};
+        border-color: {c.BORDER_SUBTLE};
     }}
-    QPushButton[variant="primary"] {{
+    QPushButton[variant="primary"], PrimaryPushButton {{
         background-color: {c.ACCENT};
         color: {c.WHITE};
         border-color: {c.ACCENT};
     }}
-    QPushButton[variant="primary"]:hover {{
-        background-color: {c.ACCENT_HOVER};
-        border-color: {c.ACCENT_HOVER};
+    QPushButton[variant="primary"]:hover, PrimaryPushButton:hover {{
+        background-color: {c.ACCENT_LIGHT};
+        border-color: {c.ACCENT_LIGHT};
     }}
-    QPushButton[variant="primary"]:pressed {{
-        background-color: {c.BACKGROUND_TERTIARY};
-        border-color: {c.BACKGROUND_TERTIARY};
+    QPushButton[variant="primary"]:pressed, PrimaryPushButton:pressed {{
+        background-color: #008e95;
+        border-color: #008e95;
     }}
     QPushButton[variant="danger"] {{
         color: {c.ERROR};
-        border-color: {c.ERROR};
+        border-color: rgba(231, 76, 60, 0.5);
     }}
     QPushButton[variant="danger"]:hover {{
-        background-color: {c.ERROR};
-        color: {c.WHITE};
+        background-color: rgba(231, 76, 60, 0.16);
+        border-color: {c.ERROR};
     }}
-    QPushButton[role="title-button"] {{
+    QPushButton[role="title-button"], QPushButton[role="close-button"] {{
         border: none;
         border-radius: 0px;
         padding: 0px;
@@ -251,16 +277,7 @@ def generate_stylesheet() -> str:
         background-color: transparent;
     }}
     QPushButton[role="title-button"]:hover {{
-        background-color: {c.BACKGROUND_TERTIARY};
-    }}
-    QPushButton[role="close-button"] {{
-        border: none;
-        border-radius: 0px;
-        padding: 0px;
-        min-width: 46px;
-        min-height: {s.TITLE_BAR_HEIGHT}px;
-        max-height: {s.TITLE_BAR_HEIGHT}px;
-        background-color: transparent;
+        background-color: rgba(255, 255, 255, 0.08);
     }}
     QPushButton[role="close-button"]:hover {{
         background-color: {c.ERROR};
@@ -281,40 +298,42 @@ def generate_stylesheet() -> str:
         max-height: {s.SIDEBAR_ITEM_HEIGHT}px;
     }}
     QPushButton[role="sidebar-item"]:hover {{
-        background-color: {c.BACKGROUND_TERTIARY};
+        background-color: {c.BACKGROUND_CARD_HOVER};
     }}
     QPushButton[role="sidebar-item"][active="true"] {{
-        background-color: {c.BACKGROUND_TERTIARY};
+        background-color: rgba(0, 173, 181, 0.12);
         border-left-color: {c.ACCENT};
-        color: {c.ACCENT};
+        color: {c.ACCENT_LIGHT};
     }}
     QLineEdit, QTextEdit, QPlainTextEdit {{
-        background-color: {c.INPUT_BACKGROUND};
+        background-color: {c.BACKGROUND_CARD};
         color: {c.TEXT_PRIMARY};
-        border: 1px solid {c.BORDER};
+        border: 1px solid {c.BORDER_SUBTLE};
+        border-bottom: 2px solid {c.BORDER_DEFAULT};
         border-radius: {s.INPUT_RADIUS}px;
         padding: 6px 12px;
         selection-background-color: {c.ACCENT};
     }}
     QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-        border-color: {c.ACCENT};
+        border-color: {c.BORDER_FOCUS};
+        border-bottom-color: {c.BORDER_FOCUS};
     }}
-    QScrollArea {{
+    QScrollArea, SmoothScrollArea {{
         background-color: transparent;
         border: none;
     }}
     QScrollBar:vertical {{
         background: transparent;
-        width: 8px;
+        width: 6px;
         margin: 0px;
     }}
     QScrollBar::handle:vertical {{
-        background: {c.BORDER};
-        border-radius: 4px;
-        min-height: 32px;
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 3px;
+        min-height: 28px;
     }}
     QScrollBar::handle:vertical:hover {{
-        background: {c.ACCENT};
+        background: rgba(0, 173, 181, 0.72);
     }}
     QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
     QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
@@ -323,15 +342,15 @@ def generate_stylesheet() -> str:
     }}
     QScrollBar:horizontal {{
         background: transparent;
-        height: 8px;
+        height: 6px;
     }}
     QScrollBar::handle:horizontal {{
-        background: {c.BORDER};
-        border-radius: 4px;
-        min-width: 32px;
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 3px;
+        min-width: 28px;
     }}
     QScrollBar::handle:horizontal:hover {{
-        background: {c.ACCENT};
+        background: rgba(0, 173, 181, 0.72);
     }}
     QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal,
     QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{
@@ -339,23 +358,23 @@ def generate_stylesheet() -> str:
         background: transparent;
     }}
     QHeaderView::section {{
-        background-color: {c.BACKGROUND_SECONDARY};
+        background-color: {c.BACKGROUND_CARD};
         color: {c.TEXT_SECONDARY};
         border: none;
-        border-bottom: 1px solid {c.BORDER};
+        border-bottom: 1px solid {c.BORDER_SUBTLE};
         padding: 8px;
     }}
     QTableWidget {{
-        background-color: {c.BACKGROUND_SECONDARY};
-        alternate-background-color: {c.BACKGROUND_PRIMARY};
-        gridline-color: {c.BORDER};
-        border: 1px solid {c.BORDER};
+        background-color: {c.BACKGROUND_CARD};
+        alternate-background-color: rgba(255, 255, 255, 0.025);
+        gridline-color: {c.BORDER_SUBTLE};
+        border: 1px solid {c.BORDER_SUBTLE};
         border-radius: {s.CARD_RADIUS}px;
     }}
     QMenu {{
-        background-color: {c.BACKGROUND_SECONDARY};
+        background-color: rgba(30, 30, 50, 0.96);
         color: {c.TEXT_PRIMARY};
-        border: 1px solid {c.BORDER};
+        border: 1px solid {c.BORDER_DEFAULT};
         padding: 5px;
     }}
     QMenu::item {{
@@ -363,13 +382,13 @@ def generate_stylesheet() -> str:
         border-radius: {s.INPUT_RADIUS}px;
     }}
     QMenu::item:selected {{
-        background-color: {c.BACKGROUND_TERTIARY};
-        color: {c.ACCENT};
+        background-color: rgba(0, 173, 181, 0.16);
+        color: {c.ACCENT_LIGHT};
     }}
     QMessageBox {{
-        background-color: {c.BACKGROUND_SECONDARY};
+        background-color: rgba(30, 30, 50, 0.96);
         color: {c.TEXT_PRIMARY};
-        border: 1px solid {c.BORDER};
+        border: 1px solid {c.BORDER_DEFAULT};
     }}
     QMessageBox QLabel {{
         color: {c.TEXT_PRIMARY};
@@ -378,51 +397,67 @@ def generate_stylesheet() -> str:
     QMessageBox QPushButton {{
         min-width: 82px;
     }}
-    QCheckBox {{
+    QCheckBox, CheckBox {{
         spacing: 9px;
         color: {c.TEXT_PRIMARY};
         padding: 4px 0px;
     }}
-    QCheckBox::indicator {{
+    QCheckBox::indicator, CheckBox::indicator {{
         width: 18px;
         height: 18px;
-        border: 1px solid {c.BORDER};
+        border: 1px solid {c.BORDER_DEFAULT};
         border-radius: 4px;
-        background-color: transparent;
+        background-color: {c.BACKGROUND_CARD};
     }}
-    QCheckBox::indicator:hover {{
+    QCheckBox::indicator:hover, CheckBox::indicator:hover {{
         border-color: {c.ACCENT};
     }}
-    QCheckBox::indicator:checked {{
+    QCheckBox::indicator:checked, CheckBox::indicator:checked {{
         background-color: {c.ACCENT};
         border-color: {c.ACCENT};
     }}
-    QComboBox {{
-        background-color: {c.INPUT_BACKGROUND};
+    QComboBox, ComboBox {{
+        background-color: {c.BACKGROUND_CARD};
         color: {c.TEXT_PRIMARY};
-        border: 1px solid {c.BORDER};
+        border: 1px solid {c.BORDER_SUBTLE};
+        border-bottom: 2px solid {c.BORDER_DEFAULT};
         border-radius: {s.INPUT_RADIUS}px;
         padding: 7px 12px;
         min-width: 130px;
     }}
-    QComboBox:hover, QComboBox:focus {{
-        border-color: {c.ACCENT};
+    QComboBox:hover, QComboBox:focus, ComboBox:hover, ComboBox:focus {{
+        border-color: {c.BORDER_FOCUS};
     }}
     QComboBox::drop-down {{
         border: none;
         width: 26px;
     }}
     QComboBox QAbstractItemView {{
-        background-color: {c.BACKGROUND_SECONDARY};
+        background-color: rgba(30, 30, 50, 0.96);
         color: {c.TEXT_PRIMARY};
-        border: 1px solid {c.BORDER};
-        selection-background-color: {c.BACKGROUND_TERTIARY};
-        selection-color: {c.ACCENT};
+        border: 1px solid {c.BORDER_DEFAULT};
+        selection-background-color: rgba(0, 173, 181, 0.16);
+        selection-color: {c.ACCENT_LIGHT};
         padding: 4px;
     }}
+    QSlider::groove:horizontal {{
+        height: 4px;
+        background: rgba(255, 255, 255, 0.16);
+        border-radius: 2px;
+    }}
+    QSlider::sub-page:horizontal {{
+        background: {c.ACCENT};
+        border-radius: 2px;
+    }}
+    QSlider::handle:horizontal {{
+        width: 16px;
+        margin: -6px 0px;
+        border-radius: 8px;
+        background: {c.ACCENT_LIGHT};
+    }}
     QProgressBar {{
-        background-color: {c.BACKGROUND_PRIMARY};
-        border: 1px solid {c.BORDER};
+        background-color: rgba(255, 255, 255, 0.08);
+        border: 1px solid {c.BORDER_SUBTLE};
         border-radius: 4px;
         text-align: center;
         color: {c.TEXT_PRIMARY};
@@ -433,8 +468,8 @@ def generate_stylesheet() -> str:
         border-radius: 3px;
     }}
     QTabWidget::pane {{
-        border: 1px solid {c.BORDER};
-        background-color: {c.BACKGROUND_SECONDARY};
+        border: 1px solid {c.BORDER_SUBTLE};
+        background-color: {c.BACKGROUND_CARD};
     }}
     QTabBar::tab {{
         background-color: transparent;
@@ -446,19 +481,19 @@ def generate_stylesheet() -> str:
         color: {c.TEXT_PRIMARY};
     }}
     QTabBar::tab:selected {{
-        color: {c.ACCENT};
+        color: {c.ACCENT_LIGHT};
         border-bottom-color: {c.ACCENT};
     }}
     QStatusBar {{
-        background-color: {c.BACKGROUND_SECONDARY};
+        background-color: rgba(30, 30, 50, 0.65);
         color: {c.TEXT_SECONDARY};
-        border-top: 1px solid {c.BORDER};
+        border-top: 1px solid {c.BORDER_SUBTLE};
     }}
     QStatusBar::item {{
         border: none;
     }}
     QSplitter::handle {{
-        background-color: {c.BORDER};
+        background-color: {c.BORDER_SUBTLE};
     }}
     """
 
@@ -466,5 +501,5 @@ def generate_stylesheet() -> str:
 def shadow_color() -> QColor:
     """Return the color used by card drop shadows."""
     color = QColor(Colors.SHADOW)
-    color.setAlpha(80)
+    color.setAlpha(76)
     return color

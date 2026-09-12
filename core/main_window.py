@@ -413,6 +413,10 @@ class MainWindow(_FramelessMainWindow):
         self._active_effect = active
         self._effect_applied = True
         self.setProperty("windowEffect", active)
+        frame = self.centralWidget()
+        if frame is not None:
+            frame.setProperty("windowEffect", active)
+            self._refresh_style(frame)
         self._refresh_style(self)
         self._logger.info("Window backdrop: requested=%s active=%s", requested, active)
         return active
