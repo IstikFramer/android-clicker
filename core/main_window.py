@@ -229,8 +229,20 @@ class MainWindow(_FramelessMainWindow):
 
         self.sidebar.navigation_requested.connect(self.navigate_to)
         self.settings_page.status_message.connect(self.set_status)
+        self.settings_page.effects_changed.connect(self._effects_changed)
         app_signals.navigate_to.connect(self.navigate_to)
         app_signals.status_message.connect(self.set_status)
+
+    def _effects_changed(self, effect_name: str, panel_opacity: int) -> None:
+        """Apply live effect settings without restarting the application."""
+        application = QApplication.instance()
+        if application is not None and hasattr(application, "apply_theme"):
+            try:
+                application.apply_theme(panel_opacity)
+            except Exception as error:  # noqa: BLE001 - styling cannot stop the shell
+                self._logger.warning("Could not refresh Fluent stylesheet: %s", error)
+        self._effect_applied = False
+        self.apply_window_effect(effect_name)
 
     def _setup_tray(self) -> None:
         """Create the tray icon and its context menu when supported."""
