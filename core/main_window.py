@@ -483,6 +483,8 @@ class MainWindow(_FramelessMainWindow):
         frame = self.centralWidget()
         if frame is not None:
             frame.setProperty("windowEffect", active)
+            if isinstance(frame, GlassBackdrop):
+                frame.set_native_material(active in {"mica", "acrylic"})
             self._refresh_style(frame)
         self._refresh_style(self)
         self._logger.info("Window backdrop: requested=%s active=%s", requested, active)

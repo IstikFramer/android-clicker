@@ -18,12 +18,19 @@ def _with_alpha(color_name: str, alpha: int) -> QColor:
     return color
 
 
-def paint_ambient_background(painter: QPainter, rect: QRectF, phase: float = 0.0) -> None:
+def paint_ambient_background(
+    painter: QPainter,
+    rect: QRectF,
+    phase: float = 0.0,
+    transparent_base: bool = False,
+) -> None:
     """Paint a subtle animated ambient background behind translucent surfaces.
 
     The background is deliberately rendered by Qt instead of relying on a
     platform-specific blur API. It therefore remains attractive on Linux,
-    Windows fallback mode, virtual machines and remote desktop sessions.
+    Windows fallback mode, virtual machines and remote desktop sessions. When
+    a native Mica or Acrylic material is active, ``transparent_base`` keeps
+    the platform backdrop visible and paints only the animated light layer.
     """
     if rect.width() <= 0 or rect.height() <= 0:
         return
@@ -31,11 +38,12 @@ def paint_ambient_background(painter: QPainter, rect: QRectF, phase: float = 0.0
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     painter.setClipRect(rect)
 
-    base = QLinearGradient(rect.topLeft(), rect.bottomRight())
-    base.setColorAt(0.0, QColor("#11182d"))
-    base.setColorAt(0.48, QColor("#101a35"))
-    base.setColorAt(1.0, QColor("#091224"))
-    painter.fillRect(rect, base)
+    if not transparent_base:
+        base = QLinearGradient(rect.topLeft(), rect.bottomRight())
+        base.setColorAt(0.0, QColor("#11182d"))
+        base.setColorAt(0.48, QColor("#101a35"))
+        base.setColorAt(1.0, QColor("#091224"))
+        painter.fillRect(rect, base)
 
     width = rect.width()
     height = rect.height()
@@ -80,6 +88,7 @@ class GlassBackdrop(QFrame):
         """Create the backdrop and start a low-cost ambient animation."""
         super().__init__(parent)
         self._phase = 0.0
+        self._native_material = False
         self.setObjectName("windowFrame")
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
@@ -96,6 +105,11 @@ class GlassBackdrop(QFrame):
         else:
             self._timer.stop()
 
+    def set_native_material(self, active: bool) -> None:
+        """Keep a native Mica or Acrylic backdrop visible below the lights."""
+        self._native_material = active
+        self.update()
+
     def _advance(self) -> None:
         """Advance the ambient phase and repaint the backdrop."""
         self._phase = (self._phase + 0.65) % 360.0
@@ -105,7 +119,12 @@ class GlassBackdrop(QFrame):
         """Paint the gradient, ambient lights and a thin glass border."""
         del event
         painter = QPainter(self)
-        paint_ambient_background(painter, QRectF(self.rect()), self._phase)
+        paint_ambient_background(
+            painter,
+            QRectF(self.rect()),
+            self._phase,
+            transparent_base=self._native_material,
+        )
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         border_path = QPainterPath()
         border_path.addRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12.0, 12.0)

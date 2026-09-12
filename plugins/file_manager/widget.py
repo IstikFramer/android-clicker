@@ -55,7 +55,12 @@ class FileManagerWidget(QWidget):
         """Paint the module background before its translucent panels."""
         del event
         painter = QPainter(self)
-        paint_ambient_background(painter, QRectF(self.rect()), self._ambient_phase)
+        paint_ambient_background(
+            painter,
+            QRectF(self.rect()),
+            self._ambient_phase,
+            transparent_base=True,
+        )
         painter.end()
 
     def _build_ui(self) -> None:
