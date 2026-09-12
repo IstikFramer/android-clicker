@@ -7,6 +7,11 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot
+try:
+    from natsort import natsorted
+except ImportError:  # pragma: no cover - dependency is installed in normal use
+    natsorted = sorted  # type: ignore[assignment]
+
 from PySide6.QtWidgets import (
     QComboBox,
     QFileDialog,
@@ -241,7 +246,7 @@ class BulkRenamePage(QWidget):
     @Slot(object)
     def set_files(self, files: list[Path]) -> None:
         """Set files and refresh the preview table."""
-        self._files = sorted(files, key=lambda path: path.name.casefold())
+        self._files = list(natsorted(files, key=lambda path: path.name.casefold()))
         self.update_preview()
         self.busy_changed.emit(False)
         self.status_message.emit(T["loaded_files"].format(count=len(self._files)))
