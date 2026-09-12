@@ -25,6 +25,7 @@ class ShellApplication(QApplication):
         self.setApplicationName(APP_NAME)
         self.setApplicationDisplayName(APP_NAME)
         self.setApplicationVersion(APP_VERSION)
+        self.setQuitOnLastWindowClosed(False)
         self.setWindowIcon(load_icon("app_icon.svg"))
         self.setFont(application_font())
         self.setStyleSheet(generate_stylesheet())

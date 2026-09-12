@@ -1,4 +1,4 @@
-"""Frameless main window and its reusable title bar."""
+"""Frameless main window, navigation shell and system tray integration."""
 
 from __future__ import annotations
 
@@ -6,24 +6,30 @@ import logging
 from typing import Any
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
-from PySide6.QtGui import QMouseEvent, QResizeEvent
+from PySide6.QtGui import QAction, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QPushButton,
     QSizeGrip,
     QStackedWidget,
     QStatusBar,
+    QSystemTrayIcon,
     QVBoxLayout,
     QWidget,
 )
 
 from core.app import APP_NAME, APP_VERSION
 from core.config import ConfigManager
-from core.theme import Colors, Sizes
+from core.home_page import HomePage
+from core.plugin_loader import PluginLoader
+from core.settings_page import SettingsPage
+from core.sidebar import Sidebar
+from core.theme import Sizes
 from core.utils import load_icon
 
 
@@ -60,7 +66,7 @@ class TitleBar(QWidget):
 
         self.minimize_button = self._make_button("minimize.svg", "Свернуть", "title-button")
         self.maximize_button = self._make_button("maximize.svg", "Развернуть", "title-button")
-        self.close_button = self._make_button("close.svg", "Закрыть", "title-button close-button")
+        self.close_button = self._make_button("close.svg", "Закрыть", "close-button")
         layout.addWidget(self.minimize_button)
         layout.addWidget(self.maximize_button)
         layout.addWidget(self.close_button)
@@ -70,15 +76,13 @@ class TitleBar(QWidget):
         self.close_button.clicked.connect(self.close_requested.emit)
 
     @staticmethod
-    def _make_button(icon_name: str, tooltip: str, roles: str) -> QPushButton:
+    def _make_button(icon_name: str, tooltip: str, role: str) -> QPushButton:
         """Create a title-bar icon button."""
         button = QPushButton()
         button.setIcon(load_icon(icon_name))
         button.setIconSize(QSize(16, 16))
         button.setToolTip(tooltip)
-        button.setProperty("role", roles)
-        if "close-button" in roles:
-            button.setProperty("role", "close-button")
+        button.setProperty("role", role)
         return button
 
     def update_maximize_icon(self, maximized: bool) -> None:
@@ -120,14 +124,10 @@ class TitleBar(QWidget):
 
 
 class MainWindow(QMainWindow):
-    """Main frameless window used by the Shell application.
-
-    The window owns the title bar, central stacked content area and status bar.
-    Feature pages can be added through :meth:`add_page`.
-    """
+    """Main frameless window for navigation, pages and system tray behavior."""
 
     def __init__(self, config: ConfigManager | None = None) -> None:
-        """Create the window and restore its previous geometry."""
+        """Create the window, restore state and load available plugins."""
         super().__init__()
         self._logger = logging.getLogger(__name__)
         self.config = config or ConfigManager()
@@ -135,18 +135,24 @@ class MainWindow(QMainWindow):
         self._resize_start_geometry = QRect()
         self._resize_start_position = QPoint()
         self._size_grip: QSizeGrip | None = None
+        self._restore_maximized = False
+        self._force_close = False
+        self.tray_icon: QSystemTrayIcon | None = None
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(900, 550)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self._build_shell()
         self._restore_geometry()
+        self._connect_signals()
+        self._setup_tray()
+        self._load_plugins()
         application = QApplication.instance()
         if application is not None:
             application.installEventFilter(self)
 
     def _build_shell(self) -> None:
-        """Build the frame, title bar, content stack and status bar."""
+        """Build the title bar, navigation area, page stack and status bar."""
         frame = QFrame(self)
         frame.setObjectName("windowFrame")
         frame.setMouseTracking(True)
@@ -160,15 +166,30 @@ class MainWindow(QMainWindow):
         self.title_bar.maximize_requested.connect(self.toggle_maximized)
         root_layout.addWidget(self.title_bar)
 
-        self.content_stack = QStackedWidget(frame)
+        body = QWidget(frame)
+        body_layout = QHBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+        self.sidebar = Sidebar(self.config, body)
+        self.content_stack = QStackedWidget(body)
         self.content_stack.setObjectName("contentStack")
-        root_layout.addWidget(self.content_stack, 1)
+        body_layout.addWidget(self.sidebar)
+        body_layout.addWidget(self.content_stack, 1)
+        root_layout.addWidget(body, 1)
 
         self._size_grip = QSizeGrip(frame)
         self._size_grip.setFixedSize(16, 16)
-
         self.setCentralWidget(frame)
         self._setup_status_bar()
+
+        self.home_page = HomePage(open_plugin=self.navigate_to)
+        self.settings_page = SettingsPage(self.config)
+        self.add_page(self.home_page)
+        self.add_page(self.settings_page)
+        self.sidebar.add_navigation_item("Главная", "home.svg", 0)
+        self.sidebar.add_navigation_item("Настройки", "settings.svg", 1)
+        self.content_stack.setCurrentIndex(0)
+        self.sidebar.set_active_page(0)
 
     def _setup_status_bar(self) -> None:
         """Create the compact application status bar."""
@@ -184,9 +205,88 @@ class MainWindow(QMainWindow):
         self.setStatusBar(status_bar)
         self.status_label = status_label
 
+    def _connect_signals(self) -> None:
+        """Connect page, sidebar and global application signals."""
+        from core.signals import app_signals
+
+        self.sidebar.navigation_requested.connect(self.navigate_to)
+        self.settings_page.status_message.connect(self.set_status)
+        app_signals.navigate_to.connect(self.navigate_to)
+        app_signals.status_message.connect(self.set_status)
+
+    def _setup_tray(self) -> None:
+        """Create the tray icon and its context menu when supported."""
+        if not QSystemTrayIcon.isSystemTrayAvailable():
+            self._logger.info("System tray is not available")
+            return
+        self.tray_icon = QSystemTrayIcon(load_icon("app_icon.svg"), self)
+        self.tray_icon.setToolTip(APP_NAME)
+        menu = QMenu(self)
+        show_action = QAction("Развернуть", self)
+        settings_action = QAction("Настройки", self)
+        quit_action = QAction("Выход", self)
+        show_action.triggered.connect(self.show_window)
+        settings_action.triggered.connect(lambda: self.navigate_to(1))
+        quit_action.triggered.connect(self.quit_from_tray)
+        menu.addAction(show_action)
+        menu.addAction(settings_action)
+        menu.addSeparator()
+        menu.addAction(quit_action)
+        self.tray_icon.setContextMenu(menu)
+        self.tray_icon.activated.connect(self._tray_activated)
+        self.tray_icon.show()
+
+    def _tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        """Show the window on a tray click or double click."""
+        if reason in (QSystemTrayIcon.ActivationReason.Trigger, QSystemTrayIcon.ActivationReason.DoubleClick):
+            self.show_window()
+
+    def show_window(self) -> None:
+        """Restore and focus the main window from the tray."""
+        self.showNormal()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_from_tray(self) -> None:
+        """Close the application explicitly from the tray menu."""
+        self._force_close = True
+        if self.tray_icon is not None:
+            self.tray_icon.hide()
+        self.close()
+
+    def _load_plugins(self) -> None:
+        """Load plugin pages and add their navigation entries."""
+        loader = PluginLoader()
+        for plugin in loader.load_plugins():
+            widget = plugin.get("widget")
+            if not isinstance(widget, QWidget):
+                continue
+            page_index = self.add_page(widget)
+            plugin["page_index"] = page_index
+            icon_name = str(plugin.get("icon", "about.svg"))
+            if not icon_name.endswith(".svg"):
+                icon_name = "about.svg"
+            self.sidebar.add_navigation_item(str(plugin.get("name", "Модуль")), icon_name, page_index)
+        self.home_page.set_modules(loader.plugins)
+
     def add_page(self, page: QWidget) -> int:
         """Add a page to the central stack and return its index."""
         return self.content_stack.addWidget(page)
+
+    def navigate_to(self, page_index: int) -> None:
+        """Switch to a valid page index and update navigation state."""
+        if not 0 <= page_index < self.content_stack.count():
+            self._logger.warning("Ignored invalid page index: %s", page_index)
+            return
+        self.content_stack.setCurrentIndex(page_index)
+        self.sidebar.set_active_page(page_index)
+        if page_index == 0:
+            self.set_status("Главная")
+        elif page_index == 1:
+            self.set_status("Настройки")
+        else:
+            self.set_status("Модуль открыт")
 
     def set_status(self, message: str) -> None:
         """Display a short message in the status bar."""
@@ -211,10 +311,7 @@ class MainWindow(QMainWindow):
             self.move(x, y)
         else:
             self._center_on_screen()
-        if bool(window.get("maximized", False)):
-            self._restore_maximized = True
-        else:
-            self._restore_maximized = False
+        self._restore_maximized = bool(window.get("maximized", False))
 
     @staticmethod
     def _point_is_visible(x: int, y: int) -> bool:
@@ -235,9 +332,10 @@ class MainWindow(QMainWindow):
     def showEvent(self, event: Any) -> None:
         """Apply saved maximized state after the native window exists."""
         super().showEvent(event)
-        if getattr(self, "_restore_maximized", False):
+        if self._restore_maximized:
             self.showMaximized()
             self.title_bar.update_maximize_icon(True)
+            self._restore_maximized = False
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Keep the manual resize grip in the bottom-right corner."""
@@ -246,29 +344,25 @@ class MainWindow(QMainWindow):
             frame = self.centralWidget()
             self._size_grip.move(frame.width() - self._size_grip.width(), frame.height() - self._size_grip.height())
 
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+    def eventFilter(self, watched: object, event: QEvent) -> bool:
         """Provide edge resize behavior for a frameless window."""
         del watched
         if self.isMaximized() or not self.isVisible():
             return False
         event_type = event.type()
         if event_type == QEvent.Type.MouseButtonPress:
-            mouse_event = event
-            if isinstance(mouse_event, QMouseEvent) and mouse_event.button() == Qt.MouseButton.LeftButton:
-                global_position = mouse_event.globalPosition().toPoint()
+            if isinstance(event, QMouseEvent) and event.button() == Qt.MouseButton.LeftButton:
+                global_position = event.globalPosition().toPoint()
                 self._resize_edge = self._edge_at(global_position)
                 if self._resize_edge:
                     self._resize_start_geometry = self.geometry()
                     self._resize_start_position = global_position
-                    return False
         elif event_type == QEvent.Type.MouseMove:
-            mouse_event = event
-            if isinstance(mouse_event, QMouseEvent):
-                global_position = mouse_event.globalPosition().toPoint()
-                if self._resize_edge and mouse_event.buttons() & Qt.MouseButton.LeftButton:
+            if isinstance(event, QMouseEvent):
+                global_position = event.globalPosition().toPoint()
+                if self._resize_edge and event.buttons() & Qt.MouseButton.LeftButton:
                     self._resize_to(global_position)
-                    return False
-                if not mouse_event.buttons():
+                elif not event.buttons():
                     self._update_edge_cursor(global_position)
         elif event_type == QEvent.Type.MouseButtonRelease:
             self._resize_edge = None
@@ -337,8 +431,17 @@ class MainWindow(QMainWindow):
         self.setGeometry(geometry)
 
     def closeEvent(self, event: Any) -> None:
-        """Save normal geometry before the window is destroyed."""
+        """Save geometry or minimize to the tray according to preferences."""
+        tray_on_close = bool(self.config.get("general.tray_on_close", True))
+        if self.tray_icon is not None and tray_on_close and not self._force_close:
+            self._save_geometry()
+            self.hide()
+            self.tray_icon.show()
+            event.ignore()
+            return
         self._save_geometry()
+        if self.tray_icon is not None:
+            self.tray_icon.hide()
         application = QApplication.instance()
         if application is not None:
             application.removeEventFilter(self)
@@ -354,7 +457,3 @@ class MainWindow(QMainWindow):
             self.config.set("window.height", geometry.height())
             self.config.set("window.x", geometry.x())
             self.config.set("window.y", geometry.y())
-
-
-# Imported only for the type annotation in eventFilter on older PySide versions.
-from PySide6.QtCore import QObject  # noqa: E402
