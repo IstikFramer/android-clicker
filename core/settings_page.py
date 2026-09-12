@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 import platform
-import sys
-from typing import Any, Callable
 
 from PySide6 import __version__ as PYSIDE_VERSION
 from PySide6.QtCore import Qt, QSignalBlocker, Signal

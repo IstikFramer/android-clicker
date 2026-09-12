@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
 
 from core.app import APP_VERSION
 from core.fluent import PrimaryPushButton, SmoothScrollArea
-from core.theme import Colors, Sizes, shadow_color
+from core.theme import Sizes, shadow_color
 from core.utils import format_bytes, get_user_name
 
 
@@ -147,7 +147,7 @@ class HomePage(QWidget):
         content_layout.setContentsMargins(24, 18, 24, 22)
         content_layout.setSpacing(5)
 
-        title = QLabel("Обновление v0.1.4 — Новый визуальный стиль", content)
+        title = QLabel(f"Обновление v{APP_VERSION} — Новый визуальный стиль", content)
         title.setProperty("role", "card-title")
         subtitle = QLabel("Сентябрь 2026", content)
         subtitle.setProperty("role", "muted")
