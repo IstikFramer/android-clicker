@@ -193,6 +193,14 @@ def generate_stylesheet() -> str:
         font-size: {Fonts.SMALL_SIZE}pt;
         color: {c.TEXT_PRIMARY};
     }}
+    QLabel[role="setting-label"] {{
+        color: {c.TEXT_PRIMARY};
+    }}
+    QLabel[role="about-value"] {{
+        color: {c.TEXT_PRIMARY};
+        font-family: "{Fonts.MONO_FAMILY}";
+        font-size: {Fonts.SMALL_SIZE}pt;
+    }}
     QPushButton {{
         background-color: transparent;
         color: {c.TEXT_PRIMARY};
