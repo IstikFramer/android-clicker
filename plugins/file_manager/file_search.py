@@ -376,6 +376,10 @@ class FileSearchPage(QWidget):
             self._thread.requestInterruption()
             self.status_message.emit(T["cancel"])
 
+    def cancel_operation(self) -> None:
+        """Expose a common cancellation slot for the module shell."""
+        self.cancel_search()
+
     def open_selected(self, row: int, column: int) -> None:
         """Open the selected result with its system application."""
         item = self.results.item(row, 1)
