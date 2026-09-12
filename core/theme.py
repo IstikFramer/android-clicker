@@ -169,6 +169,22 @@ def generate_stylesheet() -> str:
         font-weight: 600;
         color: {c.TEXT_PRIMARY};
     }}
+    QLabel[role="welcome-title"] {{
+        font-family: "{Fonts.HEADING_FAMILY}";
+        font-size: {Fonts.TITLE_SIZE}pt;
+        font-weight: 600;
+        color: {c.TEXT_PRIMARY};
+    }}
+    QLabel[role="update-text"] {{
+        color: {c.TEXT_PRIMARY};
+        line-height: 160%;
+    }}
+    QLabel[role="stat-value"] {{
+        color: {c.TEXT_PRIMARY};
+        font-family: "{Fonts.HEADING_FAMILY}";
+        font-size: 11pt;
+        font-weight: 600;
+    }}
     QLabel[role="muted"] {{
         color: {c.TEXT_SECONDARY};
     }}
