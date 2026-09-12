@@ -7,11 +7,12 @@ import platform
 import sys
 from typing import Any
 
-from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QEasingCurve, QPoint, QPropertyAnimation, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QAction, QMouseEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
+    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -149,6 +150,9 @@ class MainWindow(_FramelessMainWindow):
         self._force_close = False
         self._effect_applied = False
         self._active_effect = "none"
+        self._page_animation: QPropertyAnimation | None = None
+        self._window_animation: QPropertyAnimation | None = None
+        self._window_animated = False
         self.tray_icon: QSystemTrayIcon | None = None
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(900, 550)
@@ -324,12 +328,34 @@ class MainWindow(_FramelessMainWindow):
             return
         self.content_stack.setCurrentIndex(page_index)
         self.sidebar.set_active_page(page_index)
+        self._animate_page(self.content_stack.currentWidget())
         if page_index == 0:
             self.set_status("Главная")
         elif page_index == 1:
             self.set_status("Настройки")
         else:
             self.set_status("Модуль открыт")
+
+    def _animate_page(self, page: QWidget | None) -> None:
+        """Fade a newly selected page in over 200 milliseconds."""
+        if page is None:
+            return
+        if self._page_animation is not None:
+            self._page_animation.stop()
+        if not bool(self.config.get("appearance.animations", True)):
+            page.setGraphicsEffect(None)
+            return
+        opacity = QGraphicsOpacityEffect(page)
+        opacity.setOpacity(0.0)
+        page.setGraphicsEffect(opacity)
+        animation = QPropertyAnimation(opacity, b"opacity", self)
+        animation.setDuration(200)
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.finished.connect(lambda: page.setGraphicsEffect(None))
+        self._page_animation = animation
+        animation.start()
 
     def set_status(self, message: str) -> None:
         """Display a short message in the status bar."""
@@ -387,6 +413,25 @@ class MainWindow(_FramelessMainWindow):
             self.showMaximized()
             self.title_bar.update_maximize_icon(True)
             self._restore_maximized = False
+        self._animate_window_in()
+
+    def _animate_window_in(self) -> None:
+        """Fade the window in once when it first becomes visible."""
+        if self._window_animated or not bool(self.config.get("appearance.animations", True)):
+            self._window_animated = True
+            return
+        opacity = QGraphicsOpacityEffect(self)
+        opacity.setOpacity(0.0)
+        self.setGraphicsEffect(opacity)
+        animation = QPropertyAnimation(opacity, b"opacity", self)
+        animation.setDuration(300)
+        animation.setStartValue(0.0)
+        animation.setEndValue(1.0)
+        animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        animation.finished.connect(lambda: self.setGraphicsEffect(None))
+        self._window_animation = animation
+        self._window_animated = True
+        animation.start()
 
     def apply_window_effect(self, effect_name: str) -> str:
         """Apply Mica, Acrylic or a solid fallback without raising.
