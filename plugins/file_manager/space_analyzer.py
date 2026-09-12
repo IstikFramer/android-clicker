@@ -105,7 +105,7 @@ class SpaceWorker(QObject):
                         elif entry.is_file(follow_symlinks=False):
                             size = entry.stat(follow_symlinks=False).st_size
                             is_directory = False
-                            suffix = child.suffix.lower() or "Без расширения"
+                            suffix = child.suffix.lower() or T["no_extension"]
                             self._types[suffix] += size
                             self._files.append(
                                 {"name": child.name, "path": str(child), "size": size, "modified": child.stat().st_mtime, "type": suffix}
@@ -229,7 +229,7 @@ class SpaceAnalyzerPage(QWidget):
         row.addWidget(self.folder_edit, 1)
         browse = QPushButton(T["browse"], self)
         refresh = QPushButton(T["refresh"], self)
-        up = QPushButton("Вверх", self)
+        up = QPushButton(T["up"], self)
         browse.clicked.connect(self.choose_folder)
         refresh.clicked.connect(self.refresh)
         up.clicked.connect(self.go_up)
@@ -325,7 +325,7 @@ class SpaceAnalyzerPage(QWidget):
             if x + width > scene_width:
                 x = 0.0
                 y += row_height
-            item = TreemapItem((x, y, width - 3, row_height - 3), child, self.open_directory)
+            item = TreemapItem(QRectF(x, y, width - 3, row_height - 3), child, self.open_directory)
             self.scene.addItem(item)
             x += width
         self.scene.setSceneRect(0, 0, scene_width, max(200, y + row_height))
@@ -338,7 +338,7 @@ class SpaceAnalyzerPage(QWidget):
             self.table.setItem(row, 2, QTableWidgetItem(format_size(item["size"])))
             self.table.setItem(row, 3, QTableWidgetItem(item["type"]))
         self.pie.set_values(result["types"])
-        self.status_message.emit(f"Проанализировано: {self._current_path}")
+        self.status_message.emit(T["analyzed"].format(path=self._current_path))
 
     def open_directory(self, path: Path) -> None:
         """Open a treemap directory and render its cached or new data."""

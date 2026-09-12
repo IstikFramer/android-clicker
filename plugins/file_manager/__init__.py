@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from plugins.file_manager.styles import TEXTS as T
+
 PLUGIN_INFO = {
-    "name": "Файловый менеджмент",
+    "name": T["plugin_name"],
     "version": "0.1.5",
-    "description": "Сортировка, поиск, дубликаты, переименование и анализ диска",
+    "description": T["plugin_description"],
     "author": "dev",
     "icon": "folder.svg",
     "widget_class": "FileManagerWidget",

@@ -185,7 +185,7 @@ class FileSearchPage(QWidget):
 
         query_row = QHBoxLayout()
         self.query_edit = QLineEdit(self)
-        self.query_edit.setPlaceholderText("Имя файла или шаблон *.txt")
+        self.query_edit.setPlaceholderText(T["query_placeholder"])
         self.query_edit.returnPressed.connect(self.start_search)
         query_row.addWidget(self.query_edit, 1)
         search_button = QPushButton(T["search_button"], self)
@@ -431,7 +431,7 @@ class FileSearchPage(QWidget):
 
     def _delete_path(self, path: Path) -> None:
         """Confirm and move a selected result to the trash."""
-        answer = QMessageBox.question(self, T["delete_trash"], f"Удалить в корзину?\n{path}")
+        answer = QMessageBox.question(self, T["delete_trash"], T["confirm_trash"].format(path=path))
         if answer != QMessageBox.StandardButton.Yes:
             return
         try:

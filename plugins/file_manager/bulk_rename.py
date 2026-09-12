@@ -77,7 +77,7 @@ class RenameWorker(QObject):
                         self.progress.emit(index, max(1, total))
                         continue
                     if new.exists():
-                        self.log.emit(f"[ERROR] {new.name}: имя уже занято")
+                        self.log.emit(f"[ERROR] {new.name}: {T['name_occupied']}")
                         continue
                     old.rename(new)
                     changed.append((old, new))
@@ -109,6 +109,7 @@ class BulkRenamePage(QWidget):
         self._files: list[Path] = []
         self._history: list[list[tuple[Path, Path]]] = []
         self._mapping: list[tuple[Path, Path]] = []
+        self._has_conflicts = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -197,7 +198,7 @@ class BulkRenamePage(QWidget):
         layout.addLayout(actions)
 
         self.table = QTableWidget(0, 2, self)
-        self.table.setHorizontalHeaderLabels([T["file_name"], "Новое имя"])
+        self.table.setHorizontalHeaderLabels([T["file_name"], T["new_name"]])
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -243,7 +244,7 @@ class BulkRenamePage(QWidget):
         self._files = sorted(files, key=lambda path: path.name.casefold())
         self.update_preview()
         self.busy_changed.emit(False)
-        self.status_message.emit(f"Загружено файлов: {len(self._files)}")
+        self.status_message.emit(T["loaded_files"].format(count=len(self._files)))
 
     def _render_name(self, path: Path, number: int) -> str:
         """Render one new filename from the configured variables."""
@@ -294,10 +295,11 @@ class BulkRenamePage(QWidget):
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(path.name))
             self.table.setItem(row, 1, QTableWidgetItem(new_name))
+        self._has_conflicts = conflicts
         if conflicts:
             self.log.setText(T["conflict"])
         elif self._files:
-            self.log.setText(f"Предпросмотр готов: {len(self._files)} файлов")
+            self.log.setText(T["preview_ready"].format(count=len(self._files)))
         else:
             self.log.setText(T["no_files"])
 
@@ -307,7 +309,7 @@ class BulkRenamePage(QWidget):
             self.status_message.emit(T["nothing_to_do"])
             return
         conflicts = [new for old, new in self._mapping if new.exists() and new != old]
-        if conflicts:
+        if conflicts or self._has_conflicts:
             QMessageBox.warning(self, T["rename_button"], T["conflict"])
             return
         self._run_mapping(self._mapping)
@@ -334,10 +336,11 @@ class BulkRenamePage(QWidget):
     def _rename_completed(self, changed: list[tuple[Path, Path]]) -> None:
         """Store a successful operation for undo."""
         if changed:
+            self._files = [dict(changed).get(path, path) for path in self._files]
             self._history.append(changed)
             self._history = self._history[-10:]
             self.undo_button.setEnabled(True)
-        self.status_message.emit(f"Переименовано файлов: {len(changed)}")
+        self.status_message.emit(T["renamed_files"].format(count=len(changed)))
 
     def _rename_finished(self) -> None:
         """Reset controls when the rename worker stops."""

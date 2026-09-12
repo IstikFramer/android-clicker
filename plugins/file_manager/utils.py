@@ -34,6 +34,7 @@ except ImportError:  # pragma: no cover - dependency is installed in normal use
 from PySide6.QtCore import QObject, Signal
 
 from core.utils import load_icon
+from plugins.file_manager.styles import TEXTS as T
 
 LOGGER = logging.getLogger(__name__)
 
@@ -240,7 +241,7 @@ def hash_file(path: Path, partial: bool = False, chunk_size: int = 1024 * 1024) 
 def send_to_trash(path: Path) -> None:
     """Move a path to the operating system trash."""
     if send2trash is None:
-        raise RuntimeError("Библиотека send2trash не установлена")
+        raise RuntimeError(T["library_missing"])
     send2trash.send2trash(str(path))
 
 

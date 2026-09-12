@@ -55,7 +55,7 @@ class DuplicateWorker(QObject):
     def run(self) -> None:
         """Run the three-stage duplicate algorithm."""
         try:
-            self.phase.emit("Этап 1/3: Анализ размеров...")
+            self.phase.emit(T["phase_size"])
             by_size: dict[int, list[Path]] = defaultdict(list)
             files = list(iter_files(self.root, self.recursive))
             for index, path in enumerate(files, 1):
@@ -71,7 +71,7 @@ class DuplicateWorker(QObject):
                 self.progress.emit(index, max(1, len(files)))
 
             candidates = [group for group in by_size.values() if len(group) > 1]
-            self.phase.emit("Этап 2/3: Сравнение первых 4 КБ...")
+            self.phase.emit(T["phase_partial"])
             partial_groups: list[list[Path]] = []
             for index, group in enumerate(candidates, 1):
                 by_partial: dict[str, list[Path]] = defaultdict(list)
@@ -82,7 +82,7 @@ class DuplicateWorker(QObject):
                 partial_groups.extend(values for values in by_partial.values() if len(values) > 1)
                 self.progress.emit(index, max(1, len(candidates)))
 
-            self.phase.emit("Этап 3/3: Полное сравнение файлов...")
+            self.phase.emit(T["phase_full"])
             duplicate_groups: list[list[str]] = []
             for index, group in enumerate(partial_groups, 1):
                 by_full: dict[str, list[str]] = defaultdict(list)
@@ -288,7 +288,7 @@ class DuplicateFinderPage(QWidget):
         if not paths:
             self.status_message.emit(T["nothing_to_do"])
             return
-        answer = QMessageBox.question(self, T["trash_selected"], f"Удалить в корзину отмеченные файлы: {len(paths)}?")
+        answer = QMessageBox.question(self, T["trash_selected"], T["confirm_duplicates_trash"].format(count=len(paths)))
         if answer != QMessageBox.StandardButton.Yes:
             return
         self._delete_paths(paths, permanent=False)
@@ -302,7 +302,7 @@ class DuplicateFinderPage(QWidget):
         answer = QMessageBox.warning(
             self,
             T["delete_selected"],
-            f"Удалить файлы без возможности восстановления: {len(paths)}?",
+            T["confirm_duplicates_permanent"].format(count=len(paths)),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -318,7 +318,7 @@ class DuplicateFinderPage(QWidget):
                 deleted += 1
             except (PermissionError, FileNotFoundError, OSError, RuntimeError) as error:
                 LOGGER.warning("Could not delete %s: %s", path, error)
-        self.status_message.emit(f"Удалено файлов: {deleted} из {len(paths)}")
+        self.status_message.emit(T["deleted_files"].format(deleted=deleted, total=len(paths)))
         self.unmark_all()
 
     def cancel_operation(self) -> None:

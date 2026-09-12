@@ -58,6 +58,10 @@ class OrganizeWorker(QObject):
                 if QThread.currentThread().isInterruptionRequested():
                     break
                 destination_folder = self._destination_for(source)
+                if source.parent == destination_folder:
+                    processed += 1
+                    self.progress.emit(processed, total)
+                    continue
                 destination_folder.mkdir(parents=True, exist_ok=True) if not self.preview else None
                 target = unique_destination(destination_folder / source.name)
                 relative_target = target.relative_to(self.root) if target.is_relative_to(self.root) else target
@@ -193,7 +197,7 @@ class SmartOrganizerPage(QWidget):
 
     def add_rule(self) -> None:
         """Add an empty sorting rule."""
-        self._append_rule("Новая категория", ".ext", "/Other")
+        self._append_rule(T["new_category"], ".ext", "/Other")
 
     def remove_rule(self) -> None:
         """Remove the selected sorting rule."""
@@ -247,7 +251,7 @@ class SmartOrganizerPage(QWidget):
         """Update status after sorting completes or is cancelled."""
         self.cancel_button.setVisible(False)
         self.busy_changed.emit(False)
-        self.status_message.emit(f"Обработано {processed} из {total} файлов")
+        self.status_message.emit(T["processed_files"].format(processed=processed, total=total))
 
     def cancel_operation(self) -> None:
         """Request cancellation of the active sorting worker."""
