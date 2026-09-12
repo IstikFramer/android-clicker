@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsOpacityEffect,
@@ -57,7 +57,7 @@ class FileManagerWidget(QWidget):
 
         self.status_frame, self.status_label, self.progress_bar, self.cancel_button = self._create_status_bar()
         root.addWidget(self.status_frame)
-        self._build_placeholder_pages()
+        self._build_pages()
 
     def _create_header(self) -> QFrame:
         """Create the module title and short description."""
@@ -123,20 +123,24 @@ class FileManagerWidget(QWidget):
         layout.addWidget(cancel, 0)
         return frame, label, progress, cancel
 
-    def _build_placeholder_pages(self) -> None:
-        """Create temporary pages until the concrete tools are connected."""
-        for label in (T["sort"], T["duplicates"], T["rename"], T["space"], T["search"]):
-            page = QFrame(self.stack)
-            page.setProperty("fmRole", "panel")
-            layout = QVBoxLayout(page)
-            title = QLabel(label, page)
-            title.setProperty("fmRole", "section")
-            message = QLabel(T["select_folder"], page)
-            message.setProperty("fmRole", "muted")
-            layout.addWidget(title)
-            layout.addWidget(message)
-            layout.addStretch(1)
-            self.stack.addWidget(page)
+    def _build_pages(self) -> None:
+        """Create and connect all concrete file management pages."""
+        from plugins.file_manager.bulk_rename import BulkRenamePage
+        from plugins.file_manager.duplicate_finder import DuplicateFinderPage
+        from plugins.file_manager.file_search import FileSearchPage
+        from plugins.file_manager.smart_organizer import SmartOrganizerPage
+        from plugins.file_manager.space_analyzer import SpaceAnalyzerPage
+
+        pages = (
+            SmartOrganizerPage(self.config, self),
+            DuplicateFinderPage(self.config, self),
+            BulkRenamePage(self.config, self),
+            SpaceAnalyzerPage(self.config, self),
+            FileSearchPage(self.config, self),
+        )
+        for index, page in enumerate(pages):
+            self.add_page(page, index)
+            self.connect_page(page)
 
     def add_page(self, page: QWidget, index: int | None = None) -> int:
         """Insert a concrete tool page into the stack.
@@ -167,9 +171,9 @@ class FileManagerWidget(QWidget):
         busy = getattr(page, "busy_changed", None)
         if busy is not None:
             busy.connect(self.set_busy)
-        cancel = getattr(page, "cancel_requested", None)
-        if cancel is not None:
-            cancel.connect(self.cancel_current)
+        cancel_operation = getattr(page, "cancel_operation", None)
+        if cancel_operation is not None:
+            self.cancel_button.clicked.connect(cancel_operation)
 
     def switch_page(self, index: int) -> None:
         """Switch to a submodule page with a short fade transition."""
