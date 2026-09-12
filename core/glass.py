@@ -123,6 +123,7 @@ class GlassCard(QFrame):
         super().__init__(parent)
         self.setProperty("frameRole", frame_role)
         self.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._hovered = False
         self._shadow = QGraphicsDropShadowEffect(self)
         self._shadow.setBlurRadius(30)
