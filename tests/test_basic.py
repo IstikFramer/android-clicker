@@ -1,5 +1,6 @@
 """Basic smoke tests for the application shell."""
 
+import json
 from pathlib import Path
 
 
@@ -9,3 +10,11 @@ def test_project_layout() -> None:
     assert (root / "main.py").exists()
     assert (root / "core").is_dir()
     assert (root / "plugins").is_dir()
+
+
+def test_v014_effect_defaults() -> None:
+    """Ensure the checked-in configuration contains the visual controls."""
+    root = Path(__file__).resolve().parents[1]
+    config = json.loads((root / "data" / "config.json").read_text(encoding="utf-8"))
+    assert config["effects"]["window_effect"] == "mica"
+    assert 50 <= config["effects"]["panel_opacity"] <= 100
