@@ -19,8 +19,6 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -28,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.app import APP_VERSION
+from core.fluent import PrimaryPushButton, SmoothScrollArea
 from core.theme import Colors, Sizes, shadow_color
 from core.utils import format_bytes, get_user_name
 
@@ -53,7 +52,7 @@ class HomePage(QWidget):
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(0, 0, 0, 0)
 
-        scroll = QScrollArea(self)
+        scroll = SmoothScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         content = QWidget()
@@ -130,41 +129,48 @@ class HomePage(QWidget):
         return f"{date.day} {months[date.month - 1]} {date.year}, {weekdays[date.weekday()]}"
 
     def _create_update_card(self) -> QFrame:
-        """Create the release note card for version 0.1."""
+        """Create the release note card for version 0.1.4."""
         card = QFrame()
         card.setProperty("frameRole", "large-card")
-        card.setMinimumHeight(268)
+        card.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        card.setMinimumHeight(270)
         self._add_shadow(card)
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(24, 20, 24, 22)
-        layout.setSpacing(5)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        accent_bar = QFrame(card)
+        accent_bar.setObjectName("updateAccentBar")
+        accent_bar.setFixedHeight(3)
+        layout.addWidget(accent_bar)
+        content = QWidget(card)
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(24, 18, 24, 22)
+        content_layout.setSpacing(5)
 
-        title = QLabel(f"Обновление v{APP_VERSION} — Первый запуск", card)
+        title = QLabel("Обновление v0.1.4 — Новый визуальный стиль", content)
         title.setProperty("role", "card-title")
-        subtitle = QLabel("Сентябрь 2026", card)
+        subtitle = QLabel("Сентябрь 2026", content)
         subtitle.setProperty("role", "muted")
         text = QLabel(
-            "Привет. Это первая версия программы.\n\n"
-            "Что уже работает:\n"
-            "-- Основной интерфейс с навигацией\n"
-            "-- Система модулей — новые функции будут появляться с обновлениями\n"
-            "-- Настройки внешнего вида и поведения\n"
-            "-- Сворачивание в трей\n\n"
-            "Что впереди:\n"
-            "-- v0.1.5 — Файловый менеджмент (сортировка, дубликаты, поиск)\n"
-            "-- v0.2 — Системный монитор\n"
-            "-- v0.3 — Инструменты автоматизации\n\n"
-            "Программа в активной разработке. Если что-то сломается — перезапусти. "
-            "Стабильность будет расти с каждой версией.",
-            card,
+            "Интерфейс полностью переработан.\n\n"
+            "Что изменилось:\n"
+            "-- Эффект прозрачности Mica (Windows 11)\n"
+            "-- Стеклянные карточки и панели\n"
+            "-- Плавные анимации переходов\n"
+            "-- Обновлённые элементы управления в стиле Fluent Design\n"
+            "-- Улучшенная боковая панель\n\n"
+            "Следующее обновление:\n"
+            "-- v0.1.5 — Файловый менеджмент",
+            content,
         )
         text.setProperty("role", "update-text")
         text.setWordWrap(True)
         text.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        layout.addWidget(title)
-        layout.addWidget(subtitle)
-        layout.addSpacing(9)
-        layout.addWidget(text)
+        content_layout.addWidget(title)
+        content_layout.addWidget(subtitle)
+        content_layout.addSpacing(9)
+        content_layout.addWidget(text)
+        layout.addWidget(content)
 
         return card
 
@@ -205,8 +211,10 @@ class HomePage(QWidget):
         """Create one system statistic card."""
         card = QFrame()
         card.setProperty("frameRole", "card")
+        card.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
         card.setMinimumHeight(90)
         card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self._add_shadow(card)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 13, 16, 13)
         layout.setSpacing(4)
@@ -227,7 +235,7 @@ class HomePage(QWidget):
     def _add_shadow(widget: QFrame) -> None:
         """Apply the shared lightweight card shadow."""
         effect = QGraphicsDropShadowEffect(widget)
-        effect.setBlurRadius(20)
+        effect.setBlurRadius(30)
         effect.setOffset(0, 3)
         effect.setColor(shadow_color())
         widget.setGraphicsEffect(effect)
@@ -254,6 +262,8 @@ class HomePage(QWidget):
         """Create a card for one dynamically loaded module."""
         card = QFrame()
         card.setProperty("frameRole", "card")
+        card.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        self._add_shadow(card)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(7)
@@ -262,7 +272,7 @@ class HomePage(QWidget):
         description = QLabel(str(module.get("description", "")), card)
         description.setProperty("role", "muted")
         description.setWordWrap(True)
-        button = QPushButton("Открыть", card)
+        button = PrimaryPushButton("Открыть", card)
         button.setProperty("variant", "primary")
         button.setFixedWidth(104)
         page_index = module.get("page_index")
