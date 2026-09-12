@@ -6,9 +6,11 @@ import logging
 from dataclasses import dataclass
 from typing import Callable
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QParallelAnimationGroup, QSize, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QParallelAnimationGroup, QSize, Signal, Qt
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QPushButton,
@@ -81,6 +83,13 @@ class Sidebar(QWidget):
         self.avatar_label.setText(self._user_initial())
         self.avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.avatar_label.setFixedSize(40, 40)
+        avatar_glow = QGraphicsDropShadowEffect(self.avatar_label)
+        avatar_glow.setBlurRadius(18)
+        avatar_glow.setOffset(0, 0)
+        glow_color = QColor(Colors.ACCENT)
+        glow_color.setAlpha(120)
+        avatar_glow.setColor(glow_color)
+        self.avatar_label.setGraphicsEffect(avatar_glow)
         user_layout.addWidget(self.avatar_label)
         self.user_name_label = QLabel(get_user_name(), self.user_panel)
         self.user_name_label.setObjectName("userNameLabel")
@@ -227,6 +236,3 @@ class Sidebar(QWidget):
             return
         self._collapsed = collapsed
         self._apply_collapsed_state(animate=animate)
-
-
-from PySide6.QtCore import Qt  # noqa: E402
