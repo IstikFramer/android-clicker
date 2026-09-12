@@ -427,7 +427,6 @@ class FileSearchPage(QWidget):
 
     def _copy_path(self, path: Path) -> None:
         """Copy a selected path to the clipboard."""
-        self.window().windowHandle()
         from PySide6.QtWidgets import QApplication
 
         QApplication.clipboard().setText(str(path))
