@@ -17,6 +17,10 @@
     "scale": 100,
     "animations": true
   },
+  "effects": {
+    "window_effect": "mica",
+    "panel_opacity": 80
+  },
   "updates": {
     "check_on_start": true
   },

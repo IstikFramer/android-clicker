@@ -8,26 +8,37 @@ from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
-from core.theme import application_font, generate_stylesheet
+from core.fluent import configure_fluent
+from core.theme import Colors, application_font, generate_stylesheet
 from core.utils import get_data_dir, load_icon
 
 APP_NAME = "Shell"
-APP_VERSION = "0.1"
+APP_VERSION = "0.1.4"
 APP_DEVELOPER = "Разработчик"
 
 
 class ShellApplication(QApplication):
     """Configure Qt for the Shell desktop application."""
 
-    def __init__(self, arguments: list[str]) -> None:
-        """Create the application and apply the shared visual language."""
+    def __init__(self, arguments: list[str], panel_opacity: int = 80) -> None:
+        """Create the application and apply the shared visual language.
+
+        Args:
+            arguments: Command-line arguments passed to QApplication.
+            panel_opacity: User-selected opacity value from 50 to 100.
+        """
         super().__init__(arguments)
         self.setApplicationName(APP_NAME)
         self.setApplicationDisplayName(APP_NAME)
         self.setApplicationVersion(APP_VERSION)
         self.setWindowIcon(load_icon("app_icon.svg"))
         self.setFont(application_font())
-        self.setStyleSheet(generate_stylesheet())
+        configure_fluent(Colors.ACCENT)
+        self.apply_theme(panel_opacity)
+
+    def apply_theme(self, panel_opacity: int = 80) -> None:
+        """Rebuild the global stylesheet after a visual setting changes."""
+        self.setStyleSheet(generate_stylesheet(panel_opacity=panel_opacity))
 
 
 def configure_logging(data_dir: Path | None = None) -> None:

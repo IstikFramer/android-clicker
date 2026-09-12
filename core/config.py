@@ -39,6 +39,10 @@ class ConfigManager:
             "scale": 100,
             "animations": True,
         },
+        "effects": {
+            "window_effect": "mica",
+            "panel_opacity": 80,
+        },
         "updates": {
             "check_on_start": True,
         },

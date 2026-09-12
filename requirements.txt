@@ -1,4 +1,8 @@
 PySide6>=6.7.0
+PySide6-Fluent-Widgets[full]>=1.11.0
+PySideSix-Frameless-Window>=0.8.2
+BlurWindow>=1.2.1
 psutil>=5.9.0
 darkdetect>=0.8.0
 humanize>=4.9.0
+pywin32>=306; sys_platform == "win32"

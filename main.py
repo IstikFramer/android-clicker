@@ -46,8 +46,13 @@ def main() -> int:
     """Configure and run the application event loop."""
     configure_logging()
     sys.excepthook = handle_exception
-    application = ShellApplication(sys.argv)
     config = ConfigManager()
+    panel_opacity = config.get("effects.panel_opacity", 80)
+    try:
+        panel_opacity = max(50, min(100, int(panel_opacity)))
+    except (TypeError, ValueError):
+        panel_opacity = 80
+    application = ShellApplication(sys.argv, panel_opacity=panel_opacity)
     window = MainWindow(config)
     if bool(config.get("general.start_minimized", False)):
         window.showMinimized()
