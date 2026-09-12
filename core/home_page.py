@@ -22,12 +22,12 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
-    QGraphicsDropShadowEffect,
 )
 
 from core.app import APP_VERSION
 from core.fluent import PrimaryPushButton, SmoothScrollArea
-from core.theme import Sizes, shadow_color
+from core.glass import GlassCard
+from core.theme import Sizes
 from core.utils import format_bytes, get_user_name
 
 
@@ -130,11 +130,8 @@ class HomePage(QWidget):
 
     def _create_update_card(self) -> QFrame:
         """Create the release note card for version 0.1.4."""
-        card = QFrame()
-        card.setProperty("frameRole", "large-card")
-        card.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        card = GlassCard(frame_role="large-card")
         card.setMinimumHeight(270)
-        self._add_shadow(card)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -209,12 +206,9 @@ class HomePage(QWidget):
 
     def _create_stat_card(self, label: str, value: str, detail: str) -> QFrame:
         """Create one system statistic card."""
-        card = QFrame()
-        card.setProperty("frameRole", "card")
-        card.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
+        card = GlassCard()
         card.setMinimumHeight(90)
         card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self._add_shadow(card)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 13, 16, 13)
         layout.setSpacing(4)
@@ -230,15 +224,6 @@ class HomePage(QWidget):
         layout.addWidget(value_widget)
         layout.addWidget(detail_widget)
         return card
-
-    @staticmethod
-    def _add_shadow(widget: QFrame) -> None:
-        """Apply the shared lightweight card shadow."""
-        effect = QGraphicsDropShadowEffect(widget)
-        effect.setBlurRadius(30)
-        effect.setOffset(0, 3)
-        effect.setColor(shadow_color())
-        widget.setGraphicsEffect(effect)
 
     def set_modules(self, modules: list[dict[str, Any]]) -> None:
         """Refresh the installed module cards.
@@ -260,10 +245,7 @@ class HomePage(QWidget):
 
     def _create_module_card(self, module: dict[str, Any]) -> QFrame:
         """Create a card for one dynamically loaded module."""
-        card = QFrame()
-        card.setProperty("frameRole", "card")
-        card.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        self._add_shadow(card)
+        card = GlassCard()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(7)

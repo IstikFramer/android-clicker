@@ -14,13 +14,13 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QVBoxLayout,
     QWidget,
-    QGraphicsDropShadowEffect,
 )
 
 from core.app import APP_DEVELOPER, APP_NAME, APP_VERSION
 from core.config import ConfigManager
 from core.fluent import CheckBox, ComboBox, PrimaryPushButton, PushButton, Slider, SmoothScrollArea
-from core.theme import Sizes, shadow_color
+from core.glass import GlassCard
+from core.theme import Sizes
 
 
 class SettingsPage(QWidget):
@@ -182,14 +182,7 @@ class SettingsPage(QWidget):
     @staticmethod
     def _section_card(title_text: str) -> tuple[QFrame, QVBoxLayout]:
         """Create a labeled settings card and its inner layout."""
-        card = QFrame()
-        card.setProperty("frameRole", "card")
-        card.setAttribute(Qt.WidgetAttribute.WA_Hover, True)
-        effect = QGraphicsDropShadowEffect(card)
-        effect.setBlurRadius(30)
-        effect.setOffset(0, 3)
-        effect.setColor(shadow_color())
-        card.setGraphicsEffect(effect)
+        card = GlassCard()
         layout = QVBoxLayout(card)
         layout.setContentsMargins(20, 17, 20, 18)
         layout.setSpacing(10)
