@@ -104,6 +104,50 @@ def generate_stylesheet() -> str:
         border: 1px solid {c.BORDER};
         border-radius: {s.LARGE_CARD_RADIUS}px;
     }}
+    QFrame#windowFrame {{
+        background-color: {c.BACKGROUND_PRIMARY};
+        border: 1px solid {c.BORDER};
+        border-radius: {s.CARD_RADIUS}px;
+    }}
+    QWidget#titleBar {{
+        background-color: {c.BACKGROUND_PRIMARY};
+        border-top-left-radius: {s.CARD_RADIUS}px;
+        border-top-right-radius: {s.CARD_RADIUS}px;
+    }}
+    QWidget#sidebar {{
+        background-color: {c.BACKGROUND_SECONDARY};
+        border-bottom-left-radius: {s.CARD_RADIUS}px;
+    }}
+    QFrame#userPanel {{
+        background-color: {c.BACKGROUND_PRIMARY};
+        border: 1px solid {c.BORDER};
+        border-radius: {s.CARD_RADIUS}px;
+    }}
+    QLabel#avatarLabel {{
+        background-color: {c.ACCENT};
+        color: {c.WHITE};
+        border-radius: 20px;
+        font-size: 14pt;
+        font-weight: 600;
+    }}
+    QLabel#userNameLabel {{
+        color: {c.TEXT_PRIMARY};
+        font-weight: 600;
+    }}
+    QFrame#sidebarDivider {{
+        background-color: {c.BORDER};
+        border: none;
+    }}
+    QLabel#sidebarVersion {{
+        color: {c.TEXT_SECONDARY};
+        font-size: {Fonts.SMALL_SIZE}pt;
+    }}
+    QLabel#windowTitle {{
+        color: {c.TEXT_PRIMARY};
+        font-family: "{Fonts.HEADING_FAMILY}";
+        font-size: 11pt;
+        font-weight: 600;
+    }}
     QLabel {{
         background-color: transparent;
     }}
@@ -184,6 +228,15 @@ def generate_stylesheet() -> str:
     }}
     QPushButton[role="title-button"]:hover {{
         background-color: {c.BACKGROUND_TERTIARY};
+    }}
+    QPushButton[role="close-button"] {{
+        border: none;
+        border-radius: 0px;
+        padding: 0px;
+        min-width: 46px;
+        min-height: {s.TITLE_BAR_HEIGHT}px;
+        max-height: {s.TITLE_BAR_HEIGHT}px;
+        background-color: transparent;
     }}
     QPushButton[role="close-button"]:hover {{
         background-color: {c.ERROR};
