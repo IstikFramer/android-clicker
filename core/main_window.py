@@ -314,6 +314,9 @@ class MainWindow(_FramelessMainWindow):
             if not icon_name.endswith(".svg"):
                 icon_name = "about.svg"
             self.sidebar.add_navigation_item(str(plugin.get("name", "Модуль")), icon_name, page_index)
+            plugin_status = getattr(widget, "status_message", None)
+            if plugin_status is not None:
+                plugin_status.connect(self.set_status)
         self.home_page.set_modules(loader.plugins)
 
     def add_page(self, page: QWidget) -> int:
