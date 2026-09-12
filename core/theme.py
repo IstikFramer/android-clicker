@@ -366,6 +366,18 @@ def generate_stylesheet() -> str:
         background-color: {c.BACKGROUND_TERTIARY};
         color: {c.ACCENT};
     }}
+    QMessageBox {{
+        background-color: {c.BACKGROUND_SECONDARY};
+        color: {c.TEXT_PRIMARY};
+        border: 1px solid {c.BORDER};
+    }}
+    QMessageBox QLabel {{
+        color: {c.TEXT_PRIMARY};
+        min-width: 260px;
+    }}
+    QMessageBox QPushButton {{
+        min-width: 82px;
+    }}
     QCheckBox {{
         spacing: 9px;
         color: {c.TEXT_PRIMARY};
