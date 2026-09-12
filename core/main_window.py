@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import platform
 import sys
 from typing import Any
 
@@ -41,7 +40,7 @@ from core.plugin_loader import PluginLoader
 from core.settings_page import SettingsPage
 from core.sidebar import Sidebar
 from core.theme import Sizes
-from core.utils import load_icon
+from core.utils import is_system_dark, load_icon, supports_mica
 
 
 class TitleBar(QWidget):
@@ -453,17 +452,15 @@ class MainWindow(_FramelessMainWindow):
                 if effect is not None and hasattr(effect, "removeBackgroundEffect"):
                     effect.removeBackgroundEffect(self.winId())
             elif effect is not None and sys.platform == "win32":
-                if requested == "mica" and self._supports_mica():
-                    effect.setMicaEffect(self.winId(), isDarkMode=True)
+                if requested == "mica" and supports_mica():
+                    effect.setMicaEffect(self.winId(), isDarkMode=is_system_dark())
                     active = "mica"
                 else:
                     effect.setAcrylicEffect(self.winId())
                     active = "acrylic"
             elif requested != "none":
-                # qframelesswindow keeps this method as a safe no-op on Linux.
-                if effect is not None and hasattr(effect, "setAcrylicEffect"):
-                    effect.setAcrylicEffect(self.winId())
-                active = requested
+                # Non-Windows hosts use the QSS glass fallback.
+                active = self._apply_blur_fallback(requested) if sys.platform == "win32" else "qss"
         except Exception as error:  # noqa: BLE001 - visual effects are optional
             self._logger.warning("Window effect %s was unavailable: %s", requested, error)
             active = self._apply_blur_fallback(requested)
@@ -491,17 +488,6 @@ class MainWindow(_FramelessMainWindow):
             except Exception as error:  # noqa: BLE001 - fallback is best effort
                 self._logger.warning("BlurWindow fallback was unavailable: %s", error)
         return "qss"
-
-    @staticmethod
-    def _supports_mica() -> bool:
-        """Return whether the current Windows build is expected to support Mica."""
-        if sys.platform != "win32":
-            return False
-        try:
-            build = int(getattr(sys, "getwindowsversion")().build)
-            return build >= 22000 and bool(platform.version())
-        except (AttributeError, OSError, TypeError, ValueError):
-            return False
 
     @staticmethod
     def _refresh_style(widget: QWidget) -> None:

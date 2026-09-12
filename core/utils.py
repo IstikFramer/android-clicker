@@ -5,8 +5,14 @@ from __future__ import annotations
 import getpass
 import logging
 import os
+import platform
 import sys
 from pathlib import Path
+
+try:
+    import darkdetect
+except ImportError:  # pragma: no cover - dependency is installed in normal use
+    darkdetect = None  # type: ignore[assignment]
 
 from PySide6.QtGui import QIcon
 
@@ -90,3 +96,24 @@ def load_icon(name: str) -> QIcon:
         LOGGER.warning("Icon resource does not exist: %s", path)
         return QIcon()
     return QIcon(os.fspath(path))
+
+
+def is_system_dark() -> bool:
+    """Return the system dark-mode preference with a safe default."""
+    if darkdetect is None:
+        return True
+    try:
+        return bool(darkdetect.isDark())
+    except Exception:  # noqa: BLE001 - platform theme detection is optional
+        return True
+
+
+def supports_mica() -> bool:
+    """Return whether the current host is expected to support Windows 11 Mica."""
+    if sys.platform != "win32":
+        return False
+    try:
+        build = int(getattr(sys, "getwindowsversion")().build)
+        return build >= 22000 and bool(platform.version())
+    except (AttributeError, OSError, TypeError, ValueError):
+        return False
