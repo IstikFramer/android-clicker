@@ -37,6 +37,7 @@ class SettingsPage(QWidget):
         self._logger = logging.getLogger(__name__)
         self.config = config
         self._controls: dict[str, QWidget] = {}
+        self._opacity_value_label: QLabel | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -130,6 +131,7 @@ class SettingsPage(QWidget):
         opacity_slider.setFixedWidth(220)
         opacity_value_label = QLabel(f"{opacity_value}%", card)
         opacity_value_label.setProperty("role", "muted")
+        self._opacity_value_label = opacity_value_label
         opacity_slider.valueChanged.connect(
             lambda value: self._save_effect_opacity(value, opacity_value_label, effect_combo)
         )
@@ -265,6 +267,10 @@ class SettingsPage(QWidget):
         if result == QMessageBox.StandardButton.Yes:
             self.config.reset()
             self._restore_controls()
+            self.effects_changed.emit(
+                str(self.config.get("effects.window_effect", "mica")),
+                int(self.config.get("effects.panel_opacity", 80)),
+            )
             self.status_message.emit("Настройки сброшены")
 
     def _restore_controls(self) -> None:
@@ -280,3 +286,5 @@ class SettingsPage(QWidget):
             elif isinstance(control, Slider):
                 with QSignalBlocker(control):
                     control.setValue(int(value))
+                if self._opacity_value_label is not None:
+                    self._opacity_value_label.setText(f"{int(value)}%")
