@@ -82,7 +82,7 @@ def mono_font() -> QFont:
 def _surface_color(panel_opacity: int) -> str:
     """Convert the panel setting to a stable translucent surface color."""
     value = max(50, min(100, int(panel_opacity)))
-    alpha = 0.38 + ((value - 50) / 50) * 0.27
+    alpha = 0.50 + ((value - 50) / 50) * 0.30
     return f"rgba(30, 30, 50, {alpha:.2f})"
 
 
