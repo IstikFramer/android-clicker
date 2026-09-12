@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import platform
+import sys
 from typing import Any
 
 from PySide6.QtCore import QEvent, QPoint, QRect, QSize, Qt, Signal
@@ -22,6 +24,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+try:
+    from qframelesswindow import FramelessMainWindow as _FramelessMainWindow
+
+    FRAMELESS_WINDOW_AVAILABLE = True
+except Exception:  # noqa: BLE001 - the native helper is optional on unsupported systems
+    _FramelessMainWindow = QMainWindow
+    FRAMELESS_WINDOW_AVAILABLE = False
 
 from core.app import APP_NAME, APP_VERSION
 from core.config import ConfigManager
@@ -123,8 +133,8 @@ class TitleBar(QWidget):
         super().mouseDoubleClickEvent(event)
 
 
-class MainWindow(QMainWindow):
-    """Main frameless window for navigation, pages and system tray behavior."""
+class MainWindow(_FramelessMainWindow):
+    """Main Fluent window with native Mica or Acrylic background effects."""
 
     def __init__(self, config: ConfigManager | None = None) -> None:
         """Create the window, restore state and load available plugins."""
@@ -137,11 +147,15 @@ class MainWindow(QMainWindow):
         self._size_grip: QSizeGrip | None = None
         self._restore_maximized = False
         self._force_close = False
+        self._effect_applied = False
+        self._active_effect = "none"
         self.tray_icon: QSystemTrayIcon | None = None
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(900, 550)
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        if not FRAMELESS_WINDOW_AVAILABLE:
+            self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.Window)
         self._build_shell()
         self._restore_geometry()
         self._connect_signals()
@@ -157,14 +171,18 @@ class MainWindow(QMainWindow):
         frame.setObjectName("windowFrame")
         frame.setMouseTracking(True)
         root_layout = QVBoxLayout(frame)
-        root_layout.setContentsMargins(1, 1, 1, 1)
         root_layout.setSpacing(0)
 
-        self.title_bar = TitleBar(frame)
+        self.title_bar = TitleBar(self if FRAMELESS_WINDOW_AVAILABLE else frame)
         self.title_bar.close_requested.connect(self.close)
         self.title_bar.minimize_requested.connect(self.showMinimized)
         self.title_bar.maximize_requested.connect(self.toggle_maximized)
-        root_layout.addWidget(self.title_bar)
+        if FRAMELESS_WINDOW_AVAILABLE and hasattr(self, "setTitleBar"):
+            self.setTitleBar(self.title_bar)
+            root_layout.setContentsMargins(1, Sizes.TITLE_BAR_HEIGHT + 1, 1, 1)
+        else:
+            root_layout.setContentsMargins(1, 1, 1, 1)
+            root_layout.addWidget(self.title_bar)
 
         body = QWidget(frame)
         body_layout = QHBoxLayout(body)
@@ -349,12 +367,88 @@ class MainWindow(QMainWindow):
         self.move(available.center() - self.rect().center())
 
     def showEvent(self, event: Any) -> None:
-        """Apply saved maximized state after the native window exists."""
+        """Apply saved maximized state and the selected backdrop."""
         super().showEvent(event)
+        if not self._effect_applied:
+            self.apply_window_effect(str(self.config.get("effects.window_effect", "mica")))
         if self._restore_maximized:
             self.showMaximized()
             self.title_bar.update_maximize_icon(True)
             self._restore_maximized = False
+
+    def apply_window_effect(self, effect_name: str) -> str:
+        """Apply Mica, Acrylic or a solid fallback without raising.
+
+        Args:
+            effect_name: ``mica``, ``acrylic`` or ``none``.
+
+        Returns:
+            The effect that is active after capability detection.
+        """
+        requested = effect_name.strip().lower()
+        if requested not in {"mica", "acrylic", "none"}:
+            requested = "mica"
+        active = "none"
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, requested != "none")
+        try:
+            effect = getattr(self, "windowEffect", None)
+            if requested == "none":
+                if effect is not None and hasattr(effect, "removeBackgroundEffect"):
+                    effect.removeBackgroundEffect(self.winId())
+            elif effect is not None and sys.platform == "win32":
+                if requested == "mica" and self._supports_mica():
+                    effect.setMicaEffect(self.winId(), isDarkMode=True)
+                    active = "mica"
+                else:
+                    effect.setAcrylicEffect(self.winId())
+                    active = "acrylic"
+            elif requested != "none":
+                # qframelesswindow keeps this method as a safe no-op on Linux.
+                if effect is not None and hasattr(effect, "setAcrylicEffect"):
+                    effect.setAcrylicEffect(self.winId())
+                active = requested
+        except Exception as error:  # noqa: BLE001 - visual effects are optional
+            self._logger.warning("Window effect %s was unavailable: %s", requested, error)
+            active = self._apply_blur_fallback(requested)
+        self._active_effect = active
+        self._effect_applied = True
+        self.setProperty("windowEffect", active)
+        self._refresh_style(self)
+        self._logger.info("Window backdrop: requested=%s active=%s", requested, active)
+        return active
+
+    def _apply_blur_fallback(self, requested: str) -> str:
+        """Try BlurWindow on Windows, then retain the QSS glass fallback."""
+        if requested == "none":
+            return "none"
+        if sys.platform == "win32":
+            try:
+                from BlurWindow.blurWindow import GlobalBlur
+
+                GlobalBlur(self.winId(), "#1a1a2eB8", Acrylic=requested == "acrylic", Dark=True)
+                return requested
+            except Exception as error:  # noqa: BLE001 - fallback is best effort
+                self._logger.warning("BlurWindow fallback was unavailable: %s", error)
+        return "qss"
+
+    @staticmethod
+    def _supports_mica() -> bool:
+        """Return whether the current Windows build is expected to support Mica."""
+        if sys.platform != "win32":
+            return False
+        try:
+            build = int(getattr(sys, "getwindowsversion")().build)
+            return build >= 22000 and bool(platform.version())
+        except (AttributeError, OSError, TypeError, ValueError):
+            return False
+
+    @staticmethod
+    def _refresh_style(widget: QWidget) -> None:
+        """Re-evaluate dynamic effect properties after a backdrop change."""
+        style = widget.style()
+        style.unpolish(widget)
+        style.polish(widget)
+        widget.update()
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         """Keep the manual resize grip in the bottom-right corner."""
@@ -366,7 +460,7 @@ class MainWindow(QMainWindow):
     def eventFilter(self, watched: object, event: QEvent) -> bool:
         """Provide edge resize behavior for a frameless window."""
         del watched
-        if self.isMaximized() or not self.isVisible():
+        if FRAMELESS_WINDOW_AVAILABLE or self.isMaximized() or not self.isVisible():
             return False
         event_type = event.type()
         if event_type == QEvent.Type.MouseButtonPress:
