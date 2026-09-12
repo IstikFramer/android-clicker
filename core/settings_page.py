@@ -78,7 +78,7 @@ class SettingsPage(QWidget):
         self._add_checkbox_row(card, layout, "general.autostart", "Запускать при старте системы", False)
         self._add_checkbox_row(card, layout, "general.tray_on_close", "Сворачивать в трей при закрытии", True)
         self._add_checkbox_row(card, layout, "general.start_minimized", "Запускать в свёрнутом виде", False)
-        language = QComboBox(card)
+        language = ComboBox(card)
         language.addItem("Русский", userData="ru")
         language.setCurrentIndex(language.findData(self.config.get("general.language", "ru")))
         language.currentIndexChanged.connect(lambda: self._save_combo("general.language", language))
@@ -89,14 +89,14 @@ class SettingsPage(QWidget):
     def _appearance_section(self) -> QFrame:
         """Create the appearance settings card."""
         card, layout = self._section_card("Внешний вид")
-        theme = QComboBox(card)
+        theme = ComboBox(card)
         theme.addItem("Тёмная", userData="dark")
         theme.setCurrentIndex(theme.findData(self.config.get("appearance.theme", "dark")))
         theme.currentIndexChanged.connect(lambda: self._save_combo("appearance.theme", theme))
         self._controls["appearance.theme"] = theme
         self._add_control_row(card, layout, "Тема", theme)
 
-        scale = QComboBox(card)
+        scale = ComboBox(card)
         for value in (100, 125, 150):
             scale.addItem(f"{value}%", userData=value)
         scale.setCurrentIndex(scale.findData(self.config.get("appearance.scale", 100)))
@@ -225,7 +225,7 @@ class SettingsPage(QWidget):
         row.addWidget(control)
         layout.addLayout(row)
 
-    def _save_combo(self, key: str, combo: QComboBox) -> None:
+    def _save_combo(self, key: str, combo: ComboBox) -> None:
         """Persist the current data value of a combo box."""
         value = combo.currentData()
         self.config.set(key, value)
