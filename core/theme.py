@@ -282,13 +282,13 @@ def generate_stylesheet(panel_opacity: int = 80) -> str:
     QPushButton[role="close-button"]:hover {{
         background-color: {c.ERROR};
     }}
-    QPushButton[role="sidebar-toggle"] {{
+    QPushButton[role="sidebar-toggle"], TransparentPushButton[role="sidebar-toggle"] {{
         border: none;
         padding: 0px;
         min-height: {s.SIDEBAR_ITEM_HEIGHT}px;
         max-height: {s.SIDEBAR_ITEM_HEIGHT}px;
     }}
-    QPushButton[role="sidebar-item"] {{
+    QPushButton[role="sidebar-item"], TransparentPushButton[role="sidebar-item"] {{
         border: none;
         border-left: 3px solid transparent;
         border-radius: {s.BUTTON_RADIUS}px;
@@ -297,10 +297,10 @@ def generate_stylesheet(panel_opacity: int = 80) -> str:
         min-height: {s.SIDEBAR_ITEM_HEIGHT}px;
         max-height: {s.SIDEBAR_ITEM_HEIGHT}px;
     }}
-    QPushButton[role="sidebar-item"]:hover {{
+    QPushButton[role="sidebar-item"]:hover, TransparentPushButton[role="sidebar-item"]:hover {{
         background-color: {c.BACKGROUND_CARD_HOVER};
     }}
-    QPushButton[role="sidebar-item"][active="true"] {{
+    QPushButton[role="sidebar-item"][active="true"], TransparentPushButton[role="sidebar-item"][active="true"] {{
         background-color: rgba(0, 173, 181, 0.12);
         border-left-color: {c.ACCENT};
         color: {c.ACCENT_LIGHT};

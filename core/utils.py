@@ -117,3 +117,22 @@ def supports_mica() -> bool:
         return build >= 22000 and bool(platform.version())
     except (AttributeError, OSError, TypeError, ValueError):
         return False
+
+
+def transparency_effects_enabled() -> bool:
+    """Return the Windows transparency preference when it is available.
+
+    Windows can disable Mica and Acrylic globally for accessibility, battery or
+    performance reasons. Non-Windows platforms use the QSS fallback instead.
+    """
+    if sys.platform != "win32":
+        return True
+    try:
+        import winreg
+
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            value, _ = winreg.QueryValueEx(key, "EnableTransparency")
+        return bool(int(value))
+    except (ImportError, OSError, TypeError, ValueError):
+        return True

@@ -40,7 +40,7 @@ from core.plugin_loader import PluginLoader
 from core.settings_page import SettingsPage
 from core.sidebar import Sidebar
 from core.theme import Sizes
-from core.utils import is_system_dark, load_icon, supports_mica
+from core.utils import is_system_dark, load_icon, supports_mica, transparency_effects_enabled
 
 
 class TitleBar(QWidget):
@@ -448,12 +448,20 @@ class MainWindow(_FramelessMainWindow):
         if requested not in {"mica", "acrylic", "none"}:
             requested = "mica"
         active = "none"
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, requested != "none")
+        effects_disabled = sys.platform == "win32" and not transparency_effects_enabled()
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_TranslucentBackground,
+            requested != "none" and not effects_disabled,
+        )
         try:
             effect = getattr(self, "windowEffect", None)
             if requested == "none":
                 if effect is not None and hasattr(effect, "removeBackgroundEffect"):
                     effect.removeBackgroundEffect(self.winId())
+            elif effects_disabled:
+                if effect is not None and hasattr(effect, "removeBackgroundEffect"):
+                    effect.removeBackgroundEffect(self.winId())
+                active = "qss"
             elif effect is not None and sys.platform == "win32":
                 if requested == "mica" and supports_mica():
                     effect.setMicaEffect(self.winId(), isDarkMode=is_system_dark())

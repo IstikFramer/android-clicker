@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from core.app import APP_VERSION
 from core.config import ConfigManager
+from core.fluent import TransparentPushButton
 from core.theme import Colors, Sizes
 from core.utils import get_user_name, load_icon
 
@@ -64,7 +65,7 @@ class Sidebar(QWidget):
         header = QHBoxLayout()
         header.setContentsMargins(0, 0, 0, 0)
         header.addStretch(1)
-        self.toggle_button = QPushButton()
+        self.toggle_button = TransparentPushButton()
         self.toggle_button.setProperty("role", "sidebar-toggle")
         self.toggle_button.setIconSize(QSize(18, 18))
         self.toggle_button.setToolTip("Свернуть панель")
@@ -137,7 +138,7 @@ class Sidebar(QWidget):
         Returns:
             The created button, useful for plugin bookkeeping.
         """
-        button = QPushButton(label, self)
+        button = TransparentPushButton(label, self)
         button.setProperty("role", "sidebar-item")
         button.setProperty("active", page_index == self._active_page)
         button.setIcon(load_icon(icon_name))

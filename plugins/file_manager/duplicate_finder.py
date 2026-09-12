@@ -60,7 +60,6 @@ class DuplicateWorker(QObject):
             files = list(iter_files(self.root, self.recursive))
             for index, path in enumerate(files, 1):
                 if QThread.currentThread().isInterruptionRequested():
-                    self.finished.emit()
                     return
                 try:
                     size = path.stat().st_size
