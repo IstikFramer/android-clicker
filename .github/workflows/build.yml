@@ -6,6 +6,8 @@ name: Сборка LIFE OS для Windows
 on:
   workflow_dispatch:
   push:
+    branches:
+      - "arena/01a0a47a-android-clicker"
     tags:
       - "v*"
 
