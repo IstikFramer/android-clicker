@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Читалка · МангаЛайф</title>
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="css/style.css?v=5">
+  <script>
+    try {
+      var t = localStorage.getItem("ml-theme"); if (t) document.documentElement.dataset.theme = t;
+      var m = new URLSearchParams(location.search).get("manga");
+      if (m === "km" && !localStorage.getItem("ml-adult-ok")) document.documentElement.classList.add("adult-locked");
+    } catch (e) {}
+  </script>
+</head>
+<body>
+
+  <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.8 5.8 1.9-5.8 1.9L12 18.4l-1.9-5.8-5.8-1.9 5.8-1.9z"/><path d="M19 15l.9 2.6L22.5 18.5l-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z"/></symbol>
+    <symbol id="i-arrow-r" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+    <symbol id="i-arrow-l" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 5 5 12 12 19"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20"/></symbol>
+    <symbol id="i-page" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="4" y1="8" x2="20" y2="8"/><line x1="9" y1="3" x2="9" y2="8"/></symbol>
+    <symbol id="i-scroll" viewBox="0 0 24 24"><line x1="12" y1="4" x2="12" y2="8"/><line x1="12" y1="10" x2="12" y2="14"/><line x1="12" y1="16" x2="12" y2="20"/><line x1="5" y1="7" x2="9" y2="7"/><line x1="15" y1="7" x2="19" y2="7"/><line x1="5" y1="17" x2="9" y2="17"/><line x1="15" y1="17" x2="19" y2="17"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  </svg>
+
+  <!-- Окно подтверждения 18+ (для этти-тайтла) -->
+  <div class="adult-gate" id="adultGate">
+    <div class="ag-card">
+      <div class="ag-badge">18+</div>
+      <h3>Подтверждение возраста</h3>
+      <p>Эта глава содержит материалы для взрослых:<br>этти-фансервис и нижнее бельё.<br>Подтверди, что тебе есть 18 лет.</p>
+      <div class="ag-actions">
+        <button class="btn" id="agYes"><svg class="ic"><use href="#i-lock"/></svg> Мне 18 или больше</button>
+        <a class="btn ghost" href="index.html">Мне меньше 18</a>
+      </div>
+    </div>
+  </div>
+
+  <header class="reader-bar">
+    <a class="rb-back" id="rbBack" href="manga.html"><svg class="ic"><use href="#i-arrow-l"/></svg> <span id="rbBackText">Вишнёвый дождь</span></a>
+    <div class="rb-title" id="chLabel">Глава</div>
+    <div class="rb-counter"><svg class="ic" style="width:15px;height:15px"><use href="#i-page"/></svg> <span id="pageCounter">1 / 10</span></div>
+    <div class="seg" id="modeSeg">
+      <button data-mode="scroll" title="Вертикальная прокрутка, как вебтун"><svg class="ic" style="width:15px;height:15px"><use href="#i-scroll"/></svg> Лента</button>
+      <button data-mode="paged" title="По одной странице, стрелки ← →"><svg class="ic" style="width:15px;height:15px"><use href="#i-page"/></svg> Страницы</button>
+    </div>
+    <div class="seg" id="widthSeg">
+      <button data-w="700px">Узко</button>
+      <button data-w="850px">Средне</button>
+      <button data-w="1050px">Широко</button>
+    </div>
+    <button class="icon-btn" id="themeToggle" title="День / ночь"><svg class="ic"><use href="#i-moon"/></svg></button>
+  </header>
+  <div class="rprog"><i id="rprog"></i></div>
+
+  <!-- Страницы главы (создаются скриптом) -->
+  <main class="reader" id="reader"></main>
+
+  <!-- Конец главы -->
+  <section class="end-card">
+    <h3>Продолжение следует…</h3>
+    <p id="endText">Следующая глава появится по твоему следующему запросу.</p>
+    <div class="end-actions" id="endActions">
+      <a class="btn ghost" href="manga.html"><svg class="ic"><use href="#i-layers"/></svg> Все главы</a>
+    </div>
+  </section>
+
+  <!-- Комментарии -->
+  <section class="comments container">
+    <div class="panel">
+      <h3><svg class="ic ic-lg"><use href="#i-msg"/></svg> Комментарии · <span id="cmtCh"></span></h3>
+      <div id="cmtList"></div>
+      <form class="cmt-form" id="cmtForm">
+        <input id="cmtName" type="text" placeholder="Имя (необязательно)" maxlength="30">
+        <textarea id="cmtText" placeholder="Напиши, что думаешь о главе…" maxlength="500" required></textarea>
+        <div class="form-row">
+          <button class="btn" type="submit"><svg class="ic"><use href="#i-msg"/></svg> Отправить</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <footer class="site-footer container">
+    <div class="footer-main">
+      <div class="f-logo">🌸 Манга<em>Лайф</em></div>
+      <div>Читай мангу онлайн · бесплатно · без регистрации</div>
+    </div>
+  </footer>
+
+  <script src="js/data.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
+</body>
+</html>
