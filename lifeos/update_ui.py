@@ -28,6 +28,14 @@ TYPE_TITLES = {
 }
 
 
+def _human_date(iso: str) -> str:
+    """2026-09-15 -> 15.09.2026."""
+    parts = (iso or "").split("-")
+    if len(parts) == 3 and all(parts):
+        return f"{parts[2][:2]}.{parts[1]}.{parts[0]}"
+    return iso or "—"
+
+
 class ProgressBar(GlowAware, QWidget):
     """Полоса загрузки с плавным подтягиванием значения."""
 
@@ -176,8 +184,8 @@ class UpdateWindow(QWidget):
         info_row = QHBoxLayout()
         info_row.setSpacing(16)
         src = "Релиз GitHub" if info.source == "release" else "Ветка репозитория"
-        for k, v in (("Источник", src), ("Дата", info.published or "—"),
-                     ("Размер", f"{info.size / 1048576:.1f} МБ" if info.size else "—")):
+        for k, v in (("Источник", src), ("Дата", _human_date(info.published)),
+                     ("Размер", f"{info.size / 1048576:.0f} МБ" if info.size else "—")):
             c = QVBoxLayout()
             c.setSpacing(1)
             c.addWidget(make_label(k, "Caption"))
