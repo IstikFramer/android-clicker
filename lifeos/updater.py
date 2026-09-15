@@ -120,6 +120,7 @@ class UpdateInfo:
     title: str = ""
     notes: str = ""
     changes: dict | list = field(default_factory=dict)
+    src_url: str = ""          # архив исходников (для запуска из .py)
     url: str = ""            # ссылка на скачивание архива
     page: str = ""           # страница релиза для браузера
     size: int = 0
@@ -181,6 +182,7 @@ def check_for_update() -> UpdateInfo:
             changes=changes_from_notes(data.get("body") or ""),
             url=asset_url,
             page=data.get("html_url") or RELEASES_PAGE,
+            src_url=BRANCH_ZIP,
             size=size,
             published=(data.get("published_at") or "")[:10],
             source="release",
@@ -198,6 +200,7 @@ def check_for_update() -> UpdateInfo:
             changes=normalize_changes(data.get("changes")),
             url=data.get("url") or BRANCH_ZIP,
             page=data.get("page") or BRANCH_PAGE,
+            src_url=data.get("url") or BRANCH_ZIP,
             size=int(data.get("size") or 0),
             published=data.get("published") or data.get("date", ""),
             source="branch",
@@ -350,7 +353,13 @@ class InstallWorker(QThread):
             self.progress.emit(2, "Подключение к серверу…")
             tmpdir = Path(tempfile.mkdtemp(prefix="lifeos-update-"))
             archive = tmpdir / "update.zip"
-            self._download(self._info.url, archive)
+            # Собранная программа обновляется готовым EXE, запуск из
+            # исходников — архивом с исходным кодом.
+            if getattr(sys, "frozen", False):
+                url = self._info.url or self._info.src_url
+            else:
+                url = self._info.src_url or self._info.url
+            self._download(url, archive)
 
             if self._cancel:
                 raise InterruptedError
