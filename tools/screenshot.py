@@ -1,4 +1,4 @@
-"""Оффскрин-рендер экранов LIFE OS в PNG (для превью и проверки вёрстки)."""
+"""Оффскрин-рендер экранов LIFE OS в JPG (для превью и проверки вёрстки)."""
 from __future__ import annotations
 
 import os
@@ -15,8 +15,10 @@ from PySide6.QtGui import QIcon  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 from lifeos import config as cfg  # noqa: E402
+from lifeos.eula import EulaWindow  # noqa: E402
+from lifeos.settings import settings  # noqa: E402
 from lifeos.splash import SplashScreen  # noqa: E402
-from lifeos.theme import DEFAULT_ACCENT, build_qss  # noqa: E402
+from lifeos.theme import build_qss  # noqa: E402
 from lifeos.window import MainWindow  # noqa: E402
 
 OUT = ROOT / "docs" / "preview"
@@ -31,7 +33,8 @@ def wait(ms: int):
 
 def main():
     app = QApplication(sys.argv)
-    app.setStyleSheet(build_qss(DEFAULT_ACCENT))
+    settings.set("eula_accepted", True, save=False)
+    app.setStyleSheet(build_qss())
     app.setWindowIcon(QIcon(str(cfg.LOGO / "logo_256.png")))
 
     w = MainWindow()
@@ -39,16 +42,23 @@ def main():
     w.show()
     wait(900)
 
-    names = ["dashboard", "tools", "settings", "about"]
-    for i, name in enumerate(names):
+    for i, name in enumerate(["home", "settings", "about"]):
         w.go(i)
-        wait(700)
+        wait(800)
         w.grab().save(str(OUT / f"{name}.jpg"), quality=90)
         print("saved", name)
 
-    s = SplashScreen(DEFAULT_ACCENT, duration_ms=1200)
-    s.show()
+    e = EulaWindow(first_run=True)
+    e.resize(880, 680)
+    e.show()
     wait(700)
+    e.grab().save(str(OUT / "eula.jpg"), quality=90)
+    print("saved eula")
+    e.close()
+
+    s = SplashScreen(duration_s=6.0)
+    s.show()
+    wait(1600)
     s.grab().save(str(OUT / "splash.jpg"), quality=90)
     print("saved splash")
     s.close()

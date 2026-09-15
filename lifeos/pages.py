@@ -1,42 +1,59 @@
-"""LIFE OS — экраны приложения (пока только оформление, без бизнес-логики)."""
+"""LIFE OS — экраны приложения: Главная, Настройки, О программе."""
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt
+import json
+
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-    QProgressBar, QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
+    QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
+    QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from . import config as cfg
-from .theme import ACCENTS
+from . import icons
+from .anim import driver
+from .settings import settings
+from .theme import ACCENTS, build_qss, current_accent
 from .widgets import (
-    Divider, GlassCard, ImagePanel, LogoBadge, PulseLine, RingGauge, SparkChart,
-    load_pixmap, make_label,
+    ColorDot, Divider, GlassCard, ImagePanel, LogoOrb, SegmentedControl,
+    SliderRow, Switch, make_label,
 )
 
 
-class BasePage(QScrollArea):
-    """Прокручиваемая страница с общим отступом."""
+def load_json(name: str) -> dict:
+    try:
+        return json.loads((cfg.DATA / name).read_text("utf-8"))
+    except (OSError, ValueError):
+        return {}
 
+
+CHANGE_TYPES = {
+    "added":    ("ДОБАВЛЕНО", "sparkles"),
+    "improved": ("УЛУЧШЕНО", "layers"),
+    "fixed":    ("ИСПРАВЛЕНО", "shield"),
+}
+
+
+class BasePage(QScrollArea):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setFrameShape(QFrame.NoFrame)
         host = QWidget()
-        host.setAttribute(Qt.WA_TranslucentBackground, True)
+        host.setObjectName("Transparent")
         self.body = QVBoxLayout(host)
-        self.body.setContentsMargins(30, 20, 30, 30)
+        self.body.setContentsMargins(32, 22, 32, 32)
         self.body.setSpacing(18)
         self.setWidget(host)
-        self._accent_widgets: list = []
 
     def header(self, title: str, subtitle: str, badge: str | None = None):
         wrap = QWidget()
+        wrap.setObjectName("Transparent")
         lay = QHBoxLayout(wrap)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(12)
-
         col = QVBoxLayout()
         col.setSpacing(3)
         col.addWidget(make_label(title, "PageTitle"))
@@ -50,371 +67,450 @@ class BasePage(QScrollArea):
         self.body.addWidget(wrap)
         return wrap
 
-    def apply_accent(self, key: str):
-        acc = ACCENTS[key]
-        for w in self._accent_widgets:
-            if isinstance(w, RingGauge):
-                w.set_accent(acc.primary, acc.secondary)
-            elif hasattr(w, "set_accent"):
-                w.set_accent(acc.primary)
 
+# =========================================================== Главный экран
+class HomePage(BasePage):
+    """Что нового в текущей версии — то, что видит пользователь при запуске."""
 
-# ---------------------------------------------------------------- Dashboard
-class DashboardPage(BasePage):
-    def __init__(self, accent_key: str = "cyan", parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
-        acc = ACCENTS[accent_key]
-        self.header("Панель управления",
-                    "Обзор состояния системы и быстрый доступ к модулям",
-                    "LIVE · v" + cfg.APP_VERSION)
+        data = load_json("changelog.json")
+        releases = data.get("releases", [])
+        rel = releases[0] if releases else {}
 
-        # --- HERO -----------------------------------------------------------
-        hero = ImagePanel(cfg.BACKGROUNDS / "hero_card.jpg", overlay=0.62, accent=acc.primary)
-        hero.setMinimumHeight(212)
+        # ---------- hero ----------
+        hero = ImagePanel(cfg.BACKGROUNDS / "hero_card.jpg", overlay=0.66)
+        hero.setMinimumHeight(230)
+        hero.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         hl = QHBoxLayout(hero)
-        hl.setContentsMargins(30, 26, 30, 26)
-        hl.setSpacing(24)
+        hl.setContentsMargins(34, 28, 34, 28)
+        hl.setSpacing(26)
 
-        left = QVBoxLayout()
-        left.setSpacing(8)
-        left.addWidget(make_label("CORE ONLINE", "CardKicker"))
-        left.addWidget(make_label("Добро пожаловать в LIFE OS", "HeroTitle"))
-        left.addWidget(make_label(
-            "Единая оболочка для работы с компьютером: модули, автоматизация\n"
-            "и контроль системы в одном тёмном стеклянном интерфейсе.",
-            "HeroBody", wrap=True))
-        pulse = PulseLine(accent=acc.primary, height=54)
-        left.addWidget(pulse)
-        hl.addLayout(left, 3)
+        col = QVBoxLayout()
+        col.setSpacing(9)
+        top = QHBoxLayout()
+        top.setSpacing(8)
+        top.addWidget(make_label(f"ВЕРСИЯ {rel.get('version', cfg.APP_VERSION)}", "CardKicker"))
+        ch = make_label(rel.get("channel", cfg.APP_CHANNEL), "Badge")
+        top.addWidget(ch)
+        top.addStretch(1)
+        col.addLayout(top)
+        col.addWidget(make_label(rel.get("title", "Обновление"), "HeroTitle"))
+        col.addWidget(make_label(rel.get("summary", ""), "HeroBody", wrap=True))
+        col.addStretch(1)
 
-        badge = LogoBadge(size=130, accent=acc.primary, pixmap_name="logo_512.png")
-        hl.addWidget(badge, 0, Qt.AlignCenter)
-        hl.addStretch(1)
-
+        stats = QHBoxLayout()
+        stats.setSpacing(22)
+        counts = {"added": 0, "improved": 0, "fixed": 0}
+        for c in rel.get("changes", []):
+            counts[c.get("type", "added")] = counts.get(c.get("type", "added"), 0) + 1
+        for key, label in (("added", "новое"), ("improved", "улучшено"), ("fixed", "исправлено")):
+            box = QVBoxLayout()
+            box.setSpacing(0)
+            n = make_label(str(counts.get(key, 0)), "PageTitle")
+            box.addWidget(n)
+            box.addWidget(make_label(label, "Caption"))
+            stats.addLayout(box)
+        stats.addStretch(1)
+        col.addLayout(stats)
+        hl.addLayout(col, 1)
+        hl.addWidget(LogoOrb(size=150), 0, Qt.AlignVCenter)
         self.body.addWidget(hero)
-        self._accent_widgets += [hero, pulse, badge]
 
-        # --- KPI-строка -----------------------------------------------------
-        grid = QGridLayout()
-        grid.setSpacing(16)
-        stats = [
-            ("CPU", 27, "Загрузка процессора"),
-            ("MEMORY", 54, "Оперативная память"),
-            ("DISK", 41, "Дисковое пространство"),
-        ]
-        for i, (kicker, val, cap) in enumerate(stats):
-            card = GlassCard(padding=18)
-            card.body.setSpacing(6)
-            card.body.addWidget(make_label(kicker, "CardKicker"))
-            gauge = RingGauge(value=val, accent=acc.primary,
-                              accent2=acc.secondary, size=132)
-            card.body.addWidget(gauge, 0, Qt.AlignCenter)
-            cap_lb = make_label(cap, "StatCaption", wrap=True)
-            cap_lb.setAlignment(Qt.AlignCenter)
-            card.body.addWidget(cap_lb)
-            grid.addWidget(card, 0, i)
-            self._accent_widgets.append(gauge)
+        # ---------- список изменений ----------
+        self.body.addSpacing(4)
+        self.body.addWidget(make_label("ЧТО НОВОГО В ЭТОЙ ВЕРСИИ", "SidebarSection"))
 
-        activity = GlassCard(padding=18)
-        activity.body.setSpacing(6)
-        activity.body.addWidget(make_label("ACTIVITY", "CardKicker"))
-        activity.body.addWidget(make_label("Активность за сессию", "CardTitle"))
-        spark = SparkChart(accent=acc.primary, height=92)
-        activity.body.addWidget(spark)
-        activity.body.addWidget(make_label("Данные появятся в следующих версиях",
-                                           "StatCaption"))
-        grid.addWidget(activity, 0, 3)
-        grid.setColumnStretch(3, 2)
-        self._accent_widgets.append(spark)
-        self.body.addLayout(grid)
-
-        # --- Модули ---------------------------------------------------------
-        self.body.addWidget(make_label("МОДУЛИ", "SidebarSection"))
-        mods = QGridLayout()
-        mods.setSpacing(16)
-        modules = [
-            ("dashboard_glyph_128.png", "Рабочий стол", "Виджеты, быстрый обзор дня и системы", "READY"),
-            ("tools_glyph_128.png", "Автоматизация", "Сценарии, макросы и горячие клавиши", "SOON"),
-            ("settings_glyph_128.png", "Оптимизация", "Очистка, автозагрузка, службы Windows", "SOON"),
-            ("about_glyph_128.png", "Знания", "Заметки, база ссылок и личные инструкции", "SOON"),
-        ]
-        for i, (icon, title, desc, state) in enumerate(modules):
-            card = GlassCard(padding=18)
-            card.body.setSpacing(10)
-            top = QHBoxLayout()
-            ic = QLabel()
-            ic.setPixmap(load_pixmap(cfg.ICONS / icon, 40, 40))
-            top.addWidget(ic)
-            top.addStretch(1)
-            st = make_label(state, "Badge" if state == "READY" else "BadgeMuted")
-            top.addWidget(st, 0, Qt.AlignTop)
-            card.body.addLayout(top)
-            card.body.addWidget(make_label(title, "CardTitle"))
-            card.body.addWidget(make_label(desc, "CardBody", wrap=True))
-            mods.addWidget(card, i // 4, i % 4)
-        self.body.addLayout(mods)
-        self.body.addStretch(1)
-
-
-# ------------------------------------------------------------------- Tools
-class ToolsPage(BasePage):
-    def __init__(self, accent_key: str = "cyan", parent=None):
-        super().__init__(parent)
-        acc = ACCENTS[accent_key]
-        self.header("Инструменты", "Каталог модулей LIFE OS для работы с ПК", "PREVIEW")
-
-        search_row = QWidget()
-        sl = QHBoxLayout(search_row)
-        sl.setContentsMargins(0, 0, 0, 0)
-        sl.setSpacing(10)
-        search = QLineEdit()
-        search.setObjectName("Search")
-        search.setPlaceholderText("Поиск инструмента…   (в разработке)")
-        search.setFixedHeight(42)
-        sl.addWidget(search, 1)
-        for name in ("Все", "Система", "Файлы", "Сеть", "Медиа"):
-            chip = QPushButton(name)
-            chip.setObjectName("Chip")
-            chip.setCheckable(True)
-            chip.setChecked(name == "Все")
-            chip.setFixedHeight(42)
-            chip.setCursor(Qt.PointingHandCursor)
-            sl.addWidget(chip)
-        self.body.addWidget(search_row)
+        grouped: dict[str, list[str]] = {"added": [], "improved": [], "fixed": []}
+        for c in rel.get("changes", []):
+            grouped.setdefault(c.get("type", "added"), []).append(c.get("text", ""))
 
         grid = QGridLayout()
         grid.setSpacing(16)
-        tools = [
-            ("tools_glyph_128.png", "Быстрый запуск", "Единая палитра команд и приложений"),
-            ("settings_glyph_128.png", "Чистильщик", "Временные файлы, кэш, корзина"),
-            ("dashboard_glyph_128.png", "Монитор ресурсов", "CPU, RAM, диски и сеть в реальном времени"),
-            ("tools_glyph_128.png", "Пакетные файлы", "Массовое переименование и сортировка"),
-            ("settings_glyph_128.png", "Автозагрузка", "Управление стартом программ"),
-            ("about_glyph_128.png", "Буфер обмена", "История копирований и шаблоны"),
-        ]
-        for i, (icon, title, desc) in enumerate(tools):
-            card = GlassCard(padding=18)
-            card.body.setSpacing(10)
+        acc = current_accent()
+        cols = 0
+        for key in ("added", "improved", "fixed"):
+            items = grouped.get(key) or []
+            if not items:
+                continue
+            title, icon_name = CHANGE_TYPES[key]
+            card = GlassCard(padding=20, spacing=10)
             head = QHBoxLayout()
+            head.setSpacing(9)
             ic = QLabel()
-            ic.setPixmap(load_pixmap(cfg.ICONS / icon, 38, 38))
+            ic.setPixmap(icons.pixmap(icon_name, 18, acc.primary, 1.8))
+            ic.setFixedSize(18, 18)
             head.addWidget(ic)
-            head.addSpacing(4)
-            tcol = QVBoxLayout()
-            tcol.setSpacing(2)
-            tcol.addWidget(make_label(title, "CardTitle"))
-            tcol.addWidget(make_label("модуль v0.2", "Mono"))
-            head.addLayout(tcol)
+            head.addWidget(make_label(title, "CardKicker"))
             head.addStretch(1)
-            head.addWidget(make_label("SOON", "BadgeMuted"), 0, Qt.AlignTop)
+            head.addWidget(make_label(str(len(items)), "BadgeMuted"))
             card.body.addLayout(head)
-            card.body.addWidget(make_label(desc, "CardBody", wrap=True))
-            bar = QProgressBar()
-            bar.setObjectName("Thin")
-            bar.setTextVisible(False)
-            bar.setValue([70, 45, 88, 30, 55, 20][i])
-            card.body.addWidget(bar)
-            grid.addWidget(card, i // 3, i % 3)
+            for text in items:
+                row = QHBoxLayout()
+                row.setSpacing(9)
+                dot = QLabel("•")
+                dot.setObjectName("MonoAccent")
+                dot.setFixedWidth(9)
+                dot.setAlignment(Qt.AlignTop)
+                row.addWidget(dot, 0, Qt.AlignTop)
+                row.addWidget(make_label(text, "CardBody", wrap=True), 1)
+                card.body.addLayout(row)
+            card.body.addStretch(1)
+            grid.addWidget(card, 0, cols)
+            cols += 1
+        for i in range(cols):
+            grid.setColumnStretch(i, 1)
         self.body.addLayout(grid)
+
+        # ---------- прошлые версии ----------
+        if len(releases) > 1:
+            self.body.addSpacing(6)
+            self.body.addWidget(make_label("ПРЕДЫДУЩИЕ ВЕРСИИ", "SidebarSection"))
+            for old in releases[1:]:
+                card = GlassCard(padding=18, spacing=8, hoverable=True)
+                head = QHBoxLayout()
+                head.setSpacing(10)
+                head.addWidget(make_label("v" + old.get("version", ""), "MonoAccent"))
+                head.addWidget(make_label(old.get("title", ""), "CardTitle"))
+                head.addStretch(1)
+                head.addWidget(make_label(old.get("date", ""), "Caption"))
+                card.body.addLayout(head)
+                texts = " · ".join(c.get("text", "") for c in old.get("changes", []))
+                card.body.addWidget(make_label(texts, "CardBody", wrap=True))
+                self.body.addWidget(card)
+
         self.body.addStretch(1)
 
 
-# ---------------------------------------------------------------- Settings
+# ============================================================== Настройки
 class SettingsPage(BasePage):
-    """Настройки внешнего вида. Акценты переключаются, остальное — заготовки."""
+    """Живые настройки: любое изменение сразу применяется и сохраняется."""
 
-    def __init__(self, accent_key: str, on_accent, on_background, parent=None):
+    def __init__(self, on_restyle, on_background, parent=None):
         super().__init__(parent)
-        self._on_accent = on_accent
-        acc = ACCENTS[accent_key]
-        self.header("Настройки", "Внешний вид и поведение оболочки", "v" + cfg.APP_VERSION)
+        self._on_restyle = on_restyle
+        self._on_background = on_background
+        self.header("Настройки", "Внешний вид, производительность и поведение программы")
 
-        # --- Акцент ---------------------------------------------------------
-        card = GlassCard(padding=22, hoverable=False)
-        card.body.setSpacing(14)
-        card.body.addWidget(make_label("APPEARANCE", "CardKicker"))
-        card.body.addWidget(make_label("Акцентный цвет", "CardTitle"))
-        card.body.addWidget(make_label(
-            "Активны Cyan и Electric Blue. Остальные палитры уже заложены "
-            "в тему и включатся в следующих версиях.", "CardBody", wrap=True))
+        self._build_appearance()
+        self._build_performance()
+        self._build_behaviour()
+        self._build_reset()
+        self.body.addStretch(1)
 
-        chips = QHBoxLayout()
-        chips.setSpacing(10)
-        self._chips: list[QPushButton] = []
+    # ------------------------------------------------------- внешний вид
+    def _build_appearance(self):
+        card = GlassCard(padding=22, spacing=14, hoverable=False)
+        card.body.addWidget(make_label("ВНЕШНИЙ ВИД", "CardKicker"))
+
+        # акцент
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        col.addWidget(make_label("Акцентный цвет", "CardTitle"))
+        col.addWidget(make_label("Подсветка активных элементов и свечение", "Caption"))
+        row.addLayout(col)
+        row.addStretch(1)
+        self._dots: list[ColorDot] = []
         for key, a in ACCENTS.items():
-            btn = QPushButton(a.title if a.available else a.title + "  ·  soon")
-            btn.setObjectName("Chip")
-            btn.setCheckable(True)
-            btn.setChecked(key == accent_key)
-            btn.setEnabled(a.available)
-            btn.setFixedHeight(38)
-            btn.setCursor(Qt.PointingHandCursor if a.available else Qt.ForbiddenCursor)
-            btn.setStyleSheet(
-                f"QPushButton#Chip {{ border-left: 4px solid {a.primary}; }}"
-            )
-            btn.clicked.connect(lambda _=False, k=key: self._pick(k))
-            chips.addWidget(btn)
-            self._chips.append(btn)
-        chips.addStretch(1)
-        card.body.addLayout(chips)
-        self.body.addWidget(card)
+            dot = ColorDot(key, a.primary, a.secondary, key == settings.get("accent"))
+            dot.setToolTip(a.title)
+            dot.clicked.connect(self._pick_accent)
+            row.addWidget(dot)
+            self._dots.append(dot)
+        card.body.addLayout(row)
+        card.body.addWidget(Divider())
 
-        # --- Фон ------------------------------------------------------------
-        bgcard = GlassCard(padding=22, hoverable=False)
-        bgcard.body.setSpacing(12)
-        bgcard.body.addWidget(make_label("BACKGROUND", "CardKicker"))
-        bgcard.body.addWidget(make_label("Фон оболочки", "CardTitle"))
-        bgrow = QHBoxLayout()
-        bgrow.setSpacing(14)
-        for name, file in (("Tech Glass", "bg_main.jpg"), ("Aurora", "bg_aurora.jpg")):
-            tile = ImagePanel(cfg.BACKGROUNDS / f"{file.replace('.jpg', '@half.jpg')}",
-                              radius=14, overlay=0.30, accent=acc.primary)
-            tile.setFixedSize(220, 116)
+        # фон
+        bg_row = QHBoxLayout()
+        bg_row.setSpacing(14)
+        col2 = QVBoxLayout()
+        col2.setSpacing(1)
+        col2.addWidget(make_label("Фон оболочки", "CardTitle"))
+        col2.addWidget(make_label("Изображение под интерфейсом", "Caption"))
+        bg_row.addLayout(col2)
+        bg_row.addStretch(1)
+        self._bg_tiles: list[tuple[QWidget, str]] = []
+        for name, file in (("Blue", "bg_main.jpg"), ("Violet", "bg_violet.jpg")):
+            tile = ImagePanel(cfg.BACKGROUNDS / file.replace(".jpg", "@half.jpg"),
+                              overlay=0.28, radius=12)
+            tile.setFixedSize(150, 84)
+            tile.setCursor(Qt.PointingHandCursor)
             tl = QVBoxLayout(tile)
-            tl.setContentsMargins(12, 12, 12, 12)
+            tl.setContentsMargins(10, 8, 10, 8)
             tl.addStretch(1)
             tl.addWidget(make_label(name, "CardTitle"))
-            pick = QPushButton("", tile)
-            pick.setGeometry(0, 0, 220, 116)
-            pick.setCursor(Qt.PointingHandCursor)
-            pick.setStyleSheet("background: transparent; border: none;")
-            pick.clicked.connect(lambda _=False, f=file: on_background(f))
-            bgrow.addWidget(tile)
-            self._accent_widgets.append(tile)
-        bgrow.addStretch(1)
-        bgcard.body.addLayout(bgrow)
-        self.body.addWidget(bgcard)
+            btn = QPushButton("", tile)
+            btn.setGeometry(0, 0, 150, 84)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet("background: transparent; border: none;")
+            btn.clicked.connect(lambda _=False, f=file: self._pick_bg(f))
+            bg_row.addWidget(tile)
+            self._bg_tiles.append((tile, file))
+        card.body.addLayout(bg_row)
+        card.body.addWidget(Divider())
 
-        # --- Переключатели --------------------------------------------------
-        opts = GlassCard(padding=22, hoverable=False)
-        opts.body.setSpacing(4)
-        opts.body.addWidget(make_label("SYSTEM", "CardKicker"))
-        opts.body.addWidget(make_label("Поведение", "CardTitle"))
-        opts.body.addSpacing(8)
-        switches = [
-            ("Запускать вместе с Windows", "Оболочка стартует свёрнутой в трей", False),
-            ("Сворачивать в трей при закрытии", "Крестик прячет окно, а не закрывает", True),
-            ("Анимации интерфейса", "Пульс, свечение и плавные переходы", True),
-            ("Эффект стекла (acrylic)", "Полупрозрачные панели поверх фона", True),
-            ("Звуковые уведомления", "Появятся в версии 0.3", False),
+        # слайдеры
+        sliders = [
+            ("glass_opacity", "Прозрачность панелей", "Плотность стеклянных поверхностей", 0, 100, "%", 1),
+            ("glow_strength", "Сила свечения", "Яркость неонового ореола элементов", 0, 100, "%", 1),
+            ("corner_radius", "Скругление углов", "Радиус карточек, кнопок и окна", 4, 28, " px", 1),
+            ("ui_scale", "Масштаб интерфейса", "Размер текста и элементов", 85, 130, "%", 5),
         ]
-        for i, (title, desc, checked) in enumerate(switches):
+        for i, (key, title, desc, lo, hi, suf, step) in enumerate(sliders):
             if i:
-                opts.body.addWidget(Divider())
-            r = QWidget()
-            rl = QHBoxLayout(r)
-            rl.setContentsMargins(0, 10, 0, 10)
-            col = QVBoxLayout()
-            col.setSpacing(2)
-            col.addWidget(make_label(title, "CardTitle"))
-            col.addWidget(make_label(desc, "StatCaption"))
-            rl.addLayout(col)
-            rl.addStretch(1)
-            sw = QCheckBox()
-            sw.setObjectName("Switch")
-            sw.setChecked(checked)
-            sw.setCursor(Qt.PointingHandCursor)
-            rl.addWidget(sw)
-            opts.body.addWidget(r)
-        self.body.addWidget(opts)
+                card.body.addWidget(Divider())
+            r = SliderRow(title, desc, lo, hi, settings.get(key), suf, step)
+            r.valueChanged.connect(lambda v, k=key: self._apply(k, v))
+            card.body.addWidget(r)
+        self.body.addWidget(card)
 
-        # --- Язык/масштаб ---------------------------------------------------
-        misc = GlassCard(padding=22, hoverable=False)
-        misc.body.setSpacing(12)
-        misc.body.addWidget(make_label("LOCALE", "CardKicker"))
-        mrow = QHBoxLayout()
-        mrow.setSpacing(24)
-        for label, items in (("Язык интерфейса", ["Русский", "English"]),
-                             ("Масштаб", ["100%", "125%", "150%"]),
-                             ("Тема", ["Dark Glass", "Light (soon)"])):
-            col = QVBoxLayout()
-            col.setSpacing(6)
-            col.addWidget(make_label(label, "StatCaption"))
-            cb = QComboBox()
-            cb.setObjectName("Select")
-            cb.addItems(items)
-            cb.setCursor(Qt.PointingHandCursor)
-            col.addWidget(cb)
-            mrow.addLayout(col)
-        mrow.addStretch(1)
-        misc.body.addLayout(mrow)
-        self.body.addWidget(misc)
-        self.body.addStretch(1)
+    # --------------------------------------------------- производительность
+    def _build_performance(self):
+        card = GlassCard(padding=22, spacing=14, hoverable=False)
+        card.body.addWidget(make_label("ПРОИЗВОДИТЕЛЬНОСТЬ", "CardKicker"))
 
-    def _pick(self, key: str):
-        for btn, k in zip(self._chips, ACCENTS.keys()):
-            btn.setChecked(k == key)
-        self._on_accent(key)
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        col.addWidget(make_label("Ограничение частоты кадров", "CardTitle"))
+        col.addWidget(make_label("Выше — плавнее, ниже — экономнее для ноутбука", "Caption"))
+        row.addLayout(col)
+        row.addStretch(1)
+        fps_values = [30, 60, 120]
+        current = settings.get("fps_limit")
+        seg = SegmentedControl(["30", "60", "120"],
+                               fps_values.index(current) if current in fps_values else 1)
+        seg.setFixedWidth(210)
+        seg.changed.connect(lambda i: self._apply("fps_limit", fps_values[i]))
+        row.addWidget(seg)
+        card.body.addLayout(row)
+        card.body.addWidget(Divider())
+
+        speed = SliderRow("Скорость анимаций", "Темп переходов и подсветки",
+                          50, 200, settings.get("anim_speed"), "%", 5)
+        speed.valueChanged.connect(lambda v: self._apply("anim_speed", v))
+        card.body.addWidget(speed)
+        card.body.addWidget(Divider())
+
+        toggles = [
+            ("animations", "Анимации интерфейса", "Плавные переходы и подсветка элементов"),
+            ("heavy_effects", "Тяжёлые эффекты", "Тени, свечение фона и дыхание логотипа"),
+            ("power_saving", "Режим энергосбережения", "Ограничивает кадры и отключает фоновые эффекты"),
+        ]
+        for i, (key, title, desc) in enumerate(toggles):
+            if i:
+                card.body.addWidget(Divider())
+            card.body.addWidget(self._switch_row(key, title, desc))
+        self.body.addWidget(card)
+
+    # -------------------------------------------------------------- система
+    def _build_behaviour(self):
+        card = GlassCard(padding=22, spacing=14, hoverable=False)
+        card.body.addWidget(make_label("СИСТЕМА", "CardKicker"))
+        toggles = [
+            ("autostart", "Запускать вместе с системой", "Программа стартует при входе в учётную запись"),
+            ("start_minimized", "Запускать свёрнутой", "Открывать сразу в области уведомлений"),
+            ("close_to_tray", "Сворачивать в трей при закрытии", "Кнопка закрытия прячет окно, а не завершает работу"),
+            ("tray_notifications", "Уведомления в трее", "Всплывающие подсказки при сворачивании"),
+        ]
+        for i, (key, title, desc) in enumerate(toggles):
+            if i:
+                card.body.addWidget(Divider())
+            card.body.addWidget(self._switch_row(key, title, desc))
+
+        card.body.addWidget(Divider())
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        col.addWidget(make_label("Язык интерфейса", "CardTitle"))
+        col.addWidget(make_label("Другие языки появятся в следующих версиях", "Caption"))
+        row.addLayout(col)
+        row.addStretch(1)
+        cb = QComboBox()
+        cb.setObjectName("Select")
+        cb.addItems(["Русский"])
+        cb.setCursor(Qt.PointingHandCursor)
+        row.addWidget(cb)
+        w = QWidget()
+        w.setObjectName("Transparent")
+        w.setLayout(row)
+        card.body.addWidget(w)
+        self.body.addWidget(card)
+
+    def _build_reset(self):
+        card = GlassCard(padding=20, spacing=12, hoverable=False)
+        row = QHBoxLayout()
+        row.setSpacing(12)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        col.addWidget(make_label("Сбросить настройки", "CardTitle"))
+        col.addWidget(make_label(
+            f"Вернуть все параметры к значениям по умолчанию · {cfg.SETTINGS_FILE}",
+            "Caption"))
+        row.addLayout(col)
+        row.addStretch(1)
+        btn = QPushButton("Сбросить")
+        btn.setObjectName("Ghost")
+        btn.setFixedHeight(38)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(self._reset)
+        row.addWidget(btn)
+        card.body.addLayout(row)
+        self.body.addWidget(card)
+
+    # ------------------------------------------------------------ элементы
+    def _switch_row(self, key: str, title: str, desc: str) -> QWidget:
+        w = QWidget()
+        w.setObjectName("Transparent")
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 9, 0, 9)
+        lay.setSpacing(12)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        col.addWidget(make_label(title, "CardTitle"))
+        col.addWidget(make_label(desc, "Caption"))
+        lay.addLayout(col)
+        lay.addStretch(1)
+        sw = Switch(settings.get(key))
+        sw.toggled.connect(lambda v, k=key: self._apply(k, v))
+        lay.addWidget(sw)
+        return w
+
+    # -------------------------------------------------------------- логика
+    def _apply(self, key: str, value):
+        settings.set(key, value)
+
+    def _pick_accent(self, key: str):
+        settings.set("accent", key)
+        for dot in self._dots:
+            dot.setSelected(dot._key == key)
+
+    def _pick_bg(self, file: str):
+        settings.set("background", file)
+        self._on_background()
+
+    def _reset(self):
+        settings.reset()
+        self._on_restyle(rebuild=True)
 
 
-# ------------------------------------------------------------------- About
+# =========================================================== О программе
 class AboutPage(BasePage):
-    def __init__(self, accent_key: str = "cyan", parent=None):
+    def __init__(self, on_show_eula, parent=None):
         super().__init__(parent)
-        acc = ACCENTS[accent_key]
-        self.header("О программе", "LIFE OS — персональная операционная система", "ALPHA")
+        self.header("О программе", f"{cfg.APP_NAME} · сведения о продукте и разработчике")
 
-        hero = ImagePanel(cfg.BACKGROUNDS / "about_art.jpg", overlay=0.58, accent=acc.primary)
-        hero.setMinimumHeight(260)
+        hero = ImagePanel(cfg.BACKGROUNDS / "about_art.jpg", overlay=0.70)
+        hero.setMinimumHeight(240)
+        hero.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         hl = QHBoxLayout(hero)
         hl.setContentsMargins(34, 28, 34, 28)
         hl.setSpacing(28)
-        logo = LogoBadge(size=160, accent=acc.primary, pixmap_name="logo_512.png")
-        hl.addWidget(logo, 0, Qt.AlignVCenter)
+        hl.addWidget(LogoOrb(size=136), 0, Qt.AlignVCenter)
         col = QVBoxLayout()
-        col.setSpacing(8)
-        col.addWidget(make_label(f"{cfg.APP_NAME}", "HeroTitle"))
+        col.setSpacing(7)
+        col.addWidget(make_label(cfg.APP_NAME, "HeroTitle"))
         col.addWidget(make_label(cfg.APP_TAGLINE, "HeroBody"))
-        col.addWidget(make_label(f"BUILD {cfg.APP_BUILD}  ·  PySide 6  ·  {cfg.APP_ORG}", "Mono"))
-        col.addSpacing(6)
-        btns = QHBoxLayout()
-        btns.setSpacing(10)
-        b1 = QPushButton("Что нового")
-        b1.setObjectName("Primary")
-        b1.setFixedHeight(40)
-        b1.setCursor(Qt.PointingHandCursor)
-        b2 = QPushButton("Репозиторий")
-        b2.setObjectName("Ghost")
-        b2.setFixedHeight(40)
-        b2.setCursor(Qt.PointingHandCursor)
-        btns.addWidget(b1)
-        btns.addWidget(b2)
-        btns.addStretch(1)
-        col.addLayout(btns)
+        col.addWidget(make_label(
+            f"ВЕРСИЯ {cfg.APP_VERSION}  ·  СБОРКА {cfg.APP_BUILD}  ·  {cfg.APP_CHANNEL}",
+            "Mono"))
         hl.addLayout(col, 1)
         self.body.addWidget(hero)
-        self._accent_widgets += [hero, logo]
 
+        # --- разработчик ---
+        acc = current_accent()
         grid = QGridLayout()
         grid.setSpacing(16)
-        roadmap = [
-            ("0.1", "Оболочка", "Тёмный glass-интерфейс, навигация, трей, брендинг", "DONE"),
-            ("0.2", "Инструменты", "Мониторинг системы и быстрый запуск", "NEXT"),
-            ("0.3", "Автоматизация", "Сценарии, макросы, горячие клавиши", "PLAN"),
-            ("0.4", "Синхронизация", "Профили, облако и резервные копии", "PLAN"),
-        ]
-        for i, (ver, title, desc, state) in enumerate(roadmap):
-            card = GlassCard(padding=18)
-            card.body.setSpacing(8)
-            head = QHBoxLayout()
-            head.addWidget(make_label("v" + ver, "CardKicker"))
-            head.addStretch(1)
-            head.addWidget(make_label(state, "Badge" if state == "DONE" else "BadgeMuted"))
-            card.body.addLayout(head)
-            card.body.addWidget(make_label(title, "CardTitle"))
-            card.body.addWidget(make_label(desc, "CardBody", wrap=True))
-            grid.addWidget(card, 0, i)
+
+        dev = GlassCard(padding=20, spacing=10)
+        dev.body.addWidget(make_label("РАЗРАБОТЧИК", "CardKicker"))
+        dev.body.addWidget(make_label(cfg.DEV_NAME, "HeroTitle"))
+        dev.body.addWidget(make_label(
+            "Разработка и поддержка программного обеспечения.", "CardBody", wrap=True))
+        dev.body.addStretch(1)
+        grid.addWidget(dev, 0, 0)
+
+        contact = GlassCard(padding=20, spacing=10)
+        contact.body.addWidget(make_label("СВЯЗЬ", "CardKicker"))
+        mail_row = QHBoxLayout()
+        mail_row.setSpacing(9)
+        ic = QLabel()
+        ic.setPixmap(icons.pixmap("mail", 18, acc.primary, 1.8))
+        ic.setFixedSize(18, 18)
+        mail_row.addWidget(ic, 0, Qt.AlignVCenter)
+        mail_row.addWidget(make_label(cfg.DEV_EMAIL, "CardTitle"), 1)
+        contact.body.addLayout(mail_row)
+        contact.body.addWidget(make_label(
+            "Вопросы, сообщения об ошибках и предложения.", "CardBody", wrap=True))
+        btns = QHBoxLayout()
+        btns.setSpacing(10)
+        write = QPushButton("Написать")
+        write.setObjectName("Primary")
+        write.setFixedHeight(38)
+        write.setCursor(Qt.PointingHandCursor)
+        write.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"mailto:{cfg.DEV_EMAIL}")))
+        copy = QPushButton("Копировать адрес")
+        copy.setObjectName("Ghost")
+        copy.setFixedHeight(38)
+        copy.setCursor(Qt.PointingHandCursor)
+        copy.clicked.connect(self._copy_mail)
+        self._copy_btn = copy
+        btns.addWidget(write)
+        btns.addWidget(copy)
+        btns.addStretch(1)
+        contact.body.addLayout(btns)
+        contact.body.addStretch(1)
+        grid.addWidget(contact, 0, 1)
+
+        legal = GlassCard(padding=20, spacing=10)
+        legal.body.addWidget(make_label("ПРАВОВАЯ ИНФОРМАЦИЯ", "CardKicker"))
+        legal.body.addWidget(make_label("Пользовательское соглашение", "CardTitle"))
+        legal.body.addWidget(make_label(
+            "Условия использования программы, ограничения и ответственность сторон.",
+            "CardBody", wrap=True))
+        open_btn = QPushButton("Открыть соглашение")
+        open_btn.setObjectName("Ghost")
+        open_btn.setFixedHeight(38)
+        open_btn.setCursor(Qt.PointingHandCursor)
+        open_btn.clicked.connect(on_show_eula)
+        legal.body.addWidget(open_btn, 0, Qt.AlignLeft)
+        legal.body.addStretch(1)
+        grid.addWidget(legal, 0, 2)
+
+        for i in range(3):
+            grid.setColumnStretch(i, 1)
         self.body.addLayout(grid)
 
-        credits = GlassCard(padding=22, hoverable=False)
-        credits.body.setSpacing(6)
-        credits.body.addWidget(make_label("STACK", "CardKicker"))
-        credits.body.addWidget(make_label(
-            "Python 3 · PySide6 (Qt 6) · кастомный QSS · собственная графика 4K",
-            "CardBody", wrap=True))
-        credits.body.addWidget(make_label(
-            "© 2026 IstikFramer. Версия 0.1 — визуальный прототип оболочки: "
-            "функциональные модули подключаются в следующих релизах.",
-            "StatCaption", wrap=True))
-        self.body.addWidget(credits)
+        # --- технические сведения ---
+        tech = GlassCard(padding=20, spacing=12, hoverable=False)
+        tech.body.addWidget(make_label("СВЕДЕНИЯ О СБОРКЕ", "CardKicker"))
+        rows = [
+            ("Версия", cfg.APP_VERSION),
+            ("Сборка", cfg.APP_BUILD),
+            ("Канал", cfg.APP_CHANNEL),
+            ("Платформа", "Windows · Linux · macOS"),
+            ("Файл настроек", str(cfg.SETTINGS_FILE)),
+        ]
+        for i, (k, v) in enumerate(rows):
+            if i:
+                tech.body.addWidget(Divider())
+            r = QHBoxLayout()
+            r.addWidget(make_label(k, "CardBody"))
+            r.addStretch(1)
+            r.addWidget(make_label(v, "Mono"))
+            tech.body.addLayout(r)
+        self.body.addWidget(tech)
+
+        self.body.addWidget(make_label(
+            f"© {cfg.DEV_YEAR} {cfg.DEV_NAME} Все права защищены.", "Caption"))
         self.body.addStretch(1)
+
+    def _copy_mail(self):
+        QGuiApplication.clipboard().setText(cfg.DEV_EMAIL)
+        self._copy_btn.setText("Скопировано")
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(1600, lambda: self._copy_btn.setText("Копировать адрес"))

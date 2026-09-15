@@ -1,85 +1,304 @@
-"""LIFE OS — переиспользуемые визуальные компоненты (оболочка, без логики)."""
+"""LIFE OS — библиотека визуальных компонентов.
+
+Все анимации идут через общий движок (lifeos.anim), поэтому кадры ровные,
+частота ограничена настройками, а при отключённых анимациях виджеты
+просто перестают получать такты и не тратят ресурсы.
+"""
 from __future__ import annotations
 
 import math
 from pathlib import Path
 
 from PySide6.QtCore import (
-    QEasingCurve, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSize,
-    Property, Qt, QTimer, Signal,
+    QEasingCurve, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt,
+    Signal,
 )
 from PySide6.QtGui import (
-    QBrush, QColor, QConicalGradient, QFont, QIcon, QLinearGradient, QPainter,
-    QPainterPath, QPen, QPixmap, QRadialGradient,
+    QBrush, QColor, QConicalGradient, QFont, QFontMetrics, QLinearGradient,
+    QPainter, QPainterPath, QPen, QPixmap, QRadialGradient,
 )
 from PySide6.QtWidgets import (
-    QFrame, QGraphicsDropShadowEffect, QGraphicsOpacityEffect, QHBoxLayout,
-    QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget,
+    QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QPushButton,
+    QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from . import config as cfg
-from .theme import ACCENTS
+from . import icons
+from .anim import Spring, driver
+from .settings import settings
+from .theme import current_accent
 
-_pixmap_cache: dict[tuple[str, int, int], QPixmap] = {}
+_pm_cache: dict[tuple, QPixmap] = {}
 
 
 def load_pixmap(path: Path | str, w: int = 0, h: int = 0) -> QPixmap:
-    """Загрузка картинки с кэшем и мягким масштабированием."""
     key = (str(path), w, h)
-    if key in _pixmap_cache:
-        return _pixmap_cache[key]
-    pm = QPixmap(str(path))
-    if not pm.isNull() and (w or h):
-        if w and h:
-            pm = pm.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        elif w:
-            pm = pm.scaledToWidth(w, Qt.SmoothTransformation)
-        else:
-            pm = pm.scaledToHeight(h, Qt.SmoothTransformation)
-    _pixmap_cache[key] = pm
-    return pm
+    if key not in _pm_cache:
+        pm = QPixmap(str(path))
+        if not pm.isNull() and (w or h):
+            if w and h:
+                pm = pm.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            elif w:
+                pm = pm.scaledToWidth(w, Qt.SmoothTransformation)
+            else:
+                pm = pm.scaledToHeight(h, Qt.SmoothTransformation)
+        _pm_cache[key] = pm
+    return _pm_cache[key]
 
 
-def glow(widget: QWidget, color: str = "#00E5FF", radius: int = 34, alpha: int = 90, dy: int = 6):
-    """Неоновая тень-свечение под виджет."""
+def make_label(text: str, obj: str, parent=None, wrap: bool = False) -> QLabel:
+    lb = QLabel(text, parent)
+    lb.setObjectName(obj)
+    lb.setWordWrap(wrap)
+    if wrap:
+        lb.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+    return lb
+
+
+def soft_shadow(widget: QWidget, blur: int = 40, alpha: int = 150, dy: int = 12):
+    if not settings.get("heavy_effects"):
+        widget.setGraphicsEffect(None)
+        return None
     eff = QGraphicsDropShadowEffect(widget)
-    col = QColor(color)
-    col.setAlpha(alpha)
-    eff.setColor(col)
-    eff.setBlurRadius(radius)
+    eff.setColor(QColor(0, 0, 0, alpha))
+    eff.setBlurRadius(blur)
     eff.setOffset(0, dy)
     widget.setGraphicsEffect(eff)
     return eff
 
 
-# ---------------------------------------------------------------------------
-class BackgroundCanvas(QWidget):
-    """Фон окна: 4K-картинка + затемнение + мягкие цветные блики."""
+# ===========================================================================
+class Divider(QFrame):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName("Divider")
+        self.setFixedHeight(1)
+        self.setAttribute(Qt.WA_StyledBackground, True)
 
-    def __init__(self, parent=None, image: str = "bg_main.jpg", accent: str = "cyan"):
+
+# ===========================================================================
+class BackgroundCanvas(QWidget):
+    """Фон окна: изображение, затемнение и два медленно дышащих блика.
+
+    Статичная часть (картинка + затемнение + рамка) собирается в кэш-пиксмап
+    один раз на размер окна, а каждый кадр рисуется только готовый кэш плюс
+    два заранее отрендеренных пятна свечения. Благодаря этому фон перестал
+    съедать кадры: раньше полноэкранный градиент пересчитывался 60 раз в
+    секунду и ронял частоту до 25 FPS.
+    """
+
+    _GLOW_TEX = 192  # размер текстуры свечения
+
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        self._image = image
-        self._accent = accent
-        self._src = QPixmap(str(cfg.BACKGROUNDS / image))
-        self._scaled: QPixmap | None = None
+        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+        self._src = QPixmap()
+        self._base: QPixmap | None = None
+        self._glow: QPixmap | None = None
+        self._glow_key: tuple = ()
         self._phase = 0.0
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start(40)
+        self._accum = 0.0
+        self.reload()
+        driver().subscribe(self, self._tick)
 
-    def set_image(self, image: str):
-        self._image = image
-        self._src = QPixmap(str(cfg.BACKGROUNDS / image))
+    # ------------------------------------------------------------- ресурсы
+    def reload(self):
+        self._src = QPixmap(str(cfg.BACKGROUNDS / settings.get("background")))
+        self._base = None
+        self.update()
+
+    def invalidate(self):
+        self._base = None
+        self._glow = None
+        self.update()
+
+    def _build_base(self):
+        r = self.rect()
+        if r.width() < 2 or r.height() < 2:
+            return
+        pm = QPixmap(r.size())
+        pm.fill(QColor("#04060C"))
+        p = QPainter(pm)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        rad = settings.get("corner_radius")
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(r), rad, rad)
+        p.setClipPath(path)
+
+        if not self._src.isNull():
+            sc = self._src.scaled(r.size(), Qt.KeepAspectRatioByExpanding,
+                                  Qt.SmoothTransformation)
+            p.drawPixmap(r, sc, QRect((sc.width() - r.width()) // 2,
+                                      (sc.height() - r.height()) // 2,
+                                      r.width(), r.height()))
+        veil = QLinearGradient(0, 0, r.width(), r.height())
+        veil.setColorAt(0.0, QColor(4, 6, 12, 200))
+        veil.setColorAt(0.5, QColor(4, 6, 12, 228))
+        veil.setColorAt(1.0, QColor(4, 6, 12, 206))
+        p.fillRect(r, QBrush(veil))
+
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(255, 255, 255, 24), 1))
+        p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), rad, rad)
+        p.end()
+        self._base = pm
+
+    def _build_glow(self):
+        """Круглая текстура свечения — рисуется один раз, затем растягивается."""
+        acc = current_accent()
+        key = (acc.primary, acc.secondary)
+        if self._glow is not None and self._glow_key == key:
+            return
+        n = self._GLOW_TEX
+        pm = QPixmap(n * 2, n)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing)
+        for i, col in enumerate((QColor(acc.primary), QColor(acc.secondary))):
+            g = QRadialGradient(QPointF(n * i + n / 2, n / 2), n / 2)
+            c = QColor(col)
+            c.setAlpha(255)
+            g.setColorAt(0.0, c)
+            mid = QColor(col)
+            mid.setAlpha(90)
+            g.setColorAt(0.45, mid)
+            c0 = QColor(col)
+            c0.setAlpha(0)
+            g.setColorAt(1.0, c0)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(g))
+            p.drawRect(n * i, 0, n, n)
+        p.end()
+        self._glow = pm
+        self._glow_key = key
+
+    # --------------------------------------------------------------- кадр
+    def _tick(self, dt: float):
+        if not settings.get("heavy_effects") or settings.glow_alpha <= 0.02:
+            return
+        self._phase = (self._phase + dt * 0.22) % (math.pi * 2)
+        # блики дышат очень медленно, поэтому фону хватает ~20 кадров в секунду.
+        # Перерисовывать его синхронно с интерфейсом незачем: это полноэкранная
+        # операция, которая забирала бы кадры у отзывчивых элементов.
+        self._accum += dt
+        if self._accum < 0.05:
+            return
+        self._accum = 0.0
+        self.update()
+
+    def resizeEvent(self, e):
+        self._base = None
+        super().resizeEvent(e)
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        r = self.rect()
+        if self._base is None or self._base.size() != r.size():
+            self._build_base()
+        if self._base is not None:
+            p.drawPixmap(0, 0, self._base)
+
+        strength = settings.glow_alpha
+        if strength <= 0.02 or not settings.get("heavy_effects"):
+            p.end()
+            return
+
+        self._build_glow()
+        p.setRenderHint(QPainter.SmoothPixmapTransform)
+        n = self._GLOW_TEX
+        size = max(r.width(), r.height()) * 1.45
+        for idx, (cx, cy, base, ph) in enumerate((
+            (0.14, 0.08, 0.13, 0.0),
+            (0.90, 0.94, 0.11, 2.2),
+        )):
+            pulse = 0.5 + 0.5 * math.sin(self._phase + ph)
+            p.setOpacity(min(0.6, (base + pulse * 0.05) * strength))
+            p.drawPixmap(
+                QRectF(r.width() * cx - size / 2, r.height() * cy - size / 2, size, size),
+                self._glow, QRectF(n * idx, 0, n, n))
+        p.setOpacity(1.0)
+        p.end()
+
+
+# ===========================================================================
+class GlassCard(QFrame):
+    """Стеклянная карточка. При наведении мягко подсвечивается и приподнимается."""
+
+    def __init__(self, parent=None, hoverable: bool = True, padding: int = 20,
+                 spacing: int = 12):
+        super().__init__(parent)
+        self.setObjectName("GlassCard")
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self._hoverable = hoverable
+        self._hover = Spring(0.0, 14.0)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(padding, padding, padding, padding)
+        lay.setSpacing(spacing)
+        self.body = lay
+        soft_shadow(self, 38, 140, 10)
+        if hoverable:
+            self.setAttribute(Qt.WA_Hover, True)
+            driver().subscribe(self, self._tick)
+
+    def enterEvent(self, e):
+        if self._hoverable:
+            self._hover.set(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hover.set(0.0)
+        super().leaveEvent(e)
+
+    def _tick(self, dt: float):
+        if self._hover.done:
+            return
+        self._hover.step(dt)
+        self.update()
+
+    def paintEvent(self, e):
+        super().paintEvent(e)
+        v = self._hover.value
+        if v < 0.01:
+            return
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        rad = settings.get("corner_radius")
+        acc = current_accent()
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+
+        wash = QColor(acc.primary)
+        wash.setAlphaF(0.05 * v)
+        p.setPen(Qt.NoPen)
+        p.setBrush(wash)
+        p.drawRoundedRect(r, rad, rad)
+
+        edge = QColor(acc.primary)
+        edge.setAlphaF(0.45 * v)
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(edge, 1.2))
+        p.drawRoundedRect(r, rad, rad)
+        p.end()
+
+
+# ===========================================================================
+class ImagePanel(QFrame):
+    """Панель с фоновой картинкой, затемнением и скруглением."""
+
+    def __init__(self, image_path: Path | str, parent=None, overlay: float = 0.55,
+                 radius: int | None = None, gradient_dir: str = "h"):
+        super().__init__(parent)
+        self.setObjectName("HeroCard")
+        self._src = QPixmap(str(image_path))
+        self._scaled: QPixmap | None = None
+        self._overlay = overlay
+        self._radius = radius
+        self._dir = gradient_dir
+        soft_shadow(self, 46, 170, 14)
+
+    def set_image(self, path: Path | str):
+        self._src = QPixmap(str(path))
         self._scaled = None
-        self.update()
-
-    def set_accent(self, accent: str):
-        self._accent = accent
-        self.update()
-
-    def _tick(self):
-        self._phase = (self._phase + 0.0045) % (math.pi * 2)
         self.update()
 
     def resizeEvent(self, e):
@@ -90,229 +309,688 @@ class BackgroundCanvas(QWidget):
         p = QPainter(self)
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         r = self.rect()
-
+        if r.width() < 2 or r.height() < 2:
+            return
+        rad = self._radius if self._radius is not None else settings.get("corner_radius")
         path = QPainterPath()
-        path.addRoundedRect(QRectF(r), cfg.WINDOW_RADIUS, cfg.WINDOW_RADIUS)
+        path.addRoundedRect(QRectF(r), rad, rad)
         p.setClipPath(path)
-
-        p.fillRect(r, QColor("#05070D"))
+        p.fillRect(r, QColor("#05080F"))
 
         if not self._src.isNull():
             if self._scaled is None or self._scaled.size() != r.size():
                 self._scaled = self._src.scaled(
-                    r.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
-                )
+                    r.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
             sx = (self._scaled.width() - r.width()) // 2
             sy = (self._scaled.height() - r.height()) // 2
             p.drawPixmap(r, self._scaled, QRect(sx, sy, r.width(), r.height()))
 
-        # затемнение, чтобы UI читался
-        veil = QLinearGradient(0, 0, r.width(), r.height())
-        veil.setColorAt(0.0, QColor(5, 7, 13, 205))
-        veil.setColorAt(0.5, QColor(5, 7, 13, 232))
-        veil.setColorAt(1.0, QColor(5, 7, 13, 210))
-        p.fillRect(r, QBrush(veil))
+        g = (QLinearGradient(0, 0, r.width(), 0) if self._dir == "h"
+             else QLinearGradient(0, 0, 0, r.height()))
+        o = self._overlay
+        g.setColorAt(0.0, QColor(4, 6, 12, int(255 * min(0.97, o + 0.34))))
+        g.setColorAt(0.60, QColor(4, 6, 12, int(255 * o)))
+        g.setColorAt(1.0, QColor(4, 6, 12, int(255 * max(0.0, o - 0.30))))
+        p.fillRect(r, QBrush(g))
 
-        # два «дышащих» неоновых блика
-        acc = ACCENTS.get(self._accent, ACCENTS["cyan"])
-        c1 = QColor(acc.primary)
-        c2 = QColor(acc.secondary)
-        for col, cx, cy, rad, base, ph in (
-            (c1, 0.16, 0.10, 0.62, 34, 0.0),
-            (c2, 0.88, 0.92, 0.70, 30, math.pi * 0.7),
-        ):
-            pulse = 0.5 + 0.5 * math.sin(self._phase + ph)
-            g = QRadialGradient(
-                QPointF(r.width() * cx, r.height() * cy), max(r.width(), r.height()) * rad
-            )
-            cc = QColor(col)
-            cc.setAlpha(int(base + pulse * 16))
-            g.setColorAt(0.0, cc)
-            cc2 = QColor(col)
-            cc2.setAlpha(0)
-            g.setColorAt(1.0, cc2)
-            p.fillRect(r, QBrush(g))
-
-        # тонкая внутренняя окантовка стекла
+        acc = current_accent()
+        edge = QColor(acc.primary)
+        edge.setAlpha(int(55 * min(1.0, settings.glow_alpha + 0.3)))
         p.setBrush(Qt.NoBrush)
-        p.setPen(QPen(QColor(255, 255, 255, 26), 1))
-        p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5),
-                          cfg.WINDOW_RADIUS, cfg.WINDOW_RADIUS)
+        p.setPen(QPen(edge, 1))
+        p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), rad, rad)
         p.end()
 
 
-# ---------------------------------------------------------------------------
-class GlassCard(QFrame):
-    """Полупрозрачная стеклянная карточка с мягким свечением."""
-
-    def __init__(self, parent=None, hoverable: bool = True, padding: int = 20,
-                 spacing: int = 12, accent: str = "#00E5FF"):
-        super().__init__(parent)
-        self.setObjectName("GlassCard")
-        self.setProperty("hoverable", "true" if hoverable else "false")
-        self.setAttribute(Qt.WA_StyledBackground, True)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(padding, padding, padding, padding)
-        lay.setSpacing(spacing)
-        self.body = lay
-        eff = QGraphicsDropShadowEffect(self)
-        eff.setColor(QColor(0, 0, 0, 150))
-        eff.setBlurRadius(38)
-        eff.setOffset(0, 12)
-        self.setGraphicsEffect(eff)
-
-
-class Divider(QFrame):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("SidebarDivider")
-        self.setFixedHeight(1)
-        self.setAttribute(Qt.WA_StyledBackground, True)
-
-
-# ---------------------------------------------------------------------------
+# ===========================================================================
 class NavButton(QPushButton):
-    """Пункт бокового меню: иконка + подпись + неоновый индикатор слева."""
+    """Пункт бокового меню: SVG-иконка, подпись, плавная подсветка и индикатор."""
 
-    def __init__(self, text: str, icon_path: Path | str, parent=None, accent: str = "#00E5FF"):
+    def __init__(self, text: str, icon_name: str, parent=None):
         super().__init__(parent)
         self.setObjectName("NavItem")
         self.setCheckable(True)
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(46)
-        self._full_text = text
-        self._accent = accent
+        self.setAttribute(Qt.WA_Hover, True)
+        self._label = text
+        self._icon_name = icon_name
         self._collapsed = False
-        self.setIcon(QIcon(str(icon_path)))
-        self.setIconSize(QSize(22, 22))
-        self.setText("   " + text)
-
-    def set_accent(self, color: str):
-        self._accent = color
-        self.update()
+        self._sel = Spring(0.0, 15.0)
+        self._hov = Spring(0.0, 18.0)
+        driver().subscribe(self, self._tick)
 
     def set_collapsed(self, collapsed: bool):
         self._collapsed = collapsed
-        self.setText("" if collapsed else "   " + self._full_text)
-        self.setToolTip(self._full_text if collapsed else "")
+        self.setToolTip(self._label if collapsed else "")
+        self.update()
+
+    def setChecked(self, on: bool):
+        super().setChecked(on)
+        self._sel.set(1.0 if on else 0.0)
+        self.update()
+
+    def enterEvent(self, e):
+        self._hov.set(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hov.set(0.0)
+        super().leaveEvent(e)
+
+    def _tick(self, dt: float):
+        if self._sel.done and self._hov.done:
+            return
+        self._sel.step(dt)
+        self._hov.step(dt)
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        acc = current_accent()
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        rad = max(8, int(settings.get("corner_radius") * 0.66))
+        sel, hov = self._sel.value, self._hov.value
+
+        if hov > 0.01 and sel < 0.99:
+            c = QColor(255, 255, 255)
+            c.setAlphaF(0.05 * hov * (1 - sel))
+            p.setPen(Qt.NoPen)
+            p.setBrush(c)
+            p.drawRoundedRect(r, rad, rad)
+
+        if sel > 0.01:
+            g = QLinearGradient(r.left(), 0, r.right(), 0)
+            c1 = QColor(acc.primary)
+            c1.setAlphaF(0.22 * sel)
+            c2 = QColor(acc.primary)
+            c2.setAlphaF(0.02 * sel)
+            g.setColorAt(0.0, c1)
+            g.setColorAt(1.0, c2)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(g))
+            p.drawRoundedRect(r, rad, rad)
+            edge = QColor(acc.primary)
+            edge.setAlphaF(0.38 * sel)
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(edge, 1))
+            p.drawRoundedRect(r, rad, rad)
+
+            h = self.height()
+            bar = QRectF(4, h / 2 - h * 0.26 * sel, 3.2, h * 0.52 * sel)
+            p.setPen(Qt.NoPen)
+            halo = QColor(acc.primary)
+            halo.setAlphaF(0.30 * sel)
+            p.setBrush(halo)
+            p.drawRoundedRect(bar.adjusted(-2.5, -2.5, 2.5, 2.5), 5, 5)
+            p.setBrush(QColor(acc.primary))
+            p.drawRoundedRect(bar, 2, 2)
+
+        # иконка: цвет плавно уходит в акцент при выборе
+        base = QColor("#9DABC2")
+        act = QColor(acc.primary)
+        mix = QColor(
+            int(base.red() + (act.red() - base.red()) * max(sel, hov * 0.55)),
+            int(base.green() + (act.green() - base.green()) * max(sel, hov * 0.55)),
+            int(base.blue() + (act.blue() - base.blue()) * max(sel, hov * 0.55)),
+        )
+        pm = icons.pixmap(self._icon_name, 21, mix.name(), 1.75)
+        ix = 21 if self._collapsed else 18
+        p.drawPixmap(int((self.width() - 21) / 2) if self._collapsed else ix,
+                     int((self.height() - 21) / 2), pm)
+
+        if not self._collapsed:
+            f = self.font()
+            f.setPointSizeF(max(8.0, 9.8 * settings.get("ui_scale") / 100))
+            f.setWeight(QFont.DemiBold if sel < 0.5 else QFont.Bold)
+            p.setFont(f)
+            tc = QColor("#EDF3FF") if sel > 0.5 else QColor("#9DABC2")
+            if sel <= 0.5 and hov > 0.01:
+                tc = QColor("#EDF3FF") if hov > 0.6 else tc
+            p.setPen(tc)
+            p.drawText(QRectF(50, 0, self.width() - 60, self.height()),
+                       Qt.AlignVCenter | Qt.AlignLeft, self._label)
+        p.end()
+
+
+# ===========================================================================
+class IconButton(QPushButton):
+    """Круглая/квадратная кнопка с SVG-иконкой и плавным hover."""
+
+    def __init__(self, icon_name: str, size: int = 34, icon_size: int = 18,
+                 parent=None, danger: bool = False, tooltip: str = ""):
+        super().__init__(parent)
+        self.setObjectName("WinBtnClose" if danger else "WinBtn")
+        self.setFixedSize(size, size)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAttribute(Qt.WA_Hover, True)
+        self._icon_name = icon_name
+        self._isize = icon_size
+        self._danger = danger
+        self._hov = Spring(0.0, 20.0)
+        if tooltip:
+            self.setToolTip(tooltip)
+        driver().subscribe(self, self._tick)
+
+    def set_icon_name(self, name: str):
+        self._icon_name = name
+        self.update()
+
+    def enterEvent(self, e):
+        self._hov.set(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hov.set(0.0)
+        super().leaveEvent(e)
+
+    def _tick(self, dt: float):
+        if self._hov.done:
+            return
+        self._hov.step(dt)
         self.update()
 
     def paintEvent(self, e):
         super().paintEvent(e)
-        if not self.isChecked():
-            return
         p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        col = QColor(self._accent)
-        h = self.height()
-        bar = QRectF(3, h * 0.24, 3.4, h * 0.52)
-        gl = QColor(col)
-        gl.setAlpha(70)
-        p.setPen(Qt.NoPen)
-        p.setBrush(gl)
-        p.drawRoundedRect(bar.adjusted(-2.5, -2.5, 2.5, 2.5), 5, 5)
-        p.setBrush(col)
-        p.drawRoundedRect(bar, 2, 2)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        v = self._hov.value
+        base = QColor("#9DABC2")
+        target = QColor("#FF5C6C") if self._danger else QColor("#EDF3FF")
+        col = QColor(
+            int(base.red() + (target.red() - base.red()) * v),
+            int(base.green() + (target.green() - base.green()) * v),
+            int(base.blue() + (target.blue() - base.blue()) * v),
+        )
+        pm = icons.pixmap(self._icon_name, self._isize, col.name(), 1.8)
+        p.drawPixmap(int((self.width() - self._isize) / 2),
+                     int((self.height() - self._isize) / 2), pm)
         p.end()
 
 
-# ---------------------------------------------------------------------------
-class PulseLine(QWidget):
-    """Живая линия пульса — декоративный «сигнал жизни» системы."""
+# ===========================================================================
+class Switch(QWidget):
+    """Переключатель с анимированным ползунком."""
 
-    def __init__(self, parent=None, accent: str = "#00E5FF", height: int = 64):
+    toggled = Signal(bool)
+
+    def __init__(self, checked: bool = False, parent=None):
         super().__init__(parent)
-        self.setFixedHeight(height)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self._accent = accent
-        self._t = 0.0
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start(33)
+        self.setFixedSize(46, 26)
+        self.setCursor(Qt.PointingHandCursor)
+        self._on = checked
+        self._pos = Spring(1.0 if checked else 0.0, 18.0)
+        driver().subscribe(self, self._tick)
 
-    def set_accent(self, color: str):
-        self._accent = color
+    def isChecked(self) -> bool:
+        return self._on
 
-    def _tick(self):
-        self._t += 0.055
+    def setChecked(self, on: bool, emit: bool = False):
+        if self._on == on:
+            return
+        self._on = on
+        self._pos.set(1.0 if on else 0.0)
         self.update()
+        if emit:
+            self.toggled.emit(on)
 
-    @staticmethod
-    def _beat(x: float) -> float:
-        """Форма кардио-импульса в зависимости от фазы 0..1."""
-        d = (x % 1.0) * 10.0
-        if 3.6 <= d < 4.1:
-            return -0.28
-        if 4.1 <= d < 4.5:
-            return 1.0
-        if 4.5 <= d < 4.9:
-            return -0.62
-        if 4.9 <= d < 5.3:
-            return 0.22
-        return 0.0
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton:
+            self.setChecked(not self._on, emit=True)
+        super().mousePressEvent(e)
+
+    def _tick(self, dt: float):
+        if self._pos.done:
+            return
+        self._pos.step(dt)
+        self.update()
 
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        w, h = self.width(), self.height()
-        mid = h / 2
-        col = QColor(self._accent)
+        acc = current_accent()
+        v = self._pos.value
+        r = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
 
-        path = QPainterPath()
-        steps = max(80, w // 3)
-        for i in range(steps + 1):
-            x = w * i / steps
-            phase = x / max(w, 1) * 2.0 - self._t * 0.28
-            v = self._beat(phase)
-            v += 0.05 * math.sin(x * 0.055 + self._t * 1.5)
-            y = mid - v * (h * 0.36)
-            path.lineTo(x, y) if i else path.moveTo(x, y)
+        off = QColor(255, 255, 255, 26)
+        on1, on2 = QColor(acc.primary), QColor(acc.secondary)
+        if v < 0.999:
+            p.setPen(Qt.NoPen)
+            p.setBrush(off)
+            p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
+        if v > 0.001:
+            g = QLinearGradient(r.left(), 0, r.right(), 0)
+            on1.setAlphaF(v)
+            on2.setAlphaF(v)
+            g.setColorAt(0.0, on1)
+            g.setColorAt(1.0, on2)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(g))
+            p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
 
-        halo = QColor(col)
-        halo.setAlpha(46)
-        p.setPen(QPen(halo, 7, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        p.drawPath(path)
-        halo.setAlpha(96)
-        p.setPen(QPen(halo, 3.4, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        p.drawPath(path)
-        p.setPen(QPen(col, 1.5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        p.drawPath(path)
+        p.setBrush(Qt.NoBrush)
+        edge = QColor(255, 255, 255, 40)
+        p.setPen(QPen(edge, 1))
+        p.drawRoundedRect(r, r.height() / 2, r.height() / 2)
+
+        d = self.height() - 8
+        x = 4 + v * (self.width() - d - 8)
+        knob = QRectF(x, 4, d, d)
+        p.setPen(Qt.NoPen)
+        if v > 0.3:
+            halo = QColor(acc.primary)
+            halo.setAlphaF(0.35 * v * min(1.0, settings.glow_alpha + 0.3))
+            p.setBrush(halo)
+            p.drawEllipse(knob.adjusted(-3, -3, 3, 3))
+        p.setBrush(QColor("#FFFFFF") if v > 0.5 else QColor("#C8D3E6"))
+        p.drawEllipse(knob)
         p.end()
 
 
-# ---------------------------------------------------------------------------
-class RingGauge(QWidget):
-    """Кольцевой индикатор с градиентом и плавной анимацией значения."""
+# ===========================================================================
+class Slider(QWidget):
+    """Слайдер: неоновая шкала, перетаскиваемая ручка, подпись значения."""
 
-    def __init__(self, parent=None, value: float = 0.0, caption: str = "",
-                 accent: str = "#00E5FF", accent2: str = "#2D7FF9", size: int = 132):
+    valueChanged = Signal(int)
+
+    def __init__(self, minimum: int = 0, maximum: int = 100, value: int = 50,
+                 step: int = 1, suffix: str = "", parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(34)
+        self.setMinimumWidth(180)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAttribute(Qt.WA_Hover, True)
+        self._min, self._max, self._step = minimum, maximum, step
+        self._value = max(minimum, min(maximum, value))
+        self._vis = Spring(float(self._value), 22.0)
+        self._hov = Spring(0.0, 18.0)
+        self._drag = False
+        driver().subscribe(self, self._tick)
+        self._suffix = suffix
+
+    # ------------------------------------------------------------ значение
+    def value(self) -> int:
+        return self._value
+
+    def setValue(self, v: int, emit: bool = True):
+        v = int(round(max(self._min, min(self._max, v)) / self._step) * self._step)
+        if v == self._value:
+            return
+        self._value = v
+        self._vis.set(float(v))
+        self.update()
+        if emit:
+            self.valueChanged.emit(v)
+
+    def _track(self) -> QRectF:
+        return QRectF(9, self.height() / 2 - 3, self.width() - 18, 6)
+
+    def _from_x(self, x: float) -> int:
+        t = self._track()
+        ratio = (x - t.left()) / max(1.0, t.width())
+        return round(self._min + max(0.0, min(1.0, ratio)) * (self._max - self._min))
+
+    # -------------------------------------------------------------- ввод
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton:
+            self._drag = True
+            self.setValue(self._from_x(e.position().x()))
+        super().mousePressEvent(e)
+
+    def mouseMoveEvent(self, e):
+        if self._drag:
+            self.setValue(self._from_x(e.position().x()))
+        super().mouseMoveEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        self._drag = False
+        super().mouseReleaseEvent(e)
+
+    def wheelEvent(self, e):
+        self.setValue(self._value + (self._step if e.angleDelta().y() > 0 else -self._step))
+        e.accept()
+
+    def enterEvent(self, e):
+        self._hov.set(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hov.set(0.0)
+        super().leaveEvent(e)
+
+    def _tick(self, dt: float):
+        if self._vis.done and self._hov.done:
+            return
+        self._vis.step(dt)
+        self._hov.step(dt)
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        acc = current_accent()
+        t = self._track()
+        ratio = (self._vis.value - self._min) / max(1e-6, self._max - self._min)
+
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(255, 255, 255, 24))
+        p.drawRoundedRect(t, 3, 3)
+
+        fill = QRectF(t)
+        fill.setWidth(max(6.0, t.width() * ratio))
+        g = QLinearGradient(t.left(), 0, t.right(), 0)
+        g.setColorAt(0.0, QColor(acc.primary))
+        g.setColorAt(1.0, QColor(acc.secondary))
+        glow_a = settings.glow_alpha
+        if glow_a > 0.05:
+            halo = QColor(acc.primary)
+            halo.setAlphaF(min(0.35, 0.26 * glow_a))
+            p.setBrush(halo)
+            p.drawRoundedRect(fill.adjusted(-1, -3.5, 1, 3.5), 6, 6)
+        p.setBrush(QBrush(g))
+        p.drawRoundedRect(fill, 3, 3)
+
+        d = 15 + 2.5 * self._hov.value
+        cx = t.left() + t.width() * ratio
+        knob = QRectF(cx - d / 2, self.height() / 2 - d / 2, d, d)
+        if glow_a > 0.05:
+            halo = QColor(acc.primary)
+            halo.setAlphaF(min(0.45, 0.32 * glow_a))
+            p.setBrush(halo)
+            p.drawEllipse(knob.adjusted(-4, -4, 4, 4))
+        p.setBrush(QColor("#FFFFFF"))
+        p.drawEllipse(knob)
+        p.setBrush(QColor(acc.primary))
+        p.drawEllipse(knob.adjusted(d * 0.30, d * 0.30, -d * 0.30, -d * 0.30))
+        p.end()
+
+
+class SliderRow(QWidget):
+    """Строка настройки: название, описание, слайдер и текущее значение."""
+
+    valueChanged = Signal(int)
+
+    def __init__(self, title: str, desc: str, minimum: int, maximum: int,
+                 value: int, suffix: str = "", step: int = 1, parent=None):
+        super().__init__(parent)
+        self._suffix = suffix
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 10, 0, 10)
+        lay.setSpacing(6)
+
+        head = QHBoxLayout()
+        head.setSpacing(10)
+        col = QVBoxLayout()
+        col.setSpacing(1)
+        col.addWidget(make_label(title, "CardTitle"))
+        if desc:
+            col.addWidget(make_label(desc, "Caption"))
+        head.addLayout(col)
+        head.addStretch(1)
+        self.value_label = make_label(f"{value}{suffix}", "MonoAccent")
+        self.value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.value_label.setFixedWidth(64)
+        head.addWidget(self.value_label)
+        lay.addLayout(head)
+
+        self.slider = Slider(minimum, maximum, value, step, suffix)
+        self.slider.valueChanged.connect(self._on_change)
+        lay.addWidget(self.slider)
+
+    def _on_change(self, v: int):
+        self.value_label.setText(f"{v}{self._suffix}")
+        self.valueChanged.emit(v)
+
+    def value(self) -> int:
+        return self.slider.value()
+
+    def setValue(self, v: int):
+        self.slider.setValue(v)
+
+
+# ===========================================================================
+class SegmentedControl(QWidget):
+    """Переключатель вариантов с плавно скользящим выделением."""
+
+    changed = Signal(int)
+
+    def __init__(self, options: list[str], index: int = 0, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(36)
+        self.setCursor(Qt.PointingHandCursor)
+        self._opts = options
+        self._index = index
+        self._pos = Spring(float(index), 20.0)
+        driver().subscribe(self, self._tick)
+
+    def currentIndex(self) -> int:
+        return self._index
+
+    def setCurrentIndex(self, i: int, emit: bool = False):
+        i = max(0, min(len(self._opts) - 1, i))
+        if i == self._index:
+            return
+        self._index = i
+        self._pos.set(float(i))
+        self.update()
+        if emit:
+            self.changed.emit(i)
+
+    def sizeHint(self) -> QSize:
+        fm = QFontMetrics(self.font())
+        w = sum(fm.horizontalAdvance(o) + 34 for o in self._opts) + 8
+        return QSize(w, 36)
+
+    def mousePressEvent(self, e):
+        seg = (self.width() - 8) / len(self._opts)
+        self.setCurrentIndex(int((e.position().x() - 4) / seg), emit=True)
+        super().mousePressEvent(e)
+
+    def _tick(self, dt: float):
+        if self._pos.done:
+            return
+        self._pos.step(dt)
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        acc = current_accent()
+        r = QRectF(0.5, 0.5, self.width() - 1, self.height() - 1)
+        rad = max(8, int(settings.get("corner_radius") * 0.55))
+
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(255, 255, 255, 18))
+        p.drawRoundedRect(r, rad, rad)
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(255, 255, 255, 26), 1))
+        p.drawRoundedRect(r, rad, rad)
+
+        seg = (self.width() - 8) / len(self._opts)
+        sel = QRectF(4 + seg * self._pos.value, 4, seg, self.height() - 8)
+        g = QLinearGradient(sel.left(), 0, sel.right(), 0)
+        g.setColorAt(0.0, QColor(acc.primary))
+        g.setColorAt(1.0, QColor(acc.secondary))
+        if settings.glow_alpha > 0.05:
+            halo = QColor(acc.primary)
+            halo.setAlphaF(min(0.35, 0.25 * settings.glow_alpha))
+            p.setPen(Qt.NoPen)
+            p.setBrush(halo)
+            p.drawRoundedRect(sel.adjusted(-2, -2, 2, 2), rad - 2, rad - 2)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(g))
+        p.drawRoundedRect(sel, rad - 3, rad - 3)
+
+        f = self.font()
+        f.setPointSizeF(max(7.5, 9.0 * settings.get("ui_scale") / 100))
+        f.setWeight(QFont.Bold)
+        p.setFont(f)
+        for i, opt in enumerate(self._opts):
+            cell = QRectF(4 + seg * i, 4, seg, self.height() - 8)
+            near = max(0.0, 1.0 - abs(self._pos.value - i))
+            base = QColor("#9DABC2")
+            over = QColor("#04121A")
+            col = QColor(
+                int(base.red() + (over.red() - base.red()) * near),
+                int(base.green() + (over.green() - base.green()) * near),
+                int(base.blue() + (over.blue() - base.blue()) * near),
+            )
+            p.setPen(col)
+            p.drawText(cell, Qt.AlignCenter, opt)
+        p.end()
+
+
+# ===========================================================================
+class ColorDot(QWidget):
+    """Кружок выбора акцента с анимированным кольцом выбора."""
+
+    clicked = Signal(str)
+
+    def __init__(self, key: str, primary: str, secondary: str,
+                 selected: bool = False, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(40, 40)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAttribute(Qt.WA_Hover, True)
+        self._key = key
+        self._c1, self._c2 = primary, secondary
+        self._sel = Spring(1.0 if selected else 0.0, 18.0)
+        self._hov = Spring(0.0, 20.0)
+        driver().subscribe(self, self._tick)
+
+    def setSelected(self, on: bool):
+        self._sel.set(1.0 if on else 0.0)
+        self.update()
+
+    def mousePressEvent(self, e):
+        if e.button() == Qt.LeftButton:
+            self.clicked.emit(self._key)
+        super().mousePressEvent(e)
+
+    def enterEvent(self, e):
+        self._hov.set(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hov.set(0.0)
+        super().leaveEvent(e)
+
+    def _tick(self, dt: float):
+        if self._sel.done and self._hov.done:
+            return
+        self._sel.step(dt)
+        self._hov.step(dt)
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        s, h = self._sel.value, self._hov.value
+        cx = cy = self.width() / 2
+        d = 22 + 2 * h + 2 * s
+        dot = QRectF(cx - d / 2, cy - d / 2, d, d)
+
+        g = QLinearGradient(dot.left(), dot.top(), dot.right(), dot.bottom())
+        g.setColorAt(0.0, QColor(self._c1))
+        g.setColorAt(1.0, QColor(self._c2))
+        if (s + h) > 0.05:
+            halo = QColor(self._c1)
+            halo.setAlphaF(min(0.5, (0.22 * s + 0.16 * h) * max(0.4, settings.glow_alpha)))
+            p.setPen(Qt.NoPen)
+            p.setBrush(halo)
+            p.drawEllipse(dot.adjusted(-6, -6, 6, 6))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(g))
+        p.drawEllipse(dot)
+
+        if s > 0.01:
+            ring = QColor(self._c1)
+            ring.setAlphaF(0.9 * s)
+            p.setBrush(Qt.NoBrush)
+            p.setPen(QPen(ring, 1.8))
+            rd = d + 10
+            p.drawEllipse(QRectF(cx - rd / 2, cy - rd / 2, rd, rd))
+            pm = icons.pixmap("check", 12, "#04121A", 2.6)
+            p.setOpacity(s)
+            p.drawPixmap(int(cx - 6), int(cy - 6), pm)
+            p.setOpacity(1.0)
+        p.end()
+
+
+# ===========================================================================
+class LogoOrb(QWidget):
+    """Фирменный орб: картинка логотипа с мягким дыханием и ореолом."""
+
+    def __init__(self, size: int = 56, parent=None, breathe: bool = True,
+                 asset: str = "logo_512.png"):
         super().__init__(parent)
         self.setFixedSize(size, size)
-        self._value = 0.0
-        self._target = value
-        self._caption = caption
-        self._accent = accent
-        self._accent2 = accent2
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start(16)
+        self._phase = 0.0
+        self._breathe = breathe
+        self._pm = load_pixmap(cfg.LOGO / asset, int(size * 0.92), int(size * 0.92))
+        if breathe:
+            driver().subscribe(self, self._tick)
 
-    def set_value(self, v: float):
-        self._target = max(0.0, min(100.0, v))
-
-    def set_accent(self, a: str, a2: str):
-        self._accent, self._accent2 = a, a2
+    def _tick(self, dt: float):
+        if not settings.get("heavy_effects"):
+            return
+        self._phase = (self._phase + dt * 0.9) % (math.pi * 2)
         self.update()
 
-    def _tick(self):
-        if abs(self._value - self._target) < 0.05:
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        s = min(self.width(), self.height())
+        acc = current_accent()
+        pulse = 0.5 + 0.5 * math.sin(self._phase) if self._breathe else 0.5
+
+        strength = settings.glow_alpha
+        if strength > 0.05:
+            g = QRadialGradient(QPointF(s / 2, s / 2), s * (0.48 + 0.06 * pulse))
+            c = QColor(acc.primary)
+            c.setAlphaF(min(0.42, (0.16 + 0.10 * pulse) * strength))
+            g.setColorAt(0.0, c)
+            c0 = QColor(acc.primary)
+            c0.setAlpha(0)
+            g.setColorAt(1.0, c0)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(g))
+            p.drawEllipse(QRectF(0, 0, s, s))
+
+        if not self._pm.isNull():
+            scale = 1.0 + 0.012 * pulse if self._breathe else 1.0
+            w = self._pm.width() * scale
+            h = self._pm.height() * scale
+            p.drawPixmap(QRectF((s - w) / 2, (s - h) / 2, w, h), self._pm,
+                         QRectF(self._pm.rect()))
+        p.end()
+
+
+# ===========================================================================
+class RingGauge(QWidget):
+    """Кольцевой индикатор с плавным подтягиванием значения."""
+
+    def __init__(self, value: float = 0.0, size: int = 128, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(size, size)
+        self._v = Spring(0.0, 6.0)
+        self._v.set(value)
+        driver().subscribe(self, self._tick)
+
+    def set_value(self, v: float):
+        self._v.set(max(0.0, min(100.0, v)))
+
+    def _tick(self, dt: float):
+        if self._v.done:
             return
-        self._value += (self._target - self._value) * 0.08
+        self._v.step(dt)
         self.update()
 
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
+        acc = current_accent()
         side = min(self.width(), self.height())
         pad = 11
         rect = QRectF(pad, pad, side - pad * 2, side - pad * 2)
@@ -321,245 +999,22 @@ class RingGauge(QWidget):
         p.drawArc(rect, 0, 360 * 16)
 
         grad = QConicalGradient(rect.center(), 90)
-        grad.setColorAt(0.0, QColor(self._accent))
-        grad.setColorAt(0.5, QColor(self._accent2))
-        grad.setColorAt(1.0, QColor(self._accent))
-        span = int(-self._value / 100.0 * 360 * 16)
-
-        halo = QColor(self._accent)
-        halo.setAlpha(60)
-        p.setPen(QPen(halo, 15, Qt.SolidLine, Qt.RoundCap))
-        p.drawArc(rect, 90 * 16, span)
+        grad.setColorAt(0.0, QColor(acc.primary))
+        grad.setColorAt(0.5, QColor(acc.secondary))
+        grad.setColorAt(1.0, QColor(acc.primary))
+        span = int(-self._v.value / 100.0 * 360 * 16)
+        if settings.glow_alpha > 0.05:
+            halo = QColor(acc.primary)
+            halo.setAlphaF(min(0.35, 0.24 * settings.glow_alpha))
+            p.setPen(QPen(halo, 15, Qt.SolidLine, Qt.RoundCap))
+            p.drawArc(rect, 90 * 16, span)
         p.setPen(QPen(QBrush(grad), 9, Qt.SolidLine, Qt.RoundCap))
         p.drawArc(rect, 90 * 16, span)
 
         f = QFont()
-        f.setPointSizeF(side * 0.155)
+        f.setPointSizeF(side * 0.15)
         f.setWeight(QFont.Black)
         p.setFont(f)
-        p.setPen(QColor("#EAF2FF"))
-        p.drawText(rect, Qt.AlignCenter, f"{int(round(self._value))}%")
-
-        if self._caption:
-            f2 = QFont()
-            f2.setPointSizeF(side * 0.068)
-            f2.setWeight(QFont.DemiBold)
-            p.setFont(f2)
-            p.setPen(QColor("#6B7A94"))
-            p.drawText(QRectF(0, side * 0.66, side, side * 0.2),
-                       Qt.AlignHCenter | Qt.AlignTop, self._caption)
+        p.setPen(QColor("#EDF3FF"))
+        p.drawText(rect, Qt.AlignCenter, f"{int(round(self._v.value))}%")
         p.end()
-
-
-# ---------------------------------------------------------------------------
-class SparkChart(QWidget):
-    """Декоративный график-волна для карточек статистики."""
-
-    def __init__(self, parent=None, accent: str = "#00E5FF", points: int = 44, height: int = 74):
-        super().__init__(parent)
-        self.setFixedHeight(height)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self._accent = accent
-        self._n = points
-        self._t = 0.0
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start(60)
-
-    def set_accent(self, color: str):
-        self._accent = color
-
-    def _tick(self):
-        self._t += 0.06
-        self.update()
-
-    def paintEvent(self, _):
-        p = QPainter(self)
-        p.setRenderHint(QPainter.Antialiasing)
-        w, h = self.width(), self.height()
-        col = QColor(self._accent)
-
-        pts: list[QPointF] = []
-        for i in range(self._n):
-            x = w * i / (self._n - 1)
-            u = i / (self._n - 1)
-            v = (
-                0.50
-                + 0.22 * math.sin(u * 7.0 + self._t)
-                + 0.13 * math.sin(u * 13.0 - self._t * 1.6)
-                + 0.07 * math.sin(u * 23.0 + self._t * 0.7)
-            )
-            pts.append(QPointF(x, h - v * h * 0.86 - h * 0.07))
-
-        line = QPainterPath(pts[0])
-        for pt in pts[1:]:
-            line.lineTo(pt)
-
-        area = QPainterPath(line)
-        area.lineTo(w, h)
-        area.lineTo(0, h)
-        area.closeSubpath()
-
-        g = QLinearGradient(0, 0, 0, h)
-        c1 = QColor(col); c1.setAlpha(80)
-        c2 = QColor(col); c2.setAlpha(0)
-        g.setColorAt(0.0, c1)
-        g.setColorAt(1.0, c2)
-        p.fillPath(area, QBrush(g))
-
-        halo = QColor(col); halo.setAlpha(70)
-        p.setPen(QPen(halo, 5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        p.drawPath(line)
-        p.setPen(QPen(col, 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        p.drawPath(line)
-        p.end()
-
-
-# ---------------------------------------------------------------------------
-class LogoBadge(QWidget):
-    """Логотип с вращающимся орбитальным кольцом вокруг."""
-
-    def __init__(self, parent=None, size: int = 44, accent: str = "#00E5FF",
-                 pixmap_name: str = "logo_mini_256.png", spin: bool = True):
-        super().__init__(parent)
-        self.setFixedSize(size, size)
-        self._accent = accent
-        self._angle = 0.0
-        self._spin = spin
-        self._pm = load_pixmap(cfg.LOGO / pixmap_name, int(size * 0.78), int(size * 0.78))
-        if spin:
-            self._timer = QTimer(self)
-            self._timer.timeout.connect(self._tick)
-            self._timer.start(33)
-
-    def set_accent(self, color: str):
-        self._accent = color
-        self.update()
-
-    def _tick(self):
-        self._angle = (self._angle + 1.1) % 360
-        self.update()
-
-    def paintEvent(self, _):
-        p = QPainter(self)
-        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        s = min(self.width(), self.height())
-        col = QColor(self._accent)
-
-        g = QRadialGradient(QPointF(s / 2, s / 2), s / 2)
-        c = QColor(col); c.setAlpha(58)
-        g.setColorAt(0.0, c)
-        c0 = QColor(col); c0.setAlpha(0)
-        g.setColorAt(1.0, c0)
-        p.fillRect(self.rect(), QBrush(g))
-
-        if self._spin:
-            rect = QRectF(1.5, 1.5, s - 3, s - 3)
-            ring = QColor(col); ring.setAlpha(150)
-            p.setPen(QPen(ring, 1.6, Qt.SolidLine, Qt.RoundCap))
-            p.drawArc(rect, int(self._angle * 16), 100 * 16)
-            ring.setAlpha(60)
-            p.setPen(QPen(ring, 1.2, Qt.SolidLine, Qt.RoundCap))
-            p.drawArc(rect, int((self._angle + 180) * 16), 60 * 16)
-
-        if not self._pm.isNull():
-            p.drawPixmap(
-                int((s - self._pm.width()) / 2),
-                int((s - self._pm.height()) / 2),
-                self._pm,
-            )
-        p.end()
-
-
-# ---------------------------------------------------------------------------
-class ImagePanel(QFrame):
-    """Панель с фоновой картинкой, скруглением и затемнением под текст."""
-
-    def __init__(self, image_path: Path | str, parent=None, radius: int = 22,
-                 overlay: float = 0.55, accent: str = "#00E5FF"):
-        super().__init__(parent)
-        self.setObjectName("HeroCard")
-        self._src = QPixmap(str(image_path))
-        self._scaled: QPixmap | None = None
-        self._radius = radius
-        self._overlay = overlay
-        self._accent = accent
-        eff = QGraphicsDropShadowEffect(self)
-        eff.setColor(QColor(0, 0, 0, 170))
-        eff.setBlurRadius(46)
-        eff.setOffset(0, 16)
-        self.setGraphicsEffect(eff)
-
-    def set_accent(self, color: str):
-        self._accent = color
-        self.update()
-
-    def resizeEvent(self, e):
-        self._scaled = None
-        super().resizeEvent(e)
-
-    def paintEvent(self, _):
-        p = QPainter(self)
-        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        r = self.rect()
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(r), self._radius, self._radius)
-        p.setClipPath(path)
-        p.fillRect(r, QColor("#070A12"))
-
-        if not self._src.isNull() and r.width() > 0 and r.height() > 0:
-            if self._scaled is None or self._scaled.size() != r.size():
-                self._scaled = self._src.scaled(
-                    r.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
-                )
-            sx = (self._scaled.width() - r.width()) // 2
-            sy = (self._scaled.height() - r.height()) // 2
-            p.drawPixmap(r, self._scaled, QRect(sx, sy, r.width(), r.height()))
-
-        g = QLinearGradient(0, 0, r.width(), 0)
-        g.setColorAt(0.0, QColor(5, 7, 13, int(255 * min(0.96, self._overlay + 0.32))))
-        g.setColorAt(0.62, QColor(5, 7, 13, int(255 * self._overlay)))
-        g.setColorAt(1.0, QColor(5, 7, 13, int(255 * max(0.0, self._overlay - 0.28))))
-        p.fillRect(r, QBrush(g))
-
-        p.setBrush(Qt.NoBrush)
-        edge = QColor(self._accent)
-        edge.setAlpha(60)
-        p.setPen(QPen(edge, 1))
-        p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), self._radius, self._radius)
-        p.end()
-
-
-# ---------------------------------------------------------------------------
-def make_label(text: str, obj: str, parent=None, wrap: bool = False) -> QLabel:
-    lb = QLabel(text, parent)
-    lb.setObjectName(obj)
-    lb.setWordWrap(wrap)
-    return lb
-
-
-def row(*widgets: QWidget, spacing: int = 10, stretch_last: bool = False) -> QWidget:
-    w = QWidget()
-    lay = QHBoxLayout(w)
-    lay.setContentsMargins(0, 0, 0, 0)
-    lay.setSpacing(spacing)
-    for item in widgets:
-        lay.addWidget(item)
-    if stretch_last:
-        lay.addStretch(1)
-    return w
-
-
-def fade_in(widget: QWidget, duration: int = 260, delay: int = 0) -> QPropertyAnimation:
-    """Плавное появление виджета."""
-    eff = QGraphicsOpacityEffect(widget)
-    widget.setGraphicsEffect(eff)
-    eff.setOpacity(0.0)
-    anim = QPropertyAnimation(eff, b"opacity", widget)
-    anim.setDuration(duration)
-    anim.setStartValue(0.0)
-    anim.setEndValue(1.0)
-    anim.setEasingCurve(QEasingCurve.OutCubic)
-    widget._fade_anim = anim  # держим ссылку
-    QTimer.singleShot(delay, anim.start)
-    return anim

@@ -1,48 +1,49 @@
-"""LIFE OS — стартовый экран загрузки (безрамочный, с логотипом и прогрессом)."""
+"""LIFE OS — экран загрузки: орб, название, прогресс и этапы запуска."""
 from __future__ import annotations
+
+import math
 
 from PySide6.QtCore import QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (
     QBrush, QColor, QFont, QLinearGradient, QPainter, QPainterPath, QPixmap,
+    QRadialGradient,
 )
 from PySide6.QtWidgets import QWidget
 
 from . import config as cfg
-from .theme import ACCENTS, DEFAULT_ACCENT
+from .anim import Spring, driver, ease_out_cubic
+from .theme import current_accent
 
 STEPS = [
-    "Инициализация ядра…",
-    "Загрузка темы Dark Glass…",
-    "Подготовка графики 4K…",
-    "Сборка модулей оболочки…",
-    "Подключение системного трея…",
-    "Готово",
+    (0.00, "Инициализация"),
+    (0.18, "Загрузка оформления"),
+    (0.40, "Подготовка графики"),
+    (0.62, "Сборка интерфейса"),
+    (0.84, "Почти готово"),
+    (1.00, "Запуск"),
 ]
 
 
 class SplashScreen(QWidget):
     finished = Signal()
 
-    def __init__(self, accent_key: str = DEFAULT_ACCENT, duration_ms: int = 2200):
+    def __init__(self, duration_s: float = 2.1):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.SplashScreen | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setFixedSize(620, 360)
+        self.setFixedSize(640, 392)
 
-        self._acc = ACCENTS[accent_key]
-        self._bg = QPixmap(str(cfg.BACKGROUNDS / "splash.jpg")).scaled(
-            self.size() * 1.0, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
-        self._logo = QPixmap(str(cfg.LOGO / "logo_512.png")).scaled(
+        self._bg = QPixmap(str(cfg.BACKGROUNDS / "splash.jpg"))
+        self._orb = QPixmap(str(cfg.LOGO / "logo_512.png")).scaled(
             132, 132, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-        self._progress = 0.0
-        self._step = 0
-        self._tick_ms = 16
-        self._per_tick = 100.0 / max(1, duration_ms / self._tick_ms)
-
-        self._timer = QTimer(self)
-        self._timer.timeout.connect(self._tick)
-        self._timer.start(self._tick_ms)
+        self._t = 0.0
+        self._duration = max(0.6, duration_s)
+        self._progress = Spring(0.0, 9.0)
+        self._fade = 0.0
+        self._done = False
+        self._phase = 0.0
+        driver().subscribe(self, self._tick)
         self._center()
 
     def _center(self):
@@ -50,15 +51,19 @@ class SplashScreen(QWidget):
         self.move(scr.center().x() - self.width() // 2,
                   scr.center().y() - self.height() // 2)
 
-    def _tick(self):
-        self._progress = min(100.0, self._progress + self._per_tick)
-        self._step = min(len(STEPS) - 1, int(self._progress / 100 * (len(STEPS) - 1) + 0.001))
+    def _tick(self, dt: float):
+        self._t += dt
+        self._phase = (self._phase + dt * 1.6) % (math.pi * 2)
+        self._fade = min(1.0, self._fade + dt * 3.2)
+        self._progress.set(min(1.0, self._t / self._duration) * 100.0)
+        self._progress.step(dt)
         self.update()
-        if self._progress >= 100.0:
-            self._timer.stop()
-            QTimer.singleShot(260, self._done)
+        if not self._done and self._t >= self._duration + 0.25:
+            self._done = True
+            driver().unsubscribe(self)
+            QTimer.singleShot(120, self._finish)
 
-    def _done(self):
+    def _finish(self):
         self.finished.emit()
         self.close()
 
@@ -66,71 +71,97 @@ class SplashScreen(QWidget):
         p = QPainter(self)
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
         r = self.rect()
+        acc = current_accent()
         path = QPainterPath()
-        path.addRoundedRect(QRectF(r), 20, 20)
+        path.addRoundedRect(QRectF(r), 22, 22)
         p.setClipPath(path)
+        p.setOpacity(ease_out_cubic(self._fade))
 
-        p.fillRect(r, QColor("#05070D"))
+        p.fillRect(r, QColor("#04060C"))
         if not self._bg.isNull():
-            p.drawPixmap(
-                int((r.width() - self._bg.width()) / 2),
-                int((r.height() - self._bg.height()) / 2),
-                self._bg,
-            )
+            scaled = self._bg.scaled(r.size(), Qt.KeepAspectRatioByExpanding,
+                                     Qt.SmoothTransformation)
+            p.drawPixmap(int((r.width() - scaled.width()) / 2),
+                         int((r.height() - scaled.height()) / 2), scaled)
         veil = QLinearGradient(0, 0, 0, r.height())
-        veil.setColorAt(0.0, QColor(5, 7, 13, 170))
-        veil.setColorAt(1.0, QColor(5, 7, 13, 238))
+        veil.setColorAt(0.0, QColor(4, 6, 12, 150))
+        veil.setColorAt(1.0, QColor(4, 6, 12, 240))
         p.fillRect(r, QBrush(veil))
 
-        if not self._logo.isNull():
-            p.drawPixmap(int((r.width() - self._logo.width()) / 2), 52, self._logo)
+        # орб с дыханием
+        pulse = 0.5 + 0.5 * math.sin(self._phase)
+        cx, cy = r.width() / 2, 118.0
+        halo = QRadialGradient(cx, cy, 116 + 8 * pulse)
+        c = QColor(acc.primary)
+        c.setAlphaF(0.20 + 0.08 * pulse)
+        halo.setColorAt(0.0, c)
+        c0 = QColor(acc.primary)
+        c0.setAlpha(0)
+        halo.setColorAt(1.0, c0)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(halo))
+        p.drawEllipse(QRectF(cx - 130, cy - 130, 260, 260))
 
-        p.setPen(QColor("#EAF2FF"))
+        if not self._orb.isNull():
+            sc = 1.0 + 0.018 * pulse
+            w = self._orb.width() * sc
+            h = self._orb.height() * sc
+            p.drawPixmap(QRectF(cx - w / 2, cy - h / 2, w, h), self._orb,
+                         QRectF(self._orb.rect()))
+
+        # название
         f = QFont()
-        f.setPointSize(19)
+        f.setPointSize(20)
         f.setWeight(QFont.Black)
-        f.setLetterSpacing(QFont.AbsoluteSpacing, 6)
+        f.setLetterSpacing(QFont.AbsoluteSpacing, 7)
         p.setFont(f)
-        p.drawText(QRectF(0, 198, r.width(), 30), Qt.AlignCenter, "LIFE OS")
+        p.setPen(QColor("#EDF3FF"))
+        p.drawText(QRectF(0, 212, r.width(), 34), Qt.AlignCenter, "LIFE OS")
 
         f2 = QFont()
         f2.setPointSize(8)
         f2.setWeight(QFont.DemiBold)
-        f2.setLetterSpacing(QFont.AbsoluteSpacing, 2)
+        f2.setLetterSpacing(QFont.AbsoluteSpacing, 2.4)
         p.setFont(f2)
-        p.setPen(QColor(self._acc.primary))
-        p.drawText(QRectF(0, 228, r.width(), 20), Qt.AlignCenter,
-                   f"VERSION {cfg.APP_VERSION}  ·  {cfg.APP_TAGLINE.upper()}")
+        p.setPen(QColor(acc.primary))
+        p.drawText(QRectF(0, 246, r.width(), 20), Qt.AlignCenter,
+                   f"ВЕРСИЯ {cfg.APP_VERSION}   ·   {cfg.DEV_NAME.upper()}")
 
         # прогресс
-        bar = QRectF(90, 286, r.width() - 180, 6)
+        val = self._progress.value / 100.0
+        bar = QRectF(96, 310, r.width() - 192, 5)
         p.setPen(Qt.NoPen)
-        p.setBrush(QColor(255, 255, 255, 24))
-        p.drawRoundedRect(bar, 3, 3)
+        p.setBrush(QColor(255, 255, 255, 26))
+        p.drawRoundedRect(bar, 2.5, 2.5)
         fill = QRectF(bar)
-        fill.setWidth(bar.width() * self._progress / 100.0)
-        g = QLinearGradient(fill.left(), 0, bar.right(), 0)
-        g.setColorAt(0.0, QColor(self._acc.primary))
-        g.setColorAt(1.0, QColor(self._acc.secondary))
-        glow = QColor(self._acc.primary)
-        glow.setAlpha(70)
+        fill.setWidth(max(3.0, bar.width() * val))
+        g = QLinearGradient(bar.left(), 0, bar.right(), 0)
+        g.setColorAt(0.0, QColor(acc.primary))
+        g.setColorAt(1.0, QColor(acc.secondary))
+        glow = QColor(acc.primary)
+        glow.setAlphaF(0.34)
         p.setBrush(glow)
-        p.drawRoundedRect(fill.adjusted(-2, -3, 2, 3), 6, 6)
+        p.drawRoundedRect(fill.adjusted(-1, -3, 1, 3), 5, 5)
         p.setBrush(QBrush(g))
-        p.drawRoundedRect(fill, 3, 3)
+        p.drawRoundedRect(fill, 2.5, 2.5)
 
+        label = STEPS[0][1]
+        for th, name in STEPS:
+            if val >= th:
+                label = name
         f3 = QFont()
         f3.setPointSize(8)
         p.setFont(f3)
         p.setPen(QColor("#6B7A94"))
-        p.drawText(QRectF(90, 302, bar.width(), 22), Qt.AlignLeft | Qt.AlignVCenter,
-                   STEPS[self._step])
-        p.drawText(QRectF(90, 302, bar.width(), 22), Qt.AlignRight | Qt.AlignVCenter,
-                   f"{int(self._progress)}%")
+        p.drawText(QRectF(96, 322, bar.width(), 22),
+                   Qt.AlignLeft | Qt.AlignVCenter, label)
+        p.drawText(QRectF(96, 322, bar.width(), 22),
+                   Qt.AlignRight | Qt.AlignVCenter, f"{int(val * 100)}%")
 
         p.setBrush(Qt.NoBrush)
-        edge = QColor(self._acc.primary)
-        edge.setAlpha(70)
-        p.setPen(edge)
-        p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), 20, 20)
+        from PySide6.QtGui import QPen
+        edge = QColor(acc.primary)
+        edge.setAlpha(64)
+        p.setPen(QPen(edge, 1))
+        p.drawRoundedRect(QRectF(r).adjusted(0.5, 0.5, -0.5, -0.5), 22, 22)
         p.end()

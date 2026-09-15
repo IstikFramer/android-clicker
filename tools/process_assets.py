@@ -80,10 +80,9 @@ def log(msg: str):
 # ---------------------------------------------------------------- логотипы
 def build_logos():
     jobs = [
-        ("logo_main_raw.png", "logo", (2048, 1024, 512, 256, 128)),
-        ("logo_mini_raw.png", "logo_mini", (512, 256, 128, 64)),
-        ("logo_tray_raw.png", "logo_tray", (256, 128, 64, 32, 16)),
-        ("orb_decor_raw.png", "orb", (1024, 512, 256)),
+        ("v2_logo_main.png", "logo", (2048, 1024, 512, 256, 128)),
+        ("v2_logo_mini.png", "logo_mini", (512, 256, 128, 64)),
+        ("v2_logo_tray.png", "logo_tray", (256, 128, 64, 32, 16)),
     ]
     for fname, stem, sizes in jobs:
         src = RAW / fname
@@ -134,11 +133,11 @@ def build_icons():
 # ---------------------------------------------------------------- фоны
 def build_backgrounds():
     jobs = [
-        ("bg_main_raw.png", "bg_main", (3840, 2160)),
-        ("bg_aurora_raw.png", "bg_aurora", (3840, 2160)),
-        ("splash_raw.png", "splash", (1920, 1080)),
-        ("hero_card_raw.png", "hero_card", (2400, 900)),
-        ("about_art_raw.png", "about_art", (2048, 2048)),
+        ("v2_bg_main.png", "bg_main", (3840, 2160)),
+        ("v2_bg_violet.png", "bg_violet", (3840, 2160)),
+        ("v2_splash.png", "splash", (1920, 1080)),
+        ("v2_hero.png", "hero_card", (2400, 900)),
+        ("v2_about.png", "about_art", (2048, 2048)),
     ]
     for fname, stem, target in jobs:
         src = RAW / fname
