@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from . import config as cfg
 from .settings import settings
 
 
@@ -60,6 +61,29 @@ def scaled(px: float) -> float:
     return px * settings.get("ui_scale") / 100.0
 
 
+def _check_png() -> str:
+    """Готовит белую галочку для чекбоксов и возвращает путь к ней."""
+    out = cfg.ICONS / "checkmark.png"
+    if not out.exists():
+        from PySide6.QtCore import QRectF, Qt
+        from PySide6.QtGui import QColor, QImage, QPainter, QPen
+        img = QImage(36, 36, QImage.Format_ARGB32)
+        img.fill(Qt.transparent)
+        p = QPainter(img)
+        p.setRenderHint(QPainter.Antialiasing)
+        pen = QPen(QColor("#0B0E14"), 4.6)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        p.setPen(pen)
+        p.drawPolyline([QRectF(9, 18, 0, 0).topLeft(),
+                        QRectF(15.5, 24.5, 0, 0).topLeft(),
+                        QRectF(27, 11.5, 0, 0).topLeft()])
+        p.end()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        img.save(str(out))
+    return out.as_posix()
+
+
 def build_qss(accent_key: str | None = None) -> str:
     a = ACCENTS.get(accent_key or settings.get("accent"), ACCENTS[DEFAULT_ACCENT])
     g = settings.glass_alpha
@@ -75,6 +99,7 @@ def build_qss(accent_key: str | None = None) -> str:
         "surface": f"rgba(255,255,255,{g:.3f})",
         "surface_hi": f"rgba(255,255,255,{g + 0.035:.3f})",
         "surface_press": f"rgba(255,255,255,{g + 0.06:.3f})",
+        "check_png": _check_png(),
         "stroke": f"rgba(255,255,255,{0.06 + g * 0.35:.3f})",
         "stroke_hi": f"rgba(255,255,255,{0.12 + g * 0.4:.3f})",
         "font": FONT_STACK, "mono": MONO_STACK,
@@ -154,6 +179,21 @@ QLabel#CardKicker {{
     letter-spacing: 2px; color: {c['accent']};
 }}
 QLabel#CardBody   {{ font-size: {c['fs_md']}; color: {c['text_dim']}; }}
+QLabel#SectionLabel {{
+    font-family: {c['mono']}; font-size: {9.5 * s:.1f}px; font-weight: 700;
+    letter-spacing: 2px; color: {c['text_mute']};
+}}
+QCheckBox {{ spacing: 0px; }}
+QCheckBox::indicator {{
+    width: 19px; height: 19px; border-radius: 6px;
+    border: 1.6px solid {c['stroke_hi']};
+    background: {c['surface']};
+}}
+QCheckBox::indicator:hover {{ border-color: {c['accent']}; }}
+QCheckBox::indicator:checked {{
+    background: {c['accent']}; border-color: {c['accent']};
+    image: url("{c['check_png']}");
+}}
 QLabel#Caption    {{ font-size: {c['fs_sm']}; color: {c['text_mute']}; }}
 QLabel#PageTitle  {{ font-size: {c['fs_title']}; font-weight: 800; letter-spacing: -.5px; }}
 QLabel#PageSub    {{ font-size: {c['fs_md']}; color: {c['text_mute']}; }}

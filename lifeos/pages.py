@@ -218,6 +218,7 @@ class SettingsPage(BasePage):
 
         self._build_appearance()
         self._build_performance()
+        self._build_updates()
         self._build_behaviour()
         self._build_reset()
         self.body.addStretch(1)
@@ -256,7 +257,8 @@ class SettingsPage(BasePage):
         bg_row.addLayout(col2)
         bg_row.addStretch(1)
         self._bg_tiles: list[tuple[QWidget, str]] = []
-        for name, file in (("Blue", "bg_main.jpg"), ("Violet", "bg_violet.jpg")):
+        for name, file in (("Blue", "bg_main.jpg"), ("Violet", "bg_violet.jpg"),
+                           ("Deep", "bg_deep.jpg")):
             tile = ImagePanel(cfg.BACKGROUNDS / file.replace(".jpg", "@half.jpg"),
                               overlay=0.28, radius=12)
             tile.setFixedSize(150, 84)
@@ -328,6 +330,31 @@ class SettingsPage(BasePage):
             if i:
                 card.body.addWidget(Divider())
             card.body.addWidget(self._switch_row(key, title, desc))
+        self.body.addWidget(card)
+
+    # ----------------------------------------------------------- обновления
+    def _build_updates(self):
+        card = GlassCard(padding=22, spacing=14, hoverable=False)
+        card.body.addWidget(make_label("ОБНОВЛЕНИЯ", "CardKicker"))
+        card.body.addWidget(self._switch_row(
+            "auto_update_check", "Проверять обновления автоматически",
+            "Программа сама узнаёт о новых версиях в фоне"))
+        card.body.addWidget(Divider())
+
+        row = QHBoxLayout()
+        col = QVBoxLayout()
+        col.setSpacing(2)
+        col.addWidget(make_label("Как часто проверять", "CardTitle"))
+        col.addWidget(make_label(
+            "Реже — меньше обращений к сети", "Caption"))
+        row.addLayout(col, 1)
+        mapping = {1: 0, 6: 1, 24: 2}
+        seg = SegmentedControl(["1 час", "6 часов", "Раз в сутки"],
+                               index=mapping.get(settings.get("update_interval_h"), 0))
+        seg.changed.connect(
+            lambda i: settings.set("update_interval_h", (1, 6, 24)[i]))
+        row.addWidget(seg)
+        card.body.addLayout(row)
         self.body.addWidget(card)
 
     # -------------------------------------------------------------- система
@@ -527,6 +554,7 @@ class AboutPage(BasePage):
         col_u.addWidget(self._upd_title)
         col_u.addWidget(self._upd_sub)
         head.addLayout(col_u, 1)
+        head.addWidget(OrbIcon("clock", 34), 0, Qt.AlignVCenter)
 
         self._btn_check = QPushButton("Проверить сейчас")
         self._btn_check.setObjectName("Ghost")

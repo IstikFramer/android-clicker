@@ -52,6 +52,10 @@ _SVG: dict[str, str] = {
         <path d="M12 3.5v8"/>
         <path d="M17.6 6.9a8 8 0 1 1-11.2 0"/>
     """,
+    "wrench": """
+        <path d="M14.8 6.3a3.9 3.9 0 0 0 5 5l-8.4 8.4a2.2 2.2 0 0 1-3.1-3.1z"/>
+        <path d="M14.8 6.3 17.6 3.5"/>
+    """,
     "minus": """<path d="M5 12h14"/>""",
     "square": """<rect x="5.5" y="5.5" width="13" height="13" rx="2.6"/>""",
     "restore": """

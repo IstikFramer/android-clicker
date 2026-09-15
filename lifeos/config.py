@@ -5,8 +5,8 @@ from pathlib import Path
 
 APP_NAME = "LIFE OS"
 APP_TAGLINE = "Персональная операционная система"
-APP_VERSION = "0.2"
-APP_BUILD = "0.2.0-alpha"
+APP_VERSION = "0.3"
+APP_BUILD = "0.3.0-alpha"
 APP_CHANNEL = "ALPHA"
 
 DEV_NAME = "IKOOF inc."
@@ -18,6 +18,7 @@ ASSETS = ROOT / "assets"
 LOGO = ASSETS / "logo"
 ORBS = ASSETS / "orbs"
 BACKGROUNDS = ASSETS / "backgrounds"
+ICONS = ASSETS / "icons"
 DATA = ROOT / "data"
 USER_DIR = Path.home() / ".lifeos"
 SETTINGS_FILE = USER_DIR / "settings.json"

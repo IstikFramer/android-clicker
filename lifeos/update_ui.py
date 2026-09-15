@@ -276,14 +276,43 @@ class UpdateWindow(QWidget):
         self.prog_pct.setText("100%")
         self.prog_label.setText("Обновление установлено")
         self.hint.setText(f"Резервная копия: {Path(backup).name}")
-        self.btn_later.setText("Позже")
+        self.btn_later.setText("Не сейчас")
         self.btn_later.clicked.disconnect()
-        self.btn_later.clicked.connect(self.close)
+        self.btn_later.clicked.connect(self._cancel_restart)
         self.btn_install.setText("Перезапустить")
         self.btn_install.setEnabled(True)
         self.btn_install.clicked.disconnect()
-        self.btn_install.clicked.connect(restart_app)
+        self.btn_install.clicked.connect(self._restart_now)
         self.installed.emit()
+
+        # Автоматический перезапуск через несколько секунд с отсчётом,
+        # пользователь может отменить его кнопкой «Позже».
+        self._left = 3
+        self._countdown = QTimer(self)
+        self._countdown.timeout.connect(self._tick_restart)
+        self._countdown.start(1000)
+        self._tick_restart()
+
+    def _cancel_restart(self):
+        """Отменяет автоперезапуск: изменения применятся при следующем старте."""
+        if getattr(self, "_countdown", None):
+            self._countdown.stop()
+        self.btn_install.setText("Перезапустить")
+        self.hint.setText("Обновление применится при следующем запуске.")
+        self.close()
+
+    def _tick_restart(self):
+        if self._left <= 0:
+            self._countdown.stop()
+            self._restart_now()
+            return
+        self.btn_install.setText(f"Перезапустить ({self._left})")
+        self._left -= 1
+
+    def _restart_now(self):
+        if getattr(self, "_countdown", None):
+            self._countdown.stop()
+        restart_app()
 
     def _on_fail(self, message: str):
         self.prog_label.setText(message)

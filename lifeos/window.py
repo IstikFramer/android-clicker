@@ -18,6 +18,7 @@ from .eula import EulaWindow
 from .pages import AboutPage, HomePage, SettingsPage
 from .settings import settings
 from .theme import build_qss, current_accent
+from .tools_page import ToolsPage
 from .update_ui import UpdateWindow
 from .updater import CheckWorker, UpdateInfo
 from .widgets import (
@@ -29,6 +30,7 @@ CHECK_INTERVAL_MS = 60 * 60 * 1000   # раз в час
 
 NAV_ITEMS = [
     ("Главная", "home"),
+    ("Инструменты", "wrench"),
     ("Настройки", "sliders"),
     ("О программе", "info"),
 ]
@@ -254,8 +256,9 @@ class MainWindow(QWidget):
         # (чтобы не тормозить запуск), далее раз в час.
         self._check_timer = QTimer(self)
         self._check_timer.timeout.connect(lambda: self.check_updates(silent=True))
-        self._check_timer.start(CHECK_INTERVAL_MS)
-        QTimer.singleShot(4000, lambda: self.check_updates(silent=True))
+        self._apply_check_interval()
+        QTimer.singleShot(4000, self._first_check)
+        QTimer.singleShot(1200, self._show_whats_new_if_updated)
 
     # -------------------------------------------------------------- страницы
     def _build_pages(self):
@@ -267,6 +270,7 @@ class MainWindow(QWidget):
             w.deleteLater()
         self.pages = [
             HomePage(self.open_update_window),
+            ToolsPage(),
             SettingsPage(self.restyle, self.bg.reload),
             AboutPage(self.show_eula, self.check_updates, self.open_update_window),
         ]
@@ -316,6 +320,8 @@ class MainWindow(QWidget):
             self.restyle()
         elif key == "background":
             self.bg.reload()
+        elif key in ("auto_update_check", "update_interval_h"):
+            self._apply_check_interval()
 
     def _repaint_all(self):
         if not self._repaint_timer.isActive():
@@ -372,6 +378,33 @@ class MainWindow(QWidget):
         return win
 
     # ---------------------------------------------------------- обновления
+    def _apply_check_interval(self):
+        """Включает или выключает автопроверку согласно настройкам."""
+        if settings.get("auto_update_check"):
+            hours = max(1, int(settings.get("update_interval_h") or 1))
+            self._check_timer.start(hours * 60 * 60 * 1000)
+        else:
+            self._check_timer.stop()
+
+    def _first_check(self):
+        if settings.get("auto_update_check"):
+            self.check_updates(silent=True)
+
+    def _show_whats_new_if_updated(self):
+        """После установки новой версии один раз показывает список изменений."""
+        seen = settings.get("last_seen_version") or ""
+        if seen == cfg.APP_VERSION:
+            return
+        settings.set("last_seen_version", cfg.APP_VERSION)
+        if not seen:
+            return          # первый запуск — здороваться списком изменений не нужно
+        self.go(0)
+        if self.tray.isSystemTrayAvailable() and settings.get("tray_notifications"):
+            self.tray.showMessage(
+                f"{cfg.APP_NAME} обновлён до {cfg.APP_VERSION}",
+                "Список изменений открыт на главной странице.",
+                QIcon(str(cfg.ORBS / "done_128.png")), 5000)
+
     def check_updates(self, silent: bool = False):
         """Фоновая проверка новой версии."""
         if self._check_worker and self._check_worker.isRunning():
@@ -431,7 +464,7 @@ class MainWindow(QWidget):
         act_home = QAction("Главная", self)
         act_home.triggered.connect(lambda: (self.restore_from_tray(), self.go(0)))
         act_set = QAction("Настройки", self)
-        act_set.triggered.connect(lambda: (self.restore_from_tray(), self.go(1)))
+        act_set.triggered.connect(lambda: (self.restore_from_tray(), self.go(2)))
         act_upd = QAction("Проверить обновления", self)
         act_upd.triggered.connect(lambda: self.check_updates(silent=False))
         act_quit = QAction("Выход", self)

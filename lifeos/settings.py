@@ -25,6 +25,9 @@ DEFAULTS: dict[str, Any] = {
     "close_to_tray": True,
     "tray_notifications": True,
     "language": "Русский",
+    "auto_update_check": True,
+    "update_interval_h": 1,       # 1 / 6 / 24 часа
+    "last_seen_version": "",      # для окна «Что нового» после обновления
     "eula_accepted": False,
     "eula_version": "",
 }

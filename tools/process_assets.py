@@ -132,8 +132,12 @@ def build_icons():
 
 # ------------------------------------------ круглые орб-иконки (авто-нарезка)
 ORB_SHEETS = {
-    "v3_icons_a.png": ["download", "update", "done", "warning"],
+    "v3_icons_a.png": ["download", "update", "_dup_update", "warning"],
     "v3_icons_b.png": ["gear", "mail", "shield", "bell"],
+    "v4_icons_a.png": ["broom", "trash", "globe", "logfile"],
+    "v4_icons_b.png": ["duplicate", "tools", "disk", "analyze"],
+    "v4_icons_c.png": ["run", "rescan", "folder", "boost"],
+    "v5_icons_a.png": ["done", "cancel", "clock", "lock"],
 }
 
 
@@ -207,6 +211,7 @@ def build_backgrounds():
         ("v3_splash.png", "splash", (1920, 1080)),
         ("v2_hero.png", "hero_card", (2400, 900)),
         ("v3_update_hero.png", "update_hero", (2400, 900)),
+        ("v4_tools_hero.png", "tools_hero", (2400, 900)),
         ("v2_about.png", "about_art", (2048, 2048)),
     ]
     for fname, stem, target in jobs:
