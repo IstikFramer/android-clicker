@@ -189,10 +189,16 @@ class InstallWorker(QThread):
         self._cancel = True
 
     # ------------------------------------------------------------ служебное
+    # Архивы веток GitHub отдаются потоком без Content-Length, поэтому
+    # точный процент неизвестен. В этом случае показываем оценку, которая
+    # плавно приближается к 70 % и не выглядит зависшей.
+    _ASSUMED_MB = 40.0
+
     def _download(self, url: str, dest: Path):
         with _open(url) as r:
             total = int(r.headers.get("Content-Length") or self._info.size or 0)
             got = 0
+            last = -1
             with open(dest, "wb") as f:
                 while True:
                     if self._cancel:
@@ -202,18 +208,34 @@ class InstallWorker(QThread):
                         break
                     f.write(chunk)
                     got += len(chunk)
+                    mb = got / 1048576
                     if total:
-                        pct = int(got / total * 70)
-                        mb = got / 1048576
-                        self.progress.emit(min(70, pct), f"Загрузка… {mb:.1f} МБ")
+                        pct = min(70, int(got / total * 70))
+                        text = f"Загрузка… {mb:.1f} из {total / 1048576:.1f} МБ"
                     else:
-                        self.progress.emit(35, f"Загрузка… {got / 1048576:.1f} МБ")
+                        # асимптотика: чем больше скачано, тем ближе к 70
+                        pct = int(70 * (1 - 0.5 ** (mb / self._ASSUMED_MB)))
+                        text = f"Загрузка… {mb:.1f} МБ"
+                    if pct != last:
+                        last = pct
+                        self.progress.emit(pct, text)
 
     @staticmethod
     def _unpack_root(tmp: Path) -> Path:
         """В архивах GitHub всё лежит внутри одной папки."""
         items = [p for p in tmp.iterdir() if p.is_dir()]
         return items[0] if len(items) == 1 else tmp
+
+    @staticmethod
+    def _prune_backups(keep: int = 3):
+        """Оставляет только несколько последних резервных копий."""
+        root = cfg.USER_DIR / "backups"
+        if not root.exists():
+            return
+        items = sorted((p for p in root.iterdir() if p.is_dir()),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
+        for old in items[keep:]:
+            shutil.rmtree(old, ignore_errors=True)
 
     def _backup(self) -> Path:
         stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -267,6 +289,7 @@ class InstallWorker(QThread):
 
             self.progress.emit(92, "Установка файлов…")
             self._install(root)
+            self._prune_backups()
 
             self.progress.emit(100, "Готово")
             self.finished_ok.emit(str(backup))

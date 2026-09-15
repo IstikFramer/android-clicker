@@ -1,9 +1,12 @@
 """LIFE OS — интерфейс обновления: окно релиза, прогресс загрузки, плашка."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
+    QSizePolicy,
     QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
 )
@@ -102,7 +105,7 @@ class UpdateWindow(QWidget):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setWindowModality(Qt.ApplicationModal)
-        self.setFixedSize(720, 620)
+        self.resize(780, 640)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -210,7 +213,9 @@ class UpdateWindow(QWidget):
         fl = QHBoxLayout(foot)
         fl.setContentsMargins(28, 16, 26, 20)
         fl.setSpacing(11)
-        self.hint = make_label("Текущая версия будет сохранена в резервную копию.", "Caption")
+        self.hint = make_label("Сохраним резервную копию текущей версии.", "Caption")
+        self.hint.setWordWrap(False)
+        self.hint.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         fl.addWidget(self.hint, 1)
 
         self.btn_web = QPushButton("Открыть на GitHub")
@@ -246,7 +251,7 @@ class UpdateWindow(QWidget):
         self.btn_later.clicked.disconnect()
         self.btn_later.clicked.connect(self._cancel)
         self.prog_box.setVisible(True)
-        self.hint.setText("Не закрывайте программу до конца установки.")
+        self.hint.setText("Не закрывайте программу.")
 
         self._worker = InstallWorker(self._info, self)
         self._worker.progress.connect(self._on_progress)
@@ -270,7 +275,7 @@ class UpdateWindow(QWidget):
         self.bar.setValue(100)
         self.prog_pct.setText("100%")
         self.prog_label.setText("Обновление установлено")
-        self.hint.setText(f"Резервная копия: {backup}")
+        self.hint.setText(f"Резервная копия: {Path(backup).name}")
         self.btn_later.setText("Позже")
         self.btn_later.clicked.disconnect()
         self.btn_later.clicked.connect(self.close)

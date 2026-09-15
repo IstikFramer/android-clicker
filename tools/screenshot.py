@@ -48,6 +48,21 @@ def main():
         w.grab().save(str(OUT / f"{name}.jpg"), quality=90)
         print("saved", name)
 
+    from lifeos.update_ui import UpdateWindow
+    from lifeos.updater import UpdateInfo
+    import json
+    vj = json.loads((cfg.DATA / "version.json").read_text("utf-8"))
+    info = UpdateInfo(version="0.3", title=vj["title"], notes="",
+                      changes=vj["changes"], url=vj["url"], page=vj["page"],
+                      size=41_500_000, published="2026-09-15",
+                      source="branch", available=True)
+    u = UpdateWindow(info)
+    u.show(); wait(700)
+    u.grab().save(str(OUT / "update.jpg"), quality=90); print("saved update")
+    u._start(); wait(900)
+    u.grab().save(str(OUT / "update_progress.jpg"), quality=90); print("saved update_progress")
+    u._worker.cancel(); wait(400); u.close()
+
     e = EulaWindow(first_run=True)
     e.resize(880, 680)
     e.show()
