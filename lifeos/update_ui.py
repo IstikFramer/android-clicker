@@ -148,9 +148,19 @@ class UpdateWindow(QWidget):
             body.addWidget(make_label("Что изменилось", "CardTitle"))
             body.addWidget(make_label(info.notes, "CardBody", wrap=True))
         else:
+            # changes принимается в двух формах: словарь групп
+            # {"added": [...]} или список {"type": ..., "text": ...}.
             grouped: dict[str, list[str]] = {}
-            for c in info.changes:
-                grouped.setdefault(c.get("type", "added"), []).append(c.get("text", ""))
+            if isinstance(info.changes, dict):
+                for key, texts in info.changes.items():
+                    grouped[key] = [str(t) for t in texts]
+            else:
+                for c in info.changes:
+                    if isinstance(c, dict):
+                        grouped.setdefault(
+                            c.get("type", "added"), []).append(c.get("text", ""))
+                    else:
+                        grouped.setdefault("added", []).append(str(c))
             for key in ("added", "improved", "fixed"):
                 items = grouped.get(key)
                 if not items:
