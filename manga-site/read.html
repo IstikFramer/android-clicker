@@ -97,7 +97,31 @@
     </div>
   </footer>
 
-  <script src="js/data.js?v=8"></script>
-  <script src="js/app.js?v=8"></script>
+  <script src="js/data.js?v=9"></script>
+  <script>
+    /* Страховка от старого кэша data.js: актуальный список глав «Вишнёвого дождя» */
+    (function () {
+      try {
+        var mk = function (n) { return Array.from({ length: 10 }, function (_, i) { return "assets/pages/ch" + n + "/" + String(i + 1).padStart(2, "0") + ".jpg"; }); };
+        var chapters = [
+          { num: 1, title: "Первая встреча", date: "15 сентября 2026", pages: mk(1) },
+          { num: 2, title: "Принцесса класса", date: "15 сентября 2026", pages: mk(2) },
+          { num: 3, title: "Набросок с натуры", date: "15 сентября 2026", pages: mk(3) },
+          { num: 4, title: "Весенний фестиваль", date: "15 сентября 2026", pages: mk(4) },
+          { num: 5, title: "Старый альбом", date: "15 сентября 2026", pages: mk(5) },
+          { num: 6, title: "Вишнёвый дождь", date: "15 сентября 2026", pages: mk(6) }
+        ];
+        if (window.TITLES && TITLES.vd) {
+          chapters.forEach(function (c) {
+            if (!TITLES.vd.chapters.some(function (x) { return x.num === c.num; })) TITLES.vd.chapters.push(c);
+          });
+          TITLES.vd.chapters.sort(function (a, b) { return a.num - b.num; });
+          TITLES.vd.status = "Завершена";
+          if (window.MANGA) MANGA.chapters = TITLES.vd.chapters;
+        }
+      } catch (e) { console.warn("fallback patch:", e); }
+    })();
+  </script>
+  <script src="js/app.js?v=9"></script>
 </body>
 </html>
