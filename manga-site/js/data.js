@@ -49,6 +49,12 @@ const TITLES = {
         date: "15 сентября 2026",
         pages: Array.from({ length: 10 }, (_, i) => `assets/pages/ch4/${String(i + 1).padStart(2, "0")}.jpg`),
       },
+      {
+        num: 5,
+        title: "Старый альбом",
+        date: "15 сентября 2026",
+        pages: Array.from({ length: 10 }, (_, i) => `assets/pages/ch5/${String(i + 1).padStart(2, "0")}.jpg`),
+      },
     ],
   },
 
