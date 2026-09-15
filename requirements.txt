@@ -1,0 +1,4 @@
+PySide6>=6.6
+# только для пересборки графики (tools/process_assets.py)
+Pillow>=10.0
+numpy>=1.24
