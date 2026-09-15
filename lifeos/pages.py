@@ -15,6 +15,7 @@ from . import icons
 from .anim import driver
 from .settings import settings
 from .theme import ACCENTS, build_qss, current_accent
+from .elevation import can_elevate, is_admin
 from .update_ui import UpdateBanner
 from .updater import UpdateInfo
 from .widgets import (
@@ -258,7 +259,8 @@ class SettingsPage(BasePage):
         bg_row.addStretch(1)
         self._bg_tiles: list[tuple[QWidget, str]] = []
         for name, file in (("Blue", "bg_main.jpg"), ("Violet", "bg_violet.jpg"),
-                           ("Deep", "bg_deep.jpg")):
+                           ("Deep", "bg_deep.jpg"),
+                           ("Aurora", "bg_aurora.jpg")):
             tile = ImagePanel(cfg.BACKGROUNDS / file.replace(".jpg", "@half.jpg"),
                               overlay=0.28, radius=12)
             tile.setFixedSize(150, 84)
@@ -451,7 +453,8 @@ class SettingsPage(BasePage):
 
 # =========================================================== О программе
 class AboutPage(BasePage):
-    def __init__(self, on_show_eula, on_check=None, on_update=None, parent=None):
+    def __init__(self, on_show_eula, on_check=None, on_update=None,
+                 on_elevate=None, parent=None):
         super().__init__(parent)
         self._on_check = on_check
         self._on_update = on_update
@@ -574,6 +577,34 @@ class AboutPage(BasePage):
         head.addWidget(self._btn_install, 0, Qt.AlignVCenter)
         upd.body.addLayout(head)
         self.body.addWidget(upd)
+
+        # --- права доступа ---
+        if can_elevate() or is_admin():
+            sec = GlassCard(padding=20, spacing=12, hoverable=False)
+            r = QHBoxLayout()
+            r.setSpacing(14)
+            r.addWidget(OrbIcon("admin", 44), 0, Qt.AlignVCenter)
+            c = QVBoxLayout()
+            c.setSpacing(2)
+            c.addWidget(make_label("ПРАВА ДОСТУПА", "CardKicker"))
+            c.addWidget(make_label(
+                "Запущено от администратора" if is_admin()
+                else "Запущено от обычного пользователя", "CardTitle"))
+            c.addWidget(make_label(
+                "Доступна очистка системных папок Windows." if is_admin()
+                else "Часть системного мусора недоступна для очистки.",
+                "Caption"))
+            r.addLayout(c, 1)
+            if can_elevate():
+                b = QPushButton("Перезапустить от админа")
+                b.setObjectName("Ghost")
+                b.setFixedHeight(38)
+                b.setCursor(Qt.PointingHandCursor)
+                if on_elevate:
+                    b.clicked.connect(on_elevate)
+                r.addWidget(b, 0, Qt.AlignVCenter)
+            sec.body.addLayout(r)
+            self.body.addWidget(sec)
 
         # --- технические сведения ---
         tech = GlassCard(padding=20, spacing=12, hoverable=False)

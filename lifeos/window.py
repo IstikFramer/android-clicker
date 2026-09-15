@@ -19,6 +19,7 @@ from .eula import EulaWindow
 from .pages import AboutPage, HomePage, SettingsPage
 from .settings import settings
 from .theme import build_qss, current_accent
+from .elevation import can_elevate, is_admin, relaunch_as_admin
 from .tools_page import ToolsPage
 from .update_ui import UpdateWindow
 from .updater import CheckWorker, UpdateInfo
@@ -260,6 +261,7 @@ class MainWindow(QWidget):
         self._apply_check_interval()
         QTimer.singleShot(4000, self._first_check)
         QTimer.singleShot(1200, self._show_whats_new_if_updated)
+        QTimer.singleShot(2200, self._offer_admin)
 
     # -------------------------------------------------------------- страницы
     def _build_pages(self):
@@ -273,7 +275,8 @@ class MainWindow(QWidget):
             HomePage(self.open_update_window),
             ToolsPage(),
             SettingsPage(self.restyle, self.bg.reload),
-            AboutPage(self.show_eula, self.check_updates, self.open_update_window),
+            AboutPage(self.show_eula, self.check_updates,
+                      self.open_update_window, self.elevate),
         ]
         for pg in self.pages:
             if hasattr(pg, "on_update_state"):
@@ -377,6 +380,35 @@ class MainWindow(QWidget):
         win.raise_()
         win.activateWindow()
         return win
+
+    # -------------------------------------------------------------- права
+    def _offer_admin(self):
+        """Один раз предлагает перезапуск от администратора."""
+        if not can_elevate() or settings.get("admin_prompt_shown"):
+            return
+        settings.set("admin_prompt_shown", True)
+        box = QMessageBox(self)
+        box.setWindowTitle("Права администратора")
+        box.setIcon(QMessageBox.Information)
+        box.setText("LIFE OS запущена от обычного пользователя.")
+        box.setInformativeText(
+            "Без прав администратора часть системного мусора "
+            "(Windows\\Temp, Prefetch, дампы памяти) не удаляется.\n\n"
+            "Перезапустить с правами администратора?")
+        yes = box.addButton("Да, перезапустить", QMessageBox.AcceptRole)
+        box.addButton("Не сейчас", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is yes:
+            self.elevate()
+
+    def elevate(self):
+        """Перезапуск через UAC."""
+        if relaunch_as_admin():
+            QApplication.quit()
+        else:
+            QMessageBox.information(
+                self, "Права администратора",
+                "Запуск с повышением прав отменён или недоступен.")
 
     # ---------------------------------------------------------- обновления
     def _apply_check_interval(self):

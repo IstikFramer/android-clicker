@@ -283,7 +283,10 @@ class UpdateWindow(QWidget):
         self.bar.setValue(100)
         self.prog_pct.setText("100%")
         self.prog_label.setText("Обновление установлено")
-        self.hint.setText(f"Резервная копия: {Path(backup).name}")
+        if str(backup).lower().endswith(".bat"):
+            self.hint.setText("Файл программы будет заменён при перезапуске.")
+        else:
+            self.hint.setText(f"Резервная копия: {Path(backup).name}")
         self.btn_later.setText("Не сейчас")
         self.btn_later.clicked.disconnect()
         self.btn_later.clicked.connect(self._cancel_restart)
@@ -320,7 +323,9 @@ class UpdateWindow(QWidget):
     def _restart_now(self):
         if getattr(self, "_countdown", None):
             self._countdown.stop()
-        restart_app()
+        # В режиме EXE _backup содержит путь к скрипту замены файла.
+        script = getattr(self, "_backup", "") or ""
+        restart_app(script if script.lower().endswith(".bat") else None)
 
     def _on_fail(self, message: str):
         self.prog_label.setText(message)

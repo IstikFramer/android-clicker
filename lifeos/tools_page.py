@@ -4,12 +4,13 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QPushButton, QScrollArea, QSizePolicy,
-    QVBoxLayout, QWidget,
+    QApplication, QCheckBox, QFrame, QHBoxLayout, QMessageBox, QPushButton,
+    QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from . import config as cfg
 from .theme import current_accent
+from .elevation import can_elevate, is_admin, relaunch_as_admin
 from .tools_engine import (
     ALL_TOOLS, CleanWorker, ScanItem, ScanResult, ScanWorker, Tool,
     disk_usage, human_count, human_size,
@@ -69,6 +70,11 @@ class ToolCard(GlassCard):
             self.btn.setText("Открыть")
         else:
             self.status.setText("Ничего лишнего не найдено")
+            self.btn.setText("Проверить снова")
+
+    def set_cleaned(self, freed: int):
+        self.status.setText(f"Очищено · освобождено {human_size(freed)}")
+        self.btn.setText("Проверить снова")
 
 
 # ============================================================ строка списка
@@ -118,6 +124,9 @@ class ResultRow(QWidget):
 # ================================================================= окно
 class ToolWindow(QWidget):
     """Окно работы инструмента: сканирование → список → подтверждение."""
+
+    scanned = Signal(object)        # ScanResult
+    cleaned_up = Signal(int)        # освобождено байт
 
     def __init__(self, tool: Tool, parent=None):
         super().__init__(parent)
@@ -298,7 +307,11 @@ class ToolWindow(QWidget):
             self.summary.setText("Чисто — удалять нечего.")
             self.btn_go.setVisible(False)
             self.btn_close.setText("Готово")
+            self.scanned.emit(res)
             return
+
+        if res.locked_paths and can_elevate():
+            self.list_lay.addWidget(self._admin_banner(res.locked_paths))
 
         if res.note:
             note = make_label(res.note, "Caption")
@@ -317,6 +330,50 @@ class ToolWindow(QWidget):
         self.btn_all.setVisible(True)
         self.btn_go.setEnabled(True)
         self._refresh_summary()
+        self.scanned.emit(res)
+
+    def _admin_banner(self, locked: int) -> QWidget:
+        """Плашка: часть системных папок закрыта без прав администратора."""
+        card = GlassCard(padding=18, spacing=12, hoverable=False)
+        row = QHBoxLayout()
+        row.setSpacing(14)
+        row.addWidget(OrbIcon("admin", 44), 0, Qt.AlignVCenter)
+        col = QVBoxLayout()
+        col.setSpacing(3)
+        col.addWidget(make_label("НУЖНЫ ПРАВА АДМИНИСТРАТОРА", "CardKicker"))
+        col.addWidget(make_label(
+            f"Недоступно системных папок: {locked}", "CardTitle"))
+        txt = make_label(
+            "Программа запущена от обычного пользователя, поэтому часть "
+            "системного мусора не видна и не удаляется. Перезапустите "
+            "с правами администратора, чтобы очистить всё.", "CardBody")
+        txt.setWordWrap(True)
+        col.addWidget(txt)
+        row.addLayout(col, 1)
+        btn = QPushButton("Перезапустить от админа")
+        btn.setObjectName("Primary")
+        btn.setFixedHeight(40)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(self._ask_elevate)
+        row.addWidget(btn, 0, Qt.AlignVCenter)
+        card.body.addLayout(row)
+        return card
+
+    def _ask_elevate(self):
+        ok = QMessageBox.question(
+            self, "Права администратора",
+            "Перезапустить LIFE OS с правами администратора?\n\n"
+            "Откроется стандартный запрос Windows. Текущее окно закроется, "
+            "программа откроется заново.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if ok != QMessageBox.Yes:
+            return
+        if relaunch_as_admin():
+            QApplication.quit()
+        else:
+            QMessageBox.information(
+                self, "Права администратора",
+                "Запуск с повышением прав отменён или недоступен.")
 
     def _refresh_summary(self):
         res = self._result
@@ -358,7 +415,7 @@ class ToolWindow(QWidget):
         self._clean.failed.connect(self._on_failed)
         self._clean.start()
 
-    def _on_cleaned(self, freed: int):
+    def _on_cleaned(self, freed: int, skipped: int = 0):
         self._busy = False
         self.prog_box.setVisible(False)
         while self.list_lay.count():
@@ -375,21 +432,34 @@ class ToolWindow(QWidget):
         col.setSpacing(4)
         col.addWidget(make_label("ГОТОВО", "CardKicker"))
         col.addWidget(make_label(f"Освобождено {human_size(freed)}", "CardTitle"))
-        col.addWidget(make_label(
-            "Можно закрыть окно или проверить ещё раз.", "CardBody"))
+        if skipped:
+            tail = make_label(
+                f"Не удалось удалить файлов: {skipped}. Обычно это файлы, "
+                f"занятые работающими программами" +
+                (" — помогут права администратора."
+                 if can_elevate() else ". Закройте их и повторите."),
+                "CardBody")
+            tail.setWordWrap(True)
+            col.addWidget(tail)
+        else:
+            col.addWidget(make_label(
+                "Можно закрыть окно или проверить ещё раз.", "CardBody"))
         row.addLayout(col, 1)
         done.body.addLayout(row)
         self.list_lay.addStretch(1)
         self.list_lay.addWidget(done)
         self.list_lay.addStretch(1)
 
-        self.summary.setText(f"Освобождено {human_size(freed)}")
+        self.summary.setText(
+            f"Освобождено {human_size(freed)}"
+            + (f" · пропущено {skipped}" if skipped else ""))
         self.btn_go.setText("Проверить снова")
         self.btn_go.setEnabled(True)
         self.btn_go.clicked.disconnect()
         self.btn_go.clicked.connect(self._rescan)
         self.btn_close.setText("Готово")
         self.cleaned = freed
+        self.cleaned_up.emit(freed)
 
     def _rescan(self):
         self.btn_go.clicked.disconnect()
@@ -487,6 +557,22 @@ class ToolsPage(QScrollArea):
         ll.addWidget(OrbIcon("broom", 92), 0, Qt.AlignVCenter)
         self.body.addWidget(hero)
 
+        self._disk_slot = QVBoxLayout()
+        self._disk_slot.setContentsMargins(0, 0, 0, 0)
+        self._disk_card = None
+        self.body.addLayout(self._disk_slot)
+        self.refresh_disk()
+
+        self.body.addWidget(make_label("ДОСТУПНЫЕ ИНСТРУМЕНТЫ", "SectionLabel"))
+        self._build_grid()
+        self.body.addStretch(1)
+
+    def refresh_disk(self):
+        """Пересобирает карточку свободного места."""
+        if self._disk_card is not None:
+            self._disk_card.setParent(None)
+            self._disk_card.deleteLater()
+            self._disk_card = None
         disks = disk_usage()
         if disks:
             card = GlassCard(padding=20, spacing=14, hoverable=False)
@@ -515,10 +601,10 @@ class ToolsPage(QScrollArea):
                 row.addWidget(make_label(
                     f"{human_size(total - used)} свободно", "Mono"))
                 card.body.addLayout(row)
-            self.body.addWidget(card)
+            self._disk_slot.addWidget(card)
+            self._disk_card = card
 
-        self.body.addWidget(make_label("ДОСТУПНЫЕ ИНСТРУМЕНТЫ", "SectionLabel"))
-
+    def _build_grid(self):
         grid = QVBoxLayout()
         grid.setSpacing(14)
         pair: QHBoxLayout | None = None
@@ -535,14 +621,19 @@ class ToolsPage(QScrollArea):
         if len(ALL_TOOLS) % 2:
             pair.addStretch(1)
         self.body.addLayout(grid)
-        self.body.addStretch(1)
 
     def open_tool(self, tool: Tool):
         if self._win is not None and self._win.isVisible():
             self._win.raise_()
             self._win.activateWindow()
             return
+        card = next((c for c in self.cards if c._tool is tool), None)
         win = ToolWindow(tool)
+        if card is not None:
+            win.scanned.connect(
+                lambda res, c=card: c.set_result(res.total_size, res.total_count))
+            win.cleaned_up.connect(lambda freed, c=card: c.set_cleaned(freed))
+            win.cleaned_up.connect(lambda _f: self.refresh_disk())
         win.center_on_screen()
         self._win = win
         win.show()

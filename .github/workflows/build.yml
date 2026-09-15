@@ -1,0 +1,65 @@
+name: Сборка LIFE OS для Windows
+
+# Собирает готовый EXE на настоящей Windows-машине: запускать вручную
+# или тегом вида v0.3.2. Результат прикладывается к релизу, откуда его
+# скачивает встроенный механизм обновления.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Забрать исходники
+        uses: actions/checkout@v4
+
+      - name: Поставить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Установить зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install PySide6 pyinstaller
+
+      - name: Собрать EXE
+        run: pyinstaller lifeos.spec --noconfirm --clean
+
+      - name: Прочитать версию
+        id: ver
+        shell: bash
+        run: |
+          v=$(python -c "import re;print(re.search(r'APP_VERSION = \"([^\"]+)\"',open('lifeos/config.py',encoding='utf-8').read()).group(1))")
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Упаковать архив
+        shell: bash
+        run: |
+          cd dist
+          7z a "LIFE-OS-${{ steps.ver.outputs.version }}-windows.zip" "LIFE OS.exe"
+
+      - name: Сохранить как артефакт
+        uses: actions/upload-artifact@v4
+        with:
+          name: LIFE-OS-windows
+          path: |
+            dist/LIFE OS.exe
+            dist/*.zip
+
+      - name: Опубликовать релиз
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: LIFE OS ${{ steps.ver.outputs.version }}
+          files: |
+            dist/LIFE OS.exe
+            dist/*.zip
+          generate_release_notes: true

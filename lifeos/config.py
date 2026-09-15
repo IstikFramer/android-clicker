@@ -1,25 +1,35 @@
 """LIFE OS — глобальные константы и пути."""
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 APP_NAME = "LIFE OS"
 APP_TAGLINE = "Персональная операционная система"
-APP_VERSION = "0.3.1"
-APP_BUILD = "0.3.1-alpha"
+APP_VERSION = "0.3.2"
+APP_BUILD = "0.3.2-alpha"
 APP_CHANNEL = "ALPHA"
 
 DEV_NAME = "IKOOF inc."
 DEV_EMAIL = "IKOOF1298W@gmail.com"
 DEV_YEAR = "2026"
 
-ROOT = Path(__file__).resolve().parents[1]
-ASSETS = ROOT / "assets"
+# В собранном EXE ресурсы распаковываются во временную папку (sys._MEIPASS),
+# а пользовательские файлы остаются рядом с исполняемым файлом.
+FROZEN = bool(getattr(sys, "frozen", False))
+if FROZEN:
+    RES_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    ROOT = Path(sys.executable).resolve().parent
+else:
+    RES_ROOT = Path(__file__).resolve().parents[1]
+    ROOT = RES_ROOT
+
+ASSETS = RES_ROOT / "assets"
 LOGO = ASSETS / "logo"
 ORBS = ASSETS / "orbs"
 BACKGROUNDS = ASSETS / "backgrounds"
 ICONS = ASSETS / "icons"
-DATA = ROOT / "data"
+DATA = RES_ROOT / "data"
 USER_DIR = Path.home() / ".lifeos"
 SETTINGS_FILE = USER_DIR / "settings.json"
 BACKUP_DIR = USER_DIR / "backups"

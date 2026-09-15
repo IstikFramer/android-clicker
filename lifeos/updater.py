@@ -297,6 +297,41 @@ class InstallWorker(QThread):
                 shutil.copy2(item, target)
         return dest
 
+    @staticmethod
+    def _find_exe(root: Path) -> Path | None:
+        """Ищет .exe в распакованном архиве."""
+        for cand in sorted(root.rglob("*.exe")):
+            return cand
+        return None
+
+    @staticmethod
+    def _stage_exe_swap(new_exe: Path) -> Path:
+        """Готовит скрипт замены EXE и возвращает путь к нему."""
+        current = Path(sys.executable).resolve()
+        staged = cfg.USER_DIR / "update"
+        staged.mkdir(parents=True, exist_ok=True)
+        pending = staged / current.name
+        shutil.copy2(new_exe, pending)
+
+        backup = staged / f"{current.stem}-{cfg.APP_VERSION}.bak"
+        script = staged / "apply_update.bat"
+        # Ждём завершения программы, подменяем файл и запускаем заново.
+        script.write_text(
+            "@echo off\r\n"
+            "chcp 65001 >nul\r\n"
+            "echo Установка обновления LIFE OS...\r\n"
+            ":wait\r\n"
+            "timeout /t 1 /nobreak >nul\r\n"
+            f'tasklist /fi "imagename eq {current.name}" | find /i "{current.name}" >nul '
+            "&& goto wait\r\n"
+            f'if exist "{backup}" del /q "{backup}"\r\n'
+            f'move /y "{current}" "{backup}" >nul\r\n'
+            f'move /y "{pending}" "{current}" >nul\r\n'
+            f'start "" "{current}"\r\n'
+            'del "%~f0"\r\n',
+            encoding="utf-8")
+        return script
+
     def _install(self, src: Path):
         for item in src.iterdir():
             if item.name in PROTECTED:
@@ -325,6 +360,21 @@ class InstallWorker(QThread):
             with zipfile.ZipFile(archive) as z:
                 z.extractall(unpack)
             root = self._unpack_root(unpack)
+
+            # Собранный EXE обновляется подменой самого файла: Windows не
+            # позволяет перезаписать запущенную программу, поэтому замену
+            # выполняет маленький скрипт уже после её закрытия.
+            if getattr(sys, "frozen", False):
+                new_exe = self._find_exe(root)
+                if new_exe is None:
+                    raise FileNotFoundError(
+                        "в архиве нет исполняемого файла программы")
+                self.progress.emit(88, "Подготовка замены…")
+                script = self._stage_exe_swap(new_exe)
+                self.progress.emit(100, "Готово")
+                self.finished_ok.emit(str(script))
+                return
+
             if not (root / "main.py").exists():
                 raise FileNotFoundError("в архиве не найден main.py")
 
@@ -355,15 +405,25 @@ class InstallWorker(QThread):
 
 
 # ------------------------------------------------------------------ перезапуск
-def restart_app():
-    """Перезапускает программу тем же интерпретатором."""
+def restart_app(apply_script: str | None = None):
+    """Перезапускает программу.
+
+    Если передан путь к скрипту замены (режим собранного EXE), запускает
+    его: скрипт дождётся закрытия программы, подменит файл и откроет
+    новую версию.
+    """
     try:
-        script = str(cfg.ROOT / "main.py")
-        if getattr(sys, "frozen", False):
-            args = [sys.executable]
+        if apply_script and Path(apply_script).exists():
+            subprocess.Popen(
+                ["cmd", "/c", "start", "", "/min", apply_script],
+                cwd=str(Path(apply_script).parent),
+                close_fds=True,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        elif getattr(sys, "frozen", False):
+            subprocess.Popen([sys.executable], cwd=str(cfg.ROOT), close_fds=True)
         else:
-            args = [sys.executable, script]
-        subprocess.Popen(args, cwd=str(cfg.ROOT), close_fds=True)
+            subprocess.Popen([sys.executable, str(cfg.ROOT / "main.py")],
+                             cwd=str(cfg.ROOT), close_fds=True)
     except OSError:
         pass
     os._exit(0)

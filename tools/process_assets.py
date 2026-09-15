@@ -80,7 +80,7 @@ def log(msg: str):
 # ---------------------------------------------------------------- логотипы
 def build_logos():
     jobs = [
-        ("v2_logo_main.png", "logo", (2048, 1024, 512, 256, 128)),
+        ("v2_logo_main.png", "logo", (512, 256, 128)),
         ("v2_logo_mini.png", "logo_mini", (512, 256, 128, 64)),
         ("v2_logo_tray.png", "logo_tray", (256, 128, 64, 32, 16)),
     ]
@@ -138,6 +138,8 @@ ORB_SHEETS = {
     "v4_icons_b.png": ["duplicate", "tools", "disk", "analyze"],
     "v4_icons_c.png": ["run", "rescan", "folder", "boost"],
     "v5_icons_a.png": ["done", "cancel", "clock", "lock"],
+    "v6_icons_a.png": ["admin", "boost", "schedule", "stats"],
+    "v6_icons_b.png": ["monitor", "bolt", "cog", "package"],
 }
 
 
@@ -180,6 +182,15 @@ def _blobs(alpha: np.ndarray, min_side: int) -> list[tuple[int, int, int, int]]:
     return out
 
 
+# Иконки, которые действительно используются в интерфейсе. Остальные
+# вырезаются из листов, но не сохраняются — чтобы не раздувать поставку.
+USED_ORBS = {
+    "download", "update", "warning", "mail", "shield", "bell",
+    "broom", "trash", "globe", "logfile", "duplicate", "tools",
+    "disk", "analyze", "folder", "done", "clock", "admin", "monitor",
+}
+
+
 def build_orb_icons():
     """Режет листы круглых иконок и сохраняет каждую отдельно с прозрачностью."""
     dest = OUT / "orbs"
@@ -194,12 +205,17 @@ def build_orb_icons():
         boxes = _blobs(alpha, min_side=int(min(cut.size) * 0.15))
         if len(boxes) < len(names):
             log(f"{sheet}: найдено {len(boxes)} иконок, ожидалось {len(names)}")
+        saved = []
         for name, box in zip(names, boxes):
+            if name not in USED_ORBS:
+                continue            # не тащим в поставку то, что не рисуем
             icon = autocrop(cut.crop(box), pad_ratio=0.02)
-            icon.save(dest / f"{name}.png")
+            # Полноразмерная копия в программе не используется — интерфейс
+            # всегда берёт вариант под нужный размер.
             for sz in (256, 128, 96, 64, 48, 32):
                 icon.resize((sz, sz), Image.LANCZOS).save(dest / f"{name}_{sz}.png")
-        log(f"{sheet}: {', '.join(names[:len(boxes)])}")
+            saved.append(name)
+        log(f"{sheet}: {', '.join(saved) if saved else 'ничего не требуется'}")
 
 
 # ---------------------------------------------------------------- фоны
@@ -212,6 +228,7 @@ def build_backgrounds():
         ("v2_hero.png", "hero_card", (2400, 900)),
         ("v3_update_hero.png", "update_hero", (2400, 900)),
         ("v4_tools_hero.png", "tools_hero", (2400, 900)),
+        ("v6_bg_aurora.png", "bg_aurora", (3840, 2160)),
         ("v2_about.png", "about_art", (2048, 2048)),
     ]
     for fname, stem, target in jobs:

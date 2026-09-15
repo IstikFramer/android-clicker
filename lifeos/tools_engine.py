@@ -67,6 +67,7 @@ class ScanResult:
     items: list[ScanItem] = field(default_factory=list)
     skipped: int = 0             # файлы, до которых не было доступа
     note: str = ""
+    locked_paths: int = 0        # каталоги, требующие администратора
 
     @property
     def total_size(self) -> int:
@@ -124,29 +125,69 @@ def _dir_stats(root: Path, skip_locked: bool = True) -> tuple[int, int, list[Pat
     return size, total, tops
 
 
-def _delete(path: Path, to_recycle: bool = False) -> int:
-    """Удаляет файл или каталог, возвращает освобождённый объём."""
+def _try_unlink(path: Path) -> int:
+    """Удаляет один файл. Возвращает освобождённый объём (0, если не вышло)."""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return 0
+    try:
+        path.unlink()
+    except PermissionError:
+        # Windows: снимаем «только чтение» и пробуем ещё раз.
+        try:
+            path.chmod(0o600)
+            path.unlink()
+        except OSError:
+            return 0
+    except OSError:
+        return 0
+    return size
+
+
+def _delete(path: Path) -> tuple[int, int]:
+    """Удаляет файл или каталог.
+
+    Возвращает (освобождено байт, пропущено файлов). Считается только то,
+    что действительно исчезло с диска: занятые процессами файлы Windows
+    удалить нельзя, и записывать их в «освобождено» — обман.
+    """
+    freed = skipped = 0
     try:
         if path.is_symlink():
-            freed = 0
-            path.unlink(missing_ok=True)
-            return freed
+            try:
+                path.unlink()
+            except OSError:
+                skipped += 1
+            return freed, skipped
         if path.is_file():
-            freed = path.stat().st_size
-            path.unlink()
-            return freed
-        if path.is_dir():
-            freed = sum(
-                os.path.getsize(os.path.join(dp, f))
-                for dp, _dn, fns in os.walk(path, onerror=None)
-                for f in fns
-                if os.path.exists(os.path.join(dp, f))
-            )
-            shutil.rmtree(path, ignore_errors=True)
-            return freed
-    except (PermissionError, OSError):
-        return 0
-    return 0
+            got = _try_unlink(path)
+            return (got, 0) if got else (0, 1)
+        if not path.is_dir():
+            return 0, 0
+    except OSError:
+        return 0, 1
+
+    # Каталог обходим снизу вверх и удаляем пофайлово, чтобы один
+    # заблокированный файл не отменял очистку всей папки.
+    for dirpath, dirnames, filenames in os.walk(path, topdown=False,
+                                                onerror=None):
+        for name in filenames:
+            got = _try_unlink(Path(dirpath) / name)
+            if got:
+                freed += got
+            else:
+                skipped += 1
+        for name in dirnames:
+            try:
+                (Path(dirpath) / name).rmdir()
+            except OSError:
+                pass
+    try:
+        path.rmdir()
+    except OSError:
+        pass
+    return freed, skipped
 
 
 # ============================================================= места поиска
@@ -288,18 +329,24 @@ class Tool:
     def scan(self, report) -> ScanResult:      # pragma: no cover - интерфейс
         raise NotImplementedError
 
-    def clean(self, items: list[ScanItem], report) -> int:
-        """Удаляет выбранное, возвращает освобождённый объём."""
-        freed = 0
+    def clean(self, items: list[ScanItem], report) -> tuple[int, int]:
+        """Удаляет выбранное.
+
+        Возвращает (освобождено байт, пропущено файлов). Пропуски — это
+        файлы, занятые работающими программами: они остаются на месте.
+        """
+        freed = skipped = 0
         total = sum(len(i.paths) for i in items) or 1
         done = 0
         for item in items:
             for path in item.paths:
-                freed += _delete(path)
+                got, miss = _delete(path)
+                freed += got
+                skipped += miss
                 done += 1
-                if done % 20 == 0 or done == total:
+                if done % 10 == 0 or done == total:
                     report(int(done / total * 100), f"Удаление… {item.title}")
-        return freed
+        return freed, skipped
 
 
 class TempTool(Tool):
@@ -313,6 +360,8 @@ class TempTool(Tool):
         for n, root in enumerate(dirs):
             report(int(n / max(1, len(dirs)) * 100), f"Проверка {root}")
             size, count, tops = _dir_stats(root)
+            if not os.access(root, os.W_OK):
+                res.locked_paths += 1
             if count:
                 res.items.append(ScanItem(
                     key=str(root), title=root.name or str(root),
@@ -425,6 +474,8 @@ class LogsTool(Tool):
         for n, root in enumerate(dirs):
             report(int(n / max(1, len(dirs)) * 100), f"Проверка {root.name}")
             size, count, tops = _dir_stats(root)
+            if not os.access(root, os.W_OK):
+                res.locked_paths += 1
             if count:
                 res.items.append(ScanItem(
                     key=str(root), title=root.name, detail=str(root),
@@ -539,7 +590,7 @@ class ScanWorker(QThread):
 
 class CleanWorker(QThread):
     progress = Signal(int, str)
-    done = Signal(int)
+    done = Signal(int, int)          # освобождено байт, пропущено файлов
     failed = Signal(str)
 
     def __init__(self, tool: Tool, items: list[ScanItem], parent=None):
@@ -549,9 +600,9 @@ class CleanWorker(QThread):
 
     def run(self):
         try:
-            freed = self._tool.clean(
+            freed, skipped = self._tool.clean(
                 self._items,
                 lambda p, t: self.progress.emit(max(0, min(100, p)), t))
-            self.done.emit(freed)
+            self.done.emit(freed, skipped)
         except Exception as exc:                    # noqa: BLE001
             self.failed.emit(str(exc))
