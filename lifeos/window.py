@@ -7,6 +7,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QAction, QColor, QIcon
 from PySide6.QtWidgets import (
+    QMessageBox,
     QApplication, QGraphicsOpacityEffect, QHBoxLayout, QMenu, QPushButton,
     QSizeGrip, QStackedWidget, QSystemTrayIcon, QVBoxLayout, QWidget,
 )
@@ -446,7 +447,18 @@ class MainWindow(QWidget):
             self._update_win.raise_()
             self._update_win.activateWindow()
             return
-        win = UpdateWindow(info)
+        try:
+            win = UpdateWindow(info)
+        except Exception as exc:                    # noqa: BLE001
+            # Окно не должно ронять программу из-за неожиданного манифеста:
+            # сообщаем и предлагаем скачать обновление вручную.
+            import traceback
+            traceback.print_exc()
+            QMessageBox.warning(
+                self, "Обновление",
+                f"Не удалось показать окно обновления.\n\n{exc}\n\n"
+                f"Скачать новую версию можно на странице проекта:\n{info.page}")
+            return
         win.center_on_screen()
         self._update_win = win
         win.show()

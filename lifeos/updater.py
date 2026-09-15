@@ -53,6 +53,50 @@ TIMEOUT = 15
 PROTECTED = {".git", ".venv", "venv", "__pycache__", "backups"}
 
 
+def normalize_changes(raw) -> dict[str, list[str]]:
+    """Приводит список изменений к виду {"added": [...], ...}.
+
+    Манифест может прийти в трёх формах: словарь групп, список словарей
+    {"type", "text"} или простой список строк. Любая из них должна
+    открываться, а не ронять окно обновления.
+    """
+    out: dict[str, list[str]] = {}
+    if isinstance(raw, dict):
+        for key, texts in raw.items():
+            if isinstance(texts, (list, tuple)):
+                out[str(key)] = [str(t) for t in texts]
+            elif texts:
+                out[str(key)] = [str(texts)]
+    elif isinstance(raw, (list, tuple)):
+        for item in raw:
+            if isinstance(item, dict):
+                out.setdefault(str(item.get("type", "added")), []).append(
+                    str(item.get("text", "")))
+            elif item:
+                out.setdefault("added", []).append(str(item))
+    return {k: [t for t in v if t] for k, v in out.items() if v}
+
+
+def changes_from_notes(text: str) -> dict[str, list[str]]:
+    """Вытаскивает списки из описания релиза GitHub (markdown)."""
+    groups = {"added": "добав", "improved": "улучш", "fixed": "исправ"}
+    out: dict[str, list[str]] = {}
+    current = "added"
+    for line in (text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        low = stripped.lower().lstrip("#* ").strip()
+        matched = next((k for k, word in groups.items() if low.startswith(word)),
+                       None)
+        if matched and (stripped.startswith("#") or stripped.endswith(":")):
+            current = matched
+            continue
+        if stripped[0] in "-*•":
+            out.setdefault(current, []).append(stripped[1:].strip())
+    return {k: v for k, v in out.items() if v}
+
+
 # --------------------------------------------------------------------- версии
 def parse_version(text: str) -> tuple:
     """'0.2.1-alpha' -> (0, 2, 1). Нечисловые хвосты отбрасываются."""
@@ -75,7 +119,7 @@ class UpdateInfo:
     version: str = ""
     title: str = ""
     notes: str = ""
-    changes: list[dict] = field(default_factory=list)
+    changes: dict | list = field(default_factory=dict)
     url: str = ""            # ссылка на скачивание архива
     page: str = ""           # страница релиза для браузера
     size: int = 0
@@ -134,6 +178,7 @@ def check_for_update() -> UpdateInfo:
             version=version,
             title=data.get("name") or f"Версия {version}",
             notes=(data.get("body") or "").strip(),
+            changes=changes_from_notes(data.get("body") or ""),
             url=asset_url,
             page=data.get("html_url") or RELEASES_PAGE,
             size=size,
@@ -150,7 +195,7 @@ def check_for_update() -> UpdateInfo:
             version=version,
             title=data.get("title") or f"Версия {version}",
             notes=data.get("summary", ""),
-            changes=data.get("changes") or [],
+            changes=normalize_changes(data.get("changes")),
             url=data.get("url") or BRANCH_ZIP,
             page=data.get("page") or BRANCH_PAGE,
             published=data.get("date", ""),

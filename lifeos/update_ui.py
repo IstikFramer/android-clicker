@@ -16,7 +16,7 @@ from . import icons
 from .anim import Spring, driver
 from .settings import settings
 from .theme import current_accent
-from .updater import InstallWorker, UpdateInfo, restart_app
+from .updater import InstallWorker, UpdateInfo, normalize_changes, restart_app
 from .widgets import (
     Divider, GlassCard, GlowAware, ImagePanel, OrbIcon, make_label, soft_shadow,
 )
@@ -148,19 +148,9 @@ class UpdateWindow(QWidget):
             body.addWidget(make_label("Что изменилось", "CardTitle"))
             body.addWidget(make_label(info.notes, "CardBody", wrap=True))
         else:
-            # changes принимается в двух формах: словарь групп
-            # {"added": [...]} или список {"type": ..., "text": ...}.
-            grouped: dict[str, list[str]] = {}
-            if isinstance(info.changes, dict):
-                for key, texts in info.changes.items():
-                    grouped[key] = [str(t) for t in texts]
-            else:
-                for c in info.changes:
-                    if isinstance(c, dict):
-                        grouped.setdefault(
-                            c.get("type", "added"), []).append(c.get("text", ""))
-                    else:
-                        grouped.setdefault("added", []).append(str(c))
+            # Формат changes может отличаться между версиями манифеста,
+            # поэтому приводим его к единому виду перед отрисовкой.
+            grouped = normalize_changes(info.changes)
             for key in ("added", "improved", "fixed"):
                 items = grouped.get(key)
                 if not items:

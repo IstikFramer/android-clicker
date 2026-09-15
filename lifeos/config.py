@@ -5,8 +5,8 @@ from pathlib import Path
 
 APP_NAME = "LIFE OS"
 APP_TAGLINE = "Персональная операционная система"
-APP_VERSION = "0.3"
-APP_BUILD = "0.3.0-alpha"
+APP_VERSION = "0.3.1"
+APP_BUILD = "0.3.1-alpha"
 APP_CHANNEL = "ALPHA"
 
 DEV_NAME = "IKOOF inc."
