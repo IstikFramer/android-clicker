@@ -12,7 +12,7 @@ const TITLES = {
     title: "Вишнёвый дождь",
     altTitle: "桜の雨 · Sakura no Ame",
     author: "Сакура Ивано",
-    status: "Выходит",
+    status: "Завершена",
     year: 2026,
     rating: 4.9,
     views: 128473,

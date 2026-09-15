@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>МангаЛайф — читай мангу онлайн</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
   <script>try{var t=localStorage.getItem("ml-theme");if(t)document.documentElement.dataset.theme=t;if(localStorage.getItem("ml-adult-ok"))document.documentElement.classList.add("adult-ok")}catch(e){}</script>
 </head>
 <body>
@@ -61,7 +61,7 @@
       <img class="hero-bg" src="assets/site/banner-hero.jpg" alt="Вишнёвый дождь — баннер">
       <div id="petals"></div>
       <div class="hero-content">
-        <span class="badge"><svg class="ic" style="width:14px;height:14px"><use href="#i-spark"/></svg> Новая глава каждую неделю</span>
+        <span class="badge"><svg class="ic" style="width:14px;height:14px"><use href="#i-spark"/></svg> Завершена · 6 глав · финал уже на сайте</span>
         <h1>Вишнёвый дождь</h1>
         <div class="alt">桜の雨 · Sakura no Ame · Сакура Ивано</div>
         <div class="meta">
@@ -72,7 +72,7 @@
         <p>Тихая художница Аня, дерзкий Кирилл и старая вишня за школой. Одна случайная встреча —
            и спокойной жизни конец. А весной из-за границы возвращается Вика Лебедева…</p>
         <div class="hero-actions">
-          <a class="btn big" id="heroRead" href="read.html?chapter=4"><svg class="ic ic-lg"><use href="#i-play"/></svg> Читать главу 4</a>
+          <a class="btn big" id="heroRead" href="read.html?chapter=6"><svg class="ic ic-lg"><use href="#i-play"/></svg> Читать финал</a>
           <a class="btn big white" href="manga.html">Все главы</a>
         </div>
       </div>
@@ -164,7 +164,7 @@
 
         <article class="ch-card">
           <div class="ch-thumb">
-            <span class="ch-flag"><svg class="ic" style="width:12px;height:12px"><use href="#i-spark"/></svg> Новая</span>
+            <span class="ch-flag">Завершена</span>
             <span class="ch-num">05</span>
             <img src="assets/site/art-coming.jpg" alt="Баннер главы 5">
           </div>
@@ -180,21 +180,38 @@
           </div>
         </article>
 
-        <article class="ch-card" style="opacity:.75">
+        <article class="ch-card">
           <div class="ch-thumb">
-            <span class="ch-flag soon">Скоро</span>
+            <span class="ch-flag"><svg class="ic" style="width:12px;height:12px"><use href="#i-spark"/></svg> Финал</span>
             <span class="ch-num">06</span>
-            <img src="assets/site/art-chibi.jpg" alt="Глава 6 — скоро">
+            <img src="assets/site/banner-hero.jpg" alt="Баннер финальной главы 6">
           </div>
           <div class="ch-body">
             <h3>Глава 6 — Вишнёвый дождь</h3>
-            <div class="ch-desc">Название говорит само за себя: глава, ради которой всё начиналось.
-              10 страниц по твоему следующему запросу 🌸</div>
+            <div class="ch-desc">Десять лет спустя. Сад обещаний, Париж, старый альбом с чистыми
+              страницами и девочка с рисунком под той же вишней. Всё возвращается к началу.</div>
             <div class="ch-meta">
               <span class="m-pages"><svg class="ic" style="width:14px;height:14px"><use href="#i-page"/></svg> 10 страниц</span>
-              <span><svg class="ic" style="width:14px;height:14px"><use href="#i-clock"/></svg> ожидается</span>
+              <span><svg class="ic" style="width:14px;height:14px"><use href="#i-clock"/></svg> сегодня</span>
             </div>
-            <span class="btn ghost" style="align-self:flex-start;cursor:default">Ожидается</span>
+            <a class="btn" href="read.html?chapter=6"><svg class="ic"><use href="#i-play"/></svg> Читать финал</a>
+          </div>
+        </article>
+
+        <article class="ch-card" style="background:linear-gradient(135deg,rgba(255,45,111,.08),rgba(123,47,247,.08))">
+          <div class="ch-thumb">
+            <span class="ch-flag">Спасибо!</span>
+            <span class="ch-num">🌸</span>
+            <img src="assets/site/art-chibi.jpg" alt="Спасибо за чтение">
+          </div>
+          <div class="ch-body">
+            <h3>Манга завершена</h3>
+            <div class="ch-desc">6 глав · 60 страниц. Спасибо, что были с нами всё это время!
+              «У истории не должно быть последней страницы.»</div>
+            <div class="ch-meta">
+              <span><svg class="ic" style="width:14px;height:14px"><use href="#i-heart"/></svg> ждём том второй…</span>
+            </div>
+            <a class="btn ghost" href="read.html?chapter=1"><svg class="ic"><use href="#i-play"/></svg> Перечитать с начала</a>
           </div>
         </article>
       </div>
@@ -293,7 +310,7 @@
     </div>
   </footer>
 
-  <script src="js/data.js?v=7"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/data.js?v=8"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>
