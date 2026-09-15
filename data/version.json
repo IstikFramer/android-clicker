@@ -1,8 +1,8 @@
 {
   "version": "0.3.1",
   "title": "Исправление окна обновления",
-  "date": "2026",
-  "summary": "Программа сама следит за новыми версиями и устанавливает их в один клик.",
+  "date": "2026-09-15",
+  "summary": "Обновление снова устанавливается: окно со списком изменений больше не падает.",
   "url": "https://codeload.github.com/IstikFramer/android-clicker/zip/refs/heads/arena%2F01a0a388-android-clicker",
   "page": "https://github.com/IstikFramer/android-clicker/tree/arena%2F01a0a388-android-clicker",
   "changes": {

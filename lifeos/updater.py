@@ -199,7 +199,7 @@ def check_for_update() -> UpdateInfo:
             url=data.get("url") or BRANCH_ZIP,
             page=data.get("page") or BRANCH_PAGE,
             size=int(data.get("size") or 0),
-            published=data.get("date", ""),
+            published=data.get("published") or data.get("date", ""),
             source="branch",
             available=is_newer(version),
         )
