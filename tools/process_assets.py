@@ -130,13 +130,83 @@ def build_icons():
     log(f"иконки нарезаны: {', '.join(ICON_NAMES)}")
 
 
+# ------------------------------------------ круглые орб-иконки (авто-нарезка)
+ORB_SHEETS = {
+    "v3_icons_a.png": ["download", "update", "done", "warning"],
+    "v3_icons_b.png": ["gear", "mail", "shield", "bell"],
+}
+
+
+def _blobs(alpha: np.ndarray, min_side: int) -> list[tuple[int, int, int, int]]:
+    """Находит непрозрачные области (иконки) без сторонних библиотек.
+
+    Изображение сжимается в сетку, затем прямоугольники объединяются
+    поиском в ширину по занятым клеткам.
+    """
+    h, w = alpha.shape
+    cell = max(4, min(h, w) // 160)
+    gh, gw = h // cell, w // cell
+    grid = (alpha[:gh * cell, :gw * cell]
+            .reshape(gh, cell, gw, cell).max(axis=(1, 3)) > 40)
+
+    seen = np.zeros_like(grid, dtype=bool)
+    out = []
+    for y in range(gh):
+        for x in range(gw):
+            if not grid[y, x] or seen[y, x]:
+                continue
+            stack = [(y, x)]
+            seen[y, x] = True
+            ys, xs = [y], [x]
+            while stack:
+                cy, cx = stack.pop()
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        ny, nx = cy + dy, cx + dx
+                        if 0 <= ny < gh and 0 <= nx < gw and grid[ny, nx] and not seen[ny, nx]:
+                            seen[ny, nx] = True
+                            stack.append((ny, nx))
+                            ys.append(ny)
+                            xs.append(nx)
+            x0, x1 = min(xs) * cell, (max(xs) + 1) * cell
+            y0, y1 = min(ys) * cell, (max(ys) + 1) * cell
+            if (x1 - x0) >= min_side and (y1 - y0) >= min_side:
+                out.append((x0, y0, x1, y1))
+    out.sort(key=lambda b: (round(b[1] / max(1, h) * 6), b[0]))
+    return out
+
+
+def build_orb_icons():
+    """Режет листы круглых иконок и сохраняет каждую отдельно с прозрачностью."""
+    dest = OUT / "orbs"
+    dest.mkdir(parents=True, exist_ok=True)
+    for sheet, names in ORB_SHEETS.items():
+        src = RAW / sheet
+        if not src.exists():
+            log(f"пропуск {sheet}")
+            continue
+        cut = chroma_key(Image.open(src), tol=0.30)
+        alpha = np.asarray(cut)[..., 3]
+        boxes = _blobs(alpha, min_side=int(min(cut.size) * 0.15))
+        if len(boxes) < len(names):
+            log(f"{sheet}: найдено {len(boxes)} иконок, ожидалось {len(names)}")
+        for name, box in zip(names, boxes):
+            icon = autocrop(cut.crop(box), pad_ratio=0.02)
+            icon.save(dest / f"{name}.png")
+            for sz in (256, 128, 96, 64, 48, 32):
+                icon.resize((sz, sz), Image.LANCZOS).save(dest / f"{name}_{sz}.png")
+        log(f"{sheet}: {', '.join(names[:len(boxes)])}")
+
+
 # ---------------------------------------------------------------- фоны
 def build_backgrounds():
     jobs = [
         ("v2_bg_main.png", "bg_main", (3840, 2160)),
         ("v2_bg_violet.png", "bg_violet", (3840, 2160)),
-        ("v2_splash.png", "splash", (1920, 1080)),
+        ("v3_bg_deep.png", "bg_deep", (3840, 2160)),
+        ("v3_splash.png", "splash", (1920, 1080)),
         ("v2_hero.png", "hero_card", (2400, 900)),
+        ("v3_update_hero.png", "update_hero", (2400, 900)),
         ("v2_about.png", "about_art", (2048, 2048)),
     ]
     for fname, stem, target in jobs:
@@ -203,5 +273,6 @@ if __name__ == "__main__":
     build_logos()
     build_icons()
     build_glyph_icons()
+    build_orb_icons()
     build_backgrounds()
     print("Готово.")

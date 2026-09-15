@@ -31,6 +31,16 @@ from .theme import current_accent
 _pm_cache: dict[tuple, QPixmap] = {}
 
 
+class GlowAware:
+    """Метка для виджетов, которые сами рисуют неоновое свечение.
+
+    По ней окно понимает, что именно нужно перерисовать при изменении
+    ползунка «Сила свечения». Карточки с тенями в список не входят:
+    их update() заставляет Qt заново считать размытие в пиксмап, а это
+    и было причиной подтормаживания ползунков.
+    """
+
+
 def load_pixmap(path: Path | str, w: int = 0, h: int = 0) -> QPixmap:
     key = (str(path), w, h)
     if key not in _pm_cache:
@@ -77,7 +87,7 @@ class Divider(QFrame):
 
 
 # ===========================================================================
-class BackgroundCanvas(QWidget):
+class BackgroundCanvas(GlowAware, QWidget):
     """Фон окна: изображение, затемнение и два медленно дышащих блика.
 
     Статичная часть (картинка + затемнение + рамка) собирается в кэш-пиксмап
@@ -510,7 +520,7 @@ class IconButton(QPushButton):
 
 
 # ===========================================================================
-class Switch(QWidget):
+class Switch(GlowAware, QWidget):
     """Переключатель с анимированным ползунком."""
 
     toggled = Signal(bool)
@@ -589,7 +599,7 @@ class Switch(QWidget):
 
 
 # ===========================================================================
-class Slider(QWidget):
+class Slider(GlowAware, QWidget):
     """Слайдер: неоновая шкала, перетаскиваемая ручка, подпись значения."""
 
     valueChanged = Signal(int)
@@ -750,7 +760,7 @@ class SliderRow(QWidget):
 
 
 # ===========================================================================
-class SegmentedControl(QWidget):
+class SegmentedControl(GlowAware, QWidget):
     """Переключатель вариантов с плавно скользящим выделением."""
 
     changed = Signal(int)
@@ -842,7 +852,7 @@ class SegmentedControl(QWidget):
 
 
 # ===========================================================================
-class ColorDot(QWidget):
+class ColorDot(GlowAware, QWidget):
     """Кружок выбора акцента с анимированным кольцом выбора."""
 
     clicked = Signal(str)
@@ -919,7 +929,7 @@ class ColorDot(QWidget):
 
 
 # ===========================================================================
-class LogoOrb(QWidget):
+class LogoOrb(GlowAware, QWidget):
     """Фирменный орб: картинка логотипа с мягким дыханием и ореолом."""
 
     def __init__(self, size: int = 56, parent=None, breathe: bool = True,
@@ -968,7 +978,68 @@ class LogoOrb(QWidget):
 
 
 # ===========================================================================
-class RingGauge(QWidget):
+class OrbIcon(GlowAware, QWidget):
+    """Круглая иконка-орб (готовая картинка) с ореолом и hover-откликом."""
+
+    def __init__(self, name: str, size: int = 48, parent=None, hover: bool = False):
+        super().__init__(parent)
+        self.setFixedSize(size, size)
+        self._name = name
+        self._hov = Spring(0.0, 20.0)
+        self._hoverable = hover
+        px = min(256, max(32, int(size * 2)))
+        for cand in (256, 128, 96, 64, 48, 32):
+            if cand >= px:
+                px = cand
+                break
+        self._pm = load_pixmap(cfg.ORBS / f"{name}_{px}.png", size, size)
+        if hover:
+            self.setAttribute(Qt.WA_Hover, True)
+            driver().subscribe(self, self._tick)
+
+    def enterEvent(self, e):
+        if self._hoverable:
+            self._hov.set(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hov.set(0.0)
+        super().leaveEvent(e)
+
+    def _tick(self, dt: float):
+        if self._hov.done:
+            return
+        self._hov.step(dt)
+        self.update()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
+        s = min(self.width(), self.height())
+        strength = settings.glow_alpha
+        if strength > 0.05:
+            acc = current_accent()
+            g = QRadialGradient(QPointF(s / 2, s / 2), s * 0.62)
+            c = QColor(acc.primary)
+            c.setAlphaF(min(0.34, (0.12 + 0.10 * self._hov.value) * strength))
+            g.setColorAt(0.0, c)
+            c0 = QColor(acc.primary)
+            c0.setAlpha(0)
+            g.setColorAt(1.0, c0)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(g))
+            p.drawEllipse(QRectF(0, 0, s, s))
+        if not self._pm.isNull():
+            k = 1.0 + 0.05 * self._hov.value
+            w = self._pm.width() * k
+            h = self._pm.height() * k
+            p.drawPixmap(QRectF((s - w) / 2, (s - h) / 2, w, h), self._pm,
+                         QRectF(self._pm.rect()))
+        p.end()
+
+
+# ===========================================================================
+class RingGauge(GlowAware, QWidget):
     """Кольцевой индикатор с плавным подтягиванием значения."""
 
     def __init__(self, value: float = 0.0, size: int = 128, parent=None):

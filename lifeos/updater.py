@@ -1,0 +1,300 @@
+"""LIFE OS — проверка и установка обновлений с GitHub.
+
+Работа идёт в фоновом потоке, интерфейс не блокируется.
+
+Порядок поиска новой версии:
+  1. последний Release репозитория (если релизы опубликованы);
+  2. файл data/version.json в ветке — на случай, когда релизов ещё нет.
+
+Установка:
+  скачивание архива -> распаковка во временную папку -> резервная копия
+  текущей версии -> замена файлов -> перезапуск программы.
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import ssl
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+import zipfile
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from PySide6.QtCore import QObject, QThread, Signal
+
+from . import config as cfg
+
+GITHUB_OWNER = "IstikFramer"
+GITHUB_REPO = "android-clicker"
+GITHUB_BRANCH = "arena/01a0a388-android-clicker"
+
+API_RELEASES = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+# Contents API отдаёт файл вместе с содержимым в base64 и, в отличие от
+# raw.githubusercontent, доступен даже там, где raw-домен заблокирован.
+API_CONTENTS = (f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+                f"/contents/data/version.json?ref={GITHUB_BRANCH}")
+RAW_VERSION = (f"https://raw.githubusercontent.com/{GITHUB_OWNER}/{GITHUB_REPO}/"
+               f"{GITHUB_BRANCH}/data/version.json")
+BRANCH_ZIP = (f"https://codeload.github.com/{GITHUB_OWNER}/{GITHUB_REPO}/zip/refs/heads/"
+              f"{GITHUB_BRANCH}")
+BRANCH_PAGE = (f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/tree/{GITHUB_BRANCH}")
+RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
+
+USER_AGENT = f"LIFE-OS/{cfg.APP_VERSION}"
+TIMEOUT = 15
+
+# папки, которые никогда не трогаем при обновлении
+PROTECTED = {".git", ".venv", "venv", "__pycache__", "backups"}
+
+
+# --------------------------------------------------------------------- версии
+def parse_version(text: str) -> tuple:
+    """'0.2.1-alpha' -> (0, 2, 1). Нечисловые хвосты отбрасываются."""
+    core = str(text or "").strip().lstrip("vV").split("-")[0].split("+")[0]
+    parts = []
+    for chunk in core.split("."):
+        digits = "".join(c for c in chunk if c.isdigit())
+        parts.append(int(digits) if digits else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def is_newer(remote: str, local: str = cfg.APP_VERSION) -> bool:
+    return parse_version(remote) > parse_version(local)
+
+
+@dataclass
+class UpdateInfo:
+    version: str = ""
+    title: str = ""
+    notes: str = ""
+    changes: list[dict] = field(default_factory=list)
+    url: str = ""            # ссылка на скачивание архива
+    page: str = ""           # страница релиза для браузера
+    size: int = 0
+    published: str = ""
+    source: str = ""         # release | branch
+    available: bool = False
+
+
+# ------------------------------------------------------------------ загрузка
+def _open(url: str):
+    req = urllib.request.Request(url, headers={
+        "User-Agent": USER_AGENT,
+        "Accept": "application/vnd.github+json",
+    })
+    ctx = ssl.create_default_context()
+    return urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx)
+
+
+def _get_json(url: str) -> dict | None:
+    try:
+        with _open(url) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+        return None
+
+
+def _get_version_file() -> dict | None:
+    """Читает data/version.json из ветки: сначала через API, потом через raw."""
+    data = _get_json(API_CONTENTS)
+    if isinstance(data, dict) and data.get("content"):
+        try:
+            import base64
+            raw = base64.b64decode(data["content"]).decode("utf-8")
+            return json.loads(raw)
+        except (ValueError, TypeError):
+            pass
+    data = _get_json(RAW_VERSION)
+    return data if isinstance(data, dict) else None
+
+
+def check_for_update() -> UpdateInfo:
+    """Определяет, есть ли версия новее текущей."""
+    # 1) релизы
+    data = _get_json(API_RELEASES)
+    if isinstance(data, dict) and data.get("tag_name"):
+        version = str(data.get("tag_name", "")).lstrip("vV")
+        asset_url, size = BRANCH_ZIP, 0
+        for a in data.get("assets") or []:
+            if str(a.get("name", "")).lower().endswith(".zip"):
+                asset_url = a.get("browser_download_url") or asset_url
+                size = int(a.get("size") or 0)
+                break
+        else:
+            asset_url = data.get("zipball_url") or BRANCH_ZIP
+        return UpdateInfo(
+            version=version,
+            title=data.get("name") or f"Версия {version}",
+            notes=(data.get("body") or "").strip(),
+            url=asset_url,
+            page=data.get("html_url") or RELEASES_PAGE,
+            size=size,
+            published=(data.get("published_at") or "")[:10],
+            source="release",
+            available=is_newer(version),
+        )
+
+    # 2) version.json в ветке
+    data = _get_version_file()
+    if isinstance(data, dict) and data.get("version"):
+        version = str(data["version"])
+        return UpdateInfo(
+            version=version,
+            title=data.get("title") or f"Версия {version}",
+            notes=data.get("summary", ""),
+            changes=data.get("changes") or [],
+            url=data.get("url") or BRANCH_ZIP,
+            page=data.get("page") or BRANCH_PAGE,
+            published=data.get("date", ""),
+            source="branch",
+            available=is_newer(version),
+        )
+    return UpdateInfo()
+
+
+# -------------------------------------------------------------------- потоки
+class CheckWorker(QThread):
+    """Фоновая проверка обновлений."""
+
+    done = Signal(object)
+
+    def run(self):
+        try:
+            self.done.emit(check_for_update())
+        except Exception:
+            self.done.emit(UpdateInfo())
+
+
+class InstallWorker(QThread):
+    """Скачивание, распаковка и установка обновления."""
+
+    progress = Signal(int, str)     # проценты, подпись этапа
+    finished_ok = Signal(str)       # путь к резервной копии
+    failed = Signal(str)
+
+    def __init__(self, info: UpdateInfo, parent=None):
+        super().__init__(parent)
+        self._info = info
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    # ------------------------------------------------------------ служебное
+    def _download(self, url: str, dest: Path):
+        with _open(url) as r:
+            total = int(r.headers.get("Content-Length") or self._info.size or 0)
+            got = 0
+            with open(dest, "wb") as f:
+                while True:
+                    if self._cancel:
+                        raise InterruptedError
+                    chunk = r.read(64 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    got += len(chunk)
+                    if total:
+                        pct = int(got / total * 70)
+                        mb = got / 1048576
+                        self.progress.emit(min(70, pct), f"Загрузка… {mb:.1f} МБ")
+                    else:
+                        self.progress.emit(35, f"Загрузка… {got / 1048576:.1f} МБ")
+
+    @staticmethod
+    def _unpack_root(tmp: Path) -> Path:
+        """В архивах GitHub всё лежит внутри одной папки."""
+        items = [p for p in tmp.iterdir() if p.is_dir()]
+        return items[0] if len(items) == 1 else tmp
+
+    def _backup(self) -> Path:
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        dest = cfg.USER_DIR / "backups" / f"{cfg.APP_VERSION}-{stamp}"
+        dest.mkdir(parents=True, exist_ok=True)
+        for item in cfg.ROOT.iterdir():
+            if item.name in PROTECTED:
+                continue
+            target = dest / item.name
+            if item.is_dir():
+                shutil.copytree(item, target, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, target)
+        return dest
+
+    def _install(self, src: Path):
+        for item in src.iterdir():
+            if item.name in PROTECTED:
+                continue
+            target = cfg.ROOT / item.name
+            if item.is_dir():
+                shutil.copytree(item, target, dirs_exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(item, target)
+
+    # ------------------------------------------------------------------ run
+    def run(self):
+        tmpdir = None
+        try:
+            self.progress.emit(2, "Подключение к серверу…")
+            tmpdir = Path(tempfile.mkdtemp(prefix="lifeos-update-"))
+            archive = tmpdir / "update.zip"
+            self._download(self._info.url, archive)
+
+            if self._cancel:
+                raise InterruptedError
+            self.progress.emit(76, "Распаковка архива…")
+            unpack = tmpdir / "unpacked"
+            unpack.mkdir()
+            with zipfile.ZipFile(archive) as z:
+                z.extractall(unpack)
+            root = self._unpack_root(unpack)
+            if not (root / "main.py").exists():
+                raise FileNotFoundError("в архиве не найден main.py")
+
+            if self._cancel:
+                raise InterruptedError
+            self.progress.emit(84, "Резервная копия текущей версии…")
+            backup = self._backup()
+
+            self.progress.emit(92, "Установка файлов…")
+            self._install(root)
+
+            self.progress.emit(100, "Готово")
+            self.finished_ok.emit(str(backup))
+        except InterruptedError:
+            self.failed.emit("Обновление отменено.")
+        except urllib.error.URLError:
+            self.failed.emit("Не удалось скачать файл: проверьте подключение к интернету.")
+        except zipfile.BadZipFile:
+            self.failed.emit("Загруженный архив повреждён.")
+        except PermissionError:
+            self.failed.emit("Нет прав на запись в папку программы.")
+        except Exception as exc:
+            self.failed.emit(f"Ошибка установки: {exc}")
+        finally:
+            if tmpdir and tmpdir.exists():
+                shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+# ------------------------------------------------------------------ перезапуск
+def restart_app():
+    """Перезапускает программу тем же интерпретатором."""
+    try:
+        script = str(cfg.ROOT / "main.py")
+        if getattr(sys, "frozen", False):
+            args = [sys.executable]
+        else:
+            args = [sys.executable, script]
+        subprocess.Popen(args, cwd=str(cfg.ROOT), close_fds=True)
+    except OSError:
+        pass
+    os._exit(0)

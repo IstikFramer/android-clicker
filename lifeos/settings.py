@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from PySide6.QtCore import QTimer
+
 from . import config as cfg
 
 DEFAULTS: dict[str, Any] = {
@@ -34,7 +36,20 @@ class Settings:
     def __init__(self):
         self._data = dict(DEFAULTS)
         self._subs: list[Callable[[str, Any], None]] = []
+        self._save_timer: QTimer | None = None
         self.load()
+
+    def _save_later(self):
+        """Запись на диск не чаще раза в 400 мс.
+
+        Во время перетаскивания слайдера значение меняется десятки раз в
+        секунду — писать файл на каждый пиксель незачем.
+        """
+        if self._save_timer is None:
+            self._save_timer = QTimer()
+            self._save_timer.setSingleShot(True)
+            self._save_timer.timeout.connect(self.save)
+        self._save_timer.start(400)
 
     # --------------------------------------------------------------- файл
     def load(self):
@@ -71,7 +86,7 @@ class Settings:
             return
         self._data[key] = value
         if save:
-            self.save()
+            self._save_later()
         self._emit(key, value)
 
     def __getitem__(self, key: str) -> Any:

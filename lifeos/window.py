@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import (
     QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
-    QTimer, Qt,
+    QTimer, Qt, Signal,
 )
 from PySide6.QtGui import QAction, QColor, QIcon
 from PySide6.QtWidgets import (
@@ -18,9 +18,14 @@ from .eula import EulaWindow
 from .pages import AboutPage, HomePage, SettingsPage
 from .settings import settings
 from .theme import build_qss, current_accent
+from .update_ui import UpdateWindow
+from .updater import CheckWorker, UpdateInfo
 from .widgets import (
-    BackgroundCanvas, Divider, IconButton, LogoOrb, NavButton, make_label,
+    BackgroundCanvas, Divider, GlowAware, IconButton, LogoOrb, NavButton,
+    make_label,
 )
+
+CHECK_INTERVAL_MS = 60 * 60 * 1000   # раз в час
 
 NAV_ITEMS = [
     ("Главная", "home"),
@@ -51,6 +56,12 @@ class TitleBar(QWidget):
         self.sub = make_label("· " + cfg.APP_TAGLINE, "TitleSub")
         lay.addWidget(self.sub)
         lay.addStretch(1)
+
+        self.btn_update = IconButton("download", 34, 17,
+                                     tooltip="Доступно обновление")
+        self.btn_update.setVisible(False)
+        self.btn_update.clicked.connect(win.open_update_window)
+        lay.addWidget(self.btn_update)
 
         self.btn_min = IconButton("minus", 34, 17, tooltip="Свернуть")
         self.btn_max = IconButton("square", 34, 15, tooltip="Развернуть")
@@ -171,6 +182,9 @@ class Sidebar(QWidget):
 
 # ---------------------------------------------------------------- MainWindow
 class MainWindow(QWidget):
+    update_state_changed = Signal(object)
+    update_check_started = Signal()
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"{cfg.APP_NAME} {cfg.APP_VERSION}")
@@ -187,6 +201,24 @@ class MainWindow(QWidget):
         self._press_pos = QPoint()
         self._eula_win: EulaWindow | None = None
         self._page_anim: QPropertyAnimation | None = None
+        self._update_info: UpdateInfo | None = None
+        self._update_win: UpdateWindow | None = None
+        self._check_worker: CheckWorker | None = None
+        self._notified_version = ""
+
+        # Перегенерация QSS стоит ~60 мс, поэтому при быстром изменении
+        # настроек (перетаскивание слайдера) запросы копятся и применяются
+        # одним разом — интерфейс остаётся отзывчивым.
+        self._restyle_timer = QTimer(self)
+        self._restyle_timer.setSingleShot(True)
+        self._restyle_timer.timeout.connect(self._do_restyle)
+        self._restyle_pending = False
+
+        # Полный обход дерева виджетов тоже недёшев, поэтому перерисовка
+        # по изменению «силы свечения» так же копится и выполняется пакетом.
+        self._repaint_timer = QTimer(self)
+        self._repaint_timer.setSingleShot(True)
+        self._repaint_timer.timeout.connect(self._do_repaint_all)
 
         self.bg = BackgroundCanvas(self)
         self.bg.setGeometry(self.rect())
@@ -218,6 +250,13 @@ class MainWindow(QWidget):
         self._grip = QSizeGrip(self)
         self._grip.setFixedSize(16, 16)
 
+        # Проверка обновлений: первый раз через 4 секунды после старта
+        # (чтобы не тормозить запуск), далее раз в час.
+        self._check_timer = QTimer(self)
+        self._check_timer.timeout.connect(lambda: self.check_updates(silent=True))
+        self._check_timer.start(CHECK_INTERVAL_MS)
+        QTimer.singleShot(4000, lambda: self.check_updates(silent=True))
+
     # -------------------------------------------------------------- страницы
     def _build_pages(self):
         current = self.stack.currentIndex() if self.stack.count() else 0
@@ -227,10 +266,17 @@ class MainWindow(QWidget):
             driver().unsubscribe(w)
             w.deleteLater()
         self.pages = [
-            HomePage(),
+            HomePage(self.open_update_window),
             SettingsPage(self.restyle, self.bg.reload),
-            AboutPage(self.show_eula),
+            AboutPage(self.show_eula, self.check_updates, self.open_update_window),
         ]
+        for pg in self.pages:
+            if hasattr(pg, "on_update_state"):
+                self.update_state_changed.connect(pg.on_update_state)
+            if hasattr(pg, "on_check_started"):
+                self.update_check_started.connect(pg.on_check_started)
+        if self._update_info is not None:
+            self.update_state_changed.emit(self._update_info)
         for p in self.pages:
             self.stack.addWidget(p)
         self.stack.setCurrentIndex(min(current, len(self.pages) - 1))
@@ -257,14 +303,27 @@ class MainWindow(QWidget):
 
     # ------------------------------------------------------------ настройки
     def _on_setting(self, key: str, value):
-        if key in ("accent", "glass_opacity", "glow_strength", "corner_radius", "ui_scale"):
-            self.restyle(rebuild=key in ("ui_scale", "corner_radius"))
+        if key == "glow_strength":
+            # Свечение рисуется вручную в paintEvent виджетов: ни QSS,
+            # ни кэш фона от него не зависят — достаточно перерисовки.
+            # Фон входит в GlowAware, поэтому обновится вместе со всеми.
+            self._repaint_all()
+        elif key in ("accent", "glass_opacity", "corner_radius", "ui_scale"):
+            self.restyle()
         elif key in ("fps_limit", "anim_speed", "animations", "power_saving"):
             self._apply_runtime()
         elif key == "heavy_effects":
-            self.restyle(rebuild=True)
+            self.restyle()
         elif key == "background":
             self.bg.reload()
+
+    def _repaint_all(self):
+        if not self._repaint_timer.isActive():
+            self._repaint_timer.start(60)
+
+    def _do_repaint_all(self):
+        for w in self.findChildren(GlowAware):
+            w.update()
 
     def _apply_runtime(self):
         fps = settings.get("fps_limit")
@@ -276,6 +335,19 @@ class MainWindow(QWidget):
         self.update()
 
     def restyle(self, rebuild: bool = False):
+        """Запрашивает перестройку оформления (применится одним пакетом)."""
+        self._restyle_pending = True
+        if rebuild:
+            self._restyle_rebuild = True
+        if not self._restyle_timer.isActive():
+            self._restyle_timer.start(60)
+
+    def _do_restyle(self):
+        if not self._restyle_pending:
+            return
+        self._restyle_pending = False
+        rebuild = getattr(self, "_restyle_rebuild", False)
+        self._restyle_rebuild = False
         icons.clear_cache()
         QApplication.instance().setStyleSheet(build_qss())
         self._update_tray_icon()
@@ -284,7 +356,7 @@ class MainWindow(QWidget):
             self._build_pages()
             self.sidebar.set_active(self.stack.currentIndex())
         self.bg.invalidate()
-        self.update()
+        self._do_repaint_all()
 
     # ---------------------------------------------------------------- соглашение
     def show_eula(self, first_run: bool = False):
@@ -299,6 +371,55 @@ class MainWindow(QWidget):
         win.activateWindow()
         return win
 
+    # ---------------------------------------------------------- обновления
+    def check_updates(self, silent: bool = False):
+        """Фоновая проверка новой версии."""
+        if self._check_worker and self._check_worker.isRunning():
+            return
+        self._silent_check = silent
+        self._check_worker = CheckWorker(self)
+        self._check_worker.done.connect(self._on_check_done)
+        self._check_worker.start()
+        if not silent:
+            self.update_check_started.emit()
+
+    def _on_check_done(self, info: UpdateInfo):
+        self._update_info = info
+        silent = getattr(self, "_silent_check", True)
+        self.titlebar.btn_update.setVisible(bool(info.available))
+        self.update_state_changed.emit(info)
+
+        if info.available and info.version != self._notified_version:
+            self._notified_version = info.version
+            if self.tray.isSystemTrayAvailable():
+                self.tray.showMessage(
+                    f"{cfg.APP_NAME} · доступно обновление",
+                    f"Вышла версия {info.version}. Нажмите, чтобы установить.",
+                    QIcon(str(cfg.ORBS / "update_128.png")), 6000)
+            self.tray.setToolTip(
+                f"{cfg.APP_NAME} {cfg.APP_VERSION} · доступна версия {info.version}")
+        elif not info.available and not silent:
+            if self.tray.isSystemTrayAvailable():
+                self.tray.showMessage(
+                    cfg.APP_NAME, "Установлена последняя версия.",
+                    QIcon(str(cfg.ORBS / "done_128.png")), 3000)
+
+    def open_update_window(self):
+        info = self._update_info
+        if not info or not info.available:
+            self.check_updates(silent=False)
+            return
+        if self._update_win is not None and self._update_win.isVisible():
+            self._update_win.raise_()
+            self._update_win.activateWindow()
+            return
+        win = UpdateWindow(info)
+        win.center_on_screen()
+        self._update_win = win
+        win.show()
+        win.raise_()
+        win.activateWindow()
+
     # --------------------------------------------------------------------- трей
     def _build_tray(self):
         self.tray = QSystemTrayIcon(self)
@@ -311,6 +432,8 @@ class MainWindow(QWidget):
         act_home.triggered.connect(lambda: (self.restore_from_tray(), self.go(0)))
         act_set = QAction("Настройки", self)
         act_set.triggered.connect(lambda: (self.restore_from_tray(), self.go(1)))
+        act_upd = QAction("Проверить обновления", self)
+        act_upd.triggered.connect(lambda: self.check_updates(silent=False))
         act_quit = QAction("Выход", self)
         act_quit.triggered.connect(QApplication.instance().quit)
         menu.addAction(act_show)
@@ -318,8 +441,10 @@ class MainWindow(QWidget):
         menu.addAction(act_home)
         menu.addAction(act_set)
         menu.addSeparator()
+        menu.addAction(act_upd)
         menu.addAction(act_quit)
         self.tray.setContextMenu(menu)
+        self.tray.messageClicked.connect(self.open_update_window)
         self.tray.activated.connect(self._tray_activated)
         self.tray.show()
 

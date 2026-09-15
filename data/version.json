@@ -1,0 +1,18 @@
+{
+  "version": "0.2",
+  "title": "Обновления по воздуху",
+  "date": "2026",
+  "summary": "Программа сама следит за новыми версиями и устанавливает их в один клик.",
+  "url": "https://codeload.github.com/IstikFramer/android-clicker/zip/refs/heads/arena%2F01a0a388-android-clicker",
+  "page": "https://github.com/IstikFramer/android-clicker/tree/arena%2F01a0a388-android-clicker",
+  "changes": [
+    { "type": "added", "text": "Автоматическая проверка обновлений с GitHub раз в час" },
+    { "type": "added", "text": "Установка обновления в один клик с резервной копией" },
+    { "type": "added", "text": "Уведомление о новой версии в программе и в области уведомлений Windows" },
+    { "type": "added", "text": "Окно обновления с прогрессом загрузки и списком изменений" },
+    { "type": "added", "text": "Новый набор круглых иконок в стиле фирменного знака" },
+    { "type": "fixed", "text": "Подтормаживание при перетаскивании ползунков в настройках" },
+    { "type": "improved", "text": "Экран загрузки переоформлен под стиль логотипа" },
+    { "type": "improved", "text": "Контакты разработчика вынесены на видное место" }
+  ]
+}

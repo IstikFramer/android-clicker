@@ -35,7 +35,7 @@ class SplashScreen(QWidget):
 
         self._bg = QPixmap(str(cfg.BACKGROUNDS / "splash.jpg"))
         self._orb = QPixmap(str(cfg.LOGO / "logo_512.png")).scaled(
-            132, 132, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            146, 146, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
         self._t = 0.0
         self._duration = max(0.6, duration_s)
@@ -90,7 +90,7 @@ class SplashScreen(QWidget):
 
         # орб с дыханием
         pulse = 0.5 + 0.5 * math.sin(self._phase)
-        cx, cy = r.width() / 2, 118.0
+        cx, cy = r.width() / 2, 124.0
         halo = QRadialGradient(cx, cy, 116 + 8 * pulse)
         c = QColor(acc.primary)
         c.setAlphaF(0.20 + 0.08 * pulse)

@@ -15,9 +15,11 @@ from . import icons
 from .anim import driver
 from .settings import settings
 from .theme import ACCENTS, build_qss, current_accent
+from .update_ui import UpdateBanner
+from .updater import UpdateInfo
 from .widgets import (
-    ColorDot, Divider, GlassCard, ImagePanel, LogoOrb, SegmentedControl,
-    SliderRow, Switch, make_label,
+    ColorDot, Divider, GlassCard, ImagePanel, LogoOrb, OrbIcon,
+    SegmentedControl, SliderRow, Switch, make_label,
 )
 
 
@@ -72,8 +74,10 @@ class BasePage(QScrollArea):
 class HomePage(BasePage):
     """Что нового в текущей версии — то, что видит пользователь при запуске."""
 
-    def __init__(self, parent=None):
+    def __init__(self, on_update=None, parent=None):
         super().__init__(parent)
+        self._on_update = on_update
+        self._banner: UpdateBanner | None = None
         data = load_json("changelog.json")
         releases = data.get("releases", [])
         rel = releases[0] if releases else {}
@@ -116,6 +120,12 @@ class HomePage(BasePage):
         hl.addLayout(col, 1)
         hl.addWidget(LogoOrb(size=150), 0, Qt.AlignVCenter)
         self.body.addWidget(hero)
+
+        # место под плашку «доступно обновление»
+        self._banner_slot = QVBoxLayout()
+        self._banner_slot.setContentsMargins(0, 0, 0, 0)
+        self._banner_slot.setSpacing(0)
+        self.body.addLayout(self._banner_slot)
 
         # ---------- список изменений ----------
         self.body.addSpacing(4)
@@ -180,6 +190,20 @@ class HomePage(BasePage):
                 self.body.addWidget(card)
 
         self.body.addStretch(1)
+
+    def on_update_state(self, info: UpdateInfo):
+        """Показывает или прячет плашку обновления."""
+        if self._banner is not None:
+            self._banner.setParent(None)
+            self._banner.deleteLater()
+            self._banner = None
+        if not (info and info.available):
+            return
+        banner = UpdateBanner(info)
+        if self._on_update:
+            banner.clicked.connect(self._on_update)
+        self._banner_slot.addWidget(banner)
+        self._banner = banner
 
 
 # ============================================================== Настройки
@@ -400,8 +424,10 @@ class SettingsPage(BasePage):
 
 # =========================================================== О программе
 class AboutPage(BasePage):
-    def __init__(self, on_show_eula, parent=None):
+    def __init__(self, on_show_eula, on_check=None, on_update=None, parent=None):
         super().__init__(parent)
+        self._on_check = on_check
+        self._on_update = on_update
         self.header("О программе", f"{cfg.APP_NAME} · сведения о продукте и разработчике")
 
         hero = ImagePanel(cfg.BACKGROUNDS / "about_art.jpg", overlay=0.70)
@@ -485,6 +511,42 @@ class AboutPage(BasePage):
             grid.setColumnStretch(i, 1)
         self.body.addLayout(grid)
 
+        # --- обновления ---
+        upd = GlassCard(padding=20, spacing=12, hoverable=False)
+        head = QHBoxLayout()
+        head.setSpacing(14)
+        head.addWidget(OrbIcon("update", 44), 0, Qt.AlignVCenter)
+        col_u = QVBoxLayout()
+        col_u.setSpacing(2)
+        col_u.addWidget(make_label("ОБНОВЛЕНИЯ", "CardKicker"))
+        self._upd_title = make_label(
+            f"Установлена версия {cfg.APP_VERSION}", "CardTitle")
+        self._upd_sub = make_label(
+            "Программа проверяет новые версии автоматически раз в час.",
+            "Caption")
+        col_u.addWidget(self._upd_title)
+        col_u.addWidget(self._upd_sub)
+        head.addLayout(col_u, 1)
+
+        self._btn_check = QPushButton("Проверить сейчас")
+        self._btn_check.setObjectName("Ghost")
+        self._btn_check.setFixedHeight(38)
+        self._btn_check.setCursor(Qt.PointingHandCursor)
+        if on_check:
+            self._btn_check.clicked.connect(lambda: on_check(False))
+        head.addWidget(self._btn_check, 0, Qt.AlignVCenter)
+
+        self._btn_install = QPushButton("Обновить")
+        self._btn_install.setObjectName("Primary")
+        self._btn_install.setFixedHeight(38)
+        self._btn_install.setCursor(Qt.PointingHandCursor)
+        self._btn_install.setVisible(False)
+        if on_update:
+            self._btn_install.clicked.connect(on_update)
+        head.addWidget(self._btn_install, 0, Qt.AlignVCenter)
+        upd.body.addLayout(head)
+        self.body.addWidget(upd)
+
         # --- технические сведения ---
         tech = GlassCard(padding=20, spacing=12, hoverable=False)
         tech.body.addWidget(make_label("СВЕДЕНИЯ О СБОРКЕ", "CardKicker"))
@@ -508,6 +570,24 @@ class AboutPage(BasePage):
         self.body.addWidget(make_label(
             f"© {cfg.DEV_YEAR} {cfg.DEV_NAME} Все права защищены.", "Caption"))
         self.body.addStretch(1)
+
+    def on_check_started(self):
+        self._btn_check.setEnabled(False)
+        self._btn_check.setText("Проверка…")
+        self._upd_sub.setText("Связь с сервером обновлений…")
+
+    def on_update_state(self, info: UpdateInfo):
+        self._btn_check.setEnabled(True)
+        self._btn_check.setText("Проверить сейчас")
+        if info and info.available:
+            self._upd_title.setText(f"Доступна версия {info.version}")
+            self._upd_sub.setText(
+                info.title or "Нажмите «Обновить», чтобы установить новую версию.")
+            self._btn_install.setVisible(True)
+        else:
+            self._upd_title.setText(f"Установлена версия {cfg.APP_VERSION}")
+            self._upd_sub.setText("Это последняя версия программы.")
+            self._btn_install.setVisible(False)
 
     def _copy_mail(self):
         QGuiApplication.clipboard().setText(cfg.DEV_EMAIL)
