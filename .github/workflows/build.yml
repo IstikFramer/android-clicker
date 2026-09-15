@@ -31,7 +31,19 @@ jobs:
           pip install PySide6 pyinstaller
 
       - name: Собрать EXE
-        run: pyinstaller lifeos.spec --noconfirm --clean
+        shell: bash
+        run: |
+          set -o pipefail
+          # Логи раннера недоступны снаружи, поэтому хвост вывода
+          # дублируется в аннотации сборки.
+          if ! pyinstaller lifeos.spec --noconfirm --clean --log-level WARN 2>&1 | tee /tmp/build.log; then
+            echo "::error::Сборка PyInstaller завершилась с ошибкой"
+            tail -n 25 /tmp/build.log | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 1
+          fi
+          ls -la dist
 
       - name: Прочитать версию
         id: ver
