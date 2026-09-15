@@ -93,9 +93,13 @@ jobs:
           if-no-files-found: error
 
       - name: Опубликовать релиз
-        if: startsWith(github.ref, 'refs/tags/')
+        # Рабочая ветка публикует релиз напрямую: файлы уходят с Windows-
+        # раннера на GitHub и не зависят от скачивания артефакта агентом.
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/arena/01a0a47a-android-clicker'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          target_commitish: arena/01a0a47a-android-clicker
           name: LIFE OS ${{ steps.ver.outputs.version }}
           files: |
             dist/LIFE-OS-${{ steps.ver.outputs.version }}-windows.zip
