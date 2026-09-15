@@ -116,6 +116,30 @@ def is_newer(remote: str, local: str = cfg.APP_VERSION) -> bool:
     return parse_version(remote) > parse_version(local)
 
 
+def select_windows_package(assets: list[dict], version: str) -> tuple[str, int]:
+    """Выбирает полный ZIP папочной Windows-сборки.
+
+    Setup.exe предназначен для первой установки, а zipball GitHub содержит
+    только исходники. Встроенному обновлению нужен именно архив с EXE,
+    каталогом _internal и Python DLL.
+    """
+    expected = f"life-os-{version}-windows.zip".lower()
+    candidates = [
+        a for a in assets
+        if str(a.get("name", "")).lower().endswith(".zip")
+        and "windows" in str(a.get("name", "")).lower()
+    ]
+    chosen = next(
+        (a for a in candidates
+         if str(a.get("name", "")).lower() == expected),
+        candidates[0] if candidates else None,
+    )
+    if not chosen:
+        return "", 0
+    return (str(chosen.get("browser_download_url") or ""),
+            int(chosen.get("size") or 0))
+
+
 @dataclass
 class UpdateInfo:
     version: str = ""
@@ -174,14 +198,10 @@ def check_for_update() -> UpdateInfo:
     data = _get_json(API_RELEASES)
     if isinstance(data, dict) and data.get("tag_name"):
         version = str(data.get("tag_name", "")).lstrip("vV")
-        asset_url, size = BRANCH_ZIP, 0
-        for a in data.get("assets") or []:
-            if str(a.get("name", "")).lower().endswith(".zip"):
-                asset_url = a.get("browser_download_url") or asset_url
-                size = int(a.get("size") or 0)
-                break
-        else:
-            asset_url = data.get("zipball_url") or BRANCH_ZIP
+        # Не берём первый попавшийся ZIP или zipball исходников: собранной
+        # программе необходим полный Windows-пакет с _internal и DLL.
+        asset_url, size = select_windows_package(data.get("assets") or [], version)
+        available = is_newer(version) and bool(asset_url)
         return UpdateInfo(
             version=version,
             title=data.get("name") or f"Версия {version}",
@@ -193,7 +213,7 @@ def check_for_update() -> UpdateInfo:
             size=size,
             published=(data.get("published_at") or "")[:10],
             source="release",
-            available=is_newer(version),
+            available=available,
         )
 
     # 2) version.json в ветке
@@ -207,7 +227,7 @@ def check_for_update() -> UpdateInfo:
             changes=normalize_changes(data.get("changes")),
             url=data.get("url") or BRANCH_ZIP,
             page=data.get("page") or BRANCH_PAGE,
-            src_url=data.get("url") or BRANCH_ZIP,
+            src_url=data.get("source_url") or BRANCH_ZIP,
             size=int(data.get("size") or 0),
             published=data.get("published") or data.get("date", ""),
             source="branch",
@@ -335,6 +355,21 @@ class InstallWorker(QThread):
         return candidates[0] if candidates else None
 
     @staticmethod
+    def _validate_onedir(new_exe: Path):
+        """Проверяет, что загружен не одиночный EXE, а полная сборка."""
+        internal = new_exe.parent / "_internal"
+        if not internal.is_dir():
+            raise FileNotFoundError(
+                "в обновлении отсутствует каталог _internal с библиотеками")
+        python_dlls = list(internal.glob("python3*.dll"))
+        if not python_dlls:
+            raise FileNotFoundError(
+                "в обновлении отсутствует библиотека python3*.dll")
+        if not any(internal.glob("PySide6/QtCore*.pyd")):
+            raise FileNotFoundError(
+                "в обновлении отсутствуют библиотеки интерфейса PySide6")
+
+    @staticmethod
     def _app_dir() -> tuple[Path, bool]:
         """Папка установленной программы и признак папочной раскладки.
 
@@ -363,26 +398,41 @@ class InstallWorker(QThread):
         shutil.copytree(source, pending)
 
         script = staged / "apply_update.bat"
+        probe = target / ".lifeos-update-write-test"
         lines = [
             "@echo off",
             "chcp 65001 >nul",
+            "setlocal",
+            f'if not exist "{target}" mkdir "{target}"',
+            # Если пользователь выбрал защищённую папку (например,
+            # Program Files), скрипт сам запросит UAC и повторно запустится.
+            f'(echo test)>"{probe}" 2>nul',
+            "if errorlevel 1 (",
+            "  powershell -NoProfile -ExecutionPolicy Bypass -Command "
+            "\"Start-Process -FilePath '%~f0' -Verb RunAs\"",
+            "  exit /b 0",
+            ")",
+            f'del /q "{probe}" >nul 2>&1',
             "echo Установка обновления LIFE OS...",
             ":wait",
             "timeout /t 1 /nobreak >nul",
             f'tasklist /fi "imagename eq {current.name}" '
             f'| find /i "{current.name}" >nul && goto wait',
-            # _internal принадлежит программе целиком — зеркалим, чтобы
-            # не копились библиотеки от прошлых версий.
+            # _internal зеркалируется целиком. Поэтому python312.dll и все
+            # библиотеки PySide6 обновляются вместе с главным EXE.
             f'robocopy "{pending}\\_internal" "{target}\\_internal" '
-            f'/MIR /NFL /NDL /NJH /NJS /NP >nul',
-            # остальное копируем, ничего лишнего не удаляя
-            f'robocopy "{pending}" "{target}" /E /XD _internal '
-            f'/NFL /NDL /NJH /NJS /NP >nul',
+            f'/MIR /R:3 /W:1 /NFL /NDL /NJH /NJS /NP >nul',
             "if errorlevel 8 goto fail",
+            # Файлы установщика (unins*.exe) сохраняем, остальную папку
+            # сборки копируем поверх установленной версии.
+            f'robocopy "{pending}" "{target}" /E /XD _internal '
+            f'/R:3 /W:1 /NFL /NDL /NJH /NJS /NP >nul',
+            "if errorlevel 8 goto fail",
+            f'if not exist "{target}\\_internal\\python3*.dll" goto fail',
+            f'if not exist "{target}\\{new_name}" goto fail',
         ]
         if not onedir:
-            # переезд со старой однофайловой сборки: одиночный файл рядом
-            # с новой папкой больше не нужен
+            # Переезд со старой однофайловой сборки в полноценную папку.
             lines.append(f'if exist "{current}" del /q "{current}"')
         lines += [
             f'start "" "{target}\\{new_name}"',
@@ -390,12 +440,14 @@ class InstallWorker(QThread):
             'del "%~f0"',
             "exit /b 0",
             ":fail",
-            "echo Не удалось заменить файлы программы.",
-            "echo Скачайте новую версию вручную: "
+            "echo Не удалось заменить все файлы программы.",
+            "echo Установленная версия оставлена без запуска, чтобы не "
+            "открывать неполную сборку.",
+            "echo Скачайте установщик вручную: "
             f"{RELEASES_PAGE}",
             "pause",
         ]
-        script.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+        script.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8-sig")
         return script
 
     def _install(self, src: Path):
@@ -419,7 +471,12 @@ class InstallWorker(QThread):
             # Собранная программа обновляется готовым EXE, запуск из
             # исходников — архивом с исходным кодом.
             if getattr(sys, "frozen", False):
-                url = self._info.url or self._info.src_url
+                # Никогда не подставляем архив исходников вместо Windows-
+                # пакета: он не содержит DLL и оставит программу сломанной.
+                url = self._info.url
+                if not url:
+                    raise FileNotFoundError(
+                        "для этой версии не опубликован полный Windows ZIP")
             else:
                 url = self._info.src_url or self._info.url
             self._download(url, archive)
@@ -441,7 +498,8 @@ class InstallWorker(QThread):
                 if new_exe is None:
                     raise FileNotFoundError(
                         "в архиве нет исполняемого файла программы")
-                self.progress.emit(88, "Подготовка замены…")
+                self._validate_onedir(new_exe)
+                self.progress.emit(88, "Проверка библиотек и подготовка замены…")
                 script = self._stage_exe_swap(new_exe)
                 self.progress.emit(100, "Готово")
                 self.finished_ok.emit(str(script))
