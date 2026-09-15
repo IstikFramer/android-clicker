@@ -102,7 +102,10 @@ class BackgroundCanvas(GlowAware, QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-        self.setAttribute(Qt.WA_OpaquePaintEvent, True)
+        # У прозрачного безрамочного окна пиксели за скруглением должны
+        # оставаться прозрачными. OpaquePaintEvent превращал их в острые
+        # тёмные углы поверх скруглённого фона.
+        self.setAttribute(Qt.WA_OpaquePaintEvent, False)
         self._src = QPixmap()
         self._base: QPixmap | None = None
         self._glow: QPixmap | None = None
@@ -128,13 +131,17 @@ class BackgroundCanvas(GlowAware, QWidget):
         if r.width() < 2 or r.height() < 2:
             return
         pm = QPixmap(r.size())
-        pm.fill(QColor("#04060C"))
+        pm.fill(Qt.transparent)
         p = QPainter(pm)
         p.setRenderHints(QPainter.Antialiasing | QPainter.SmoothPixmapTransform)
-        rad = settings.get("corner_radius")
+        # В развёрнутом окне скругления не нужны: они оставляли щели в
+        # углах экрана. В обычном режиме фон действительно прозрачный за
+        # пределами округлого контура.
+        rad = 0 if self.window().isMaximized() else settings.get("corner_radius")
         path = QPainterPath()
         path.addRoundedRect(QRectF(r), rad, rad)
         p.setClipPath(path)
+        p.fillRect(r, QColor("#04060C"))
 
         if not self._src.isNull():
             sc = self._src.scaled(r.size(), Qt.KeepAspectRatioByExpanding,
@@ -1107,18 +1114,21 @@ class HintTip(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setAttribute(Qt.WA_ShowWithoutActivating, True)
         self._text = text
-        self._pad = 14
-        self._max_w = 330
+        self._pad = 15
+        self._max_w = 340
         font = QFont("Inter")
         font.setPixelSize(13)
         self.setFont(font)
         metrics = QFontMetrics(font)
+        # Ширина подсказки остаётся той же, на которой измерялся текст.
+        # Раньше окно сжималось до rect.width(), текст переносился заново и
+        # последняя/первая строка оказывалась за рассчитанной высотой.
+        content_w = self._max_w - self._pad * 2
         rect = metrics.boundingRect(
-            QRect(0, 0, self._max_w - self._pad * 2, 4000),
-            Qt.TextWordWrap, text)
+            QRect(0, 0, content_w, 4000),
+            Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop, text)
         self._text_rect = rect
-        self.resize(min(self._max_w, rect.width() + self._pad * 2),
-                    rect.height() + self._pad * 2)
+        self.resize(self._max_w, rect.height() + self._pad * 2 + 4)
         self._opacity = 0.0
         self.setWindowOpacity(0.0)
         self._fade = QTimer(self)
@@ -1167,9 +1177,9 @@ class HintTip(QWidget):
         p.setPen(QPen(edge, 1.0))
         p.drawPath(path)
         p.setPen(QColor("#DCE3F0"))
-        p.drawText(self.rect().adjusted(self._pad, self._pad,
+        p.drawText(self.rect().adjusted(self._pad, self._pad + 2,
                                         -self._pad, -self._pad),
-                   Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignVCenter,
+                   Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignTop,
                    self._text)
         p.end()
 

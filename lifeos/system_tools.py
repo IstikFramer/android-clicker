@@ -20,7 +20,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
-from .tools_engine import human_size
+from .tools_engine import disk_usage, human_size
 
 IS_WIN = sys.platform.startswith("win")
 IS_MAC = sys.platform == "darwin"
@@ -594,5 +594,68 @@ class SystemWorker(QThread):
                 rows=[[k, v] for k, v in rows],
                 note="Соединение в порядке" if online
                      else "Интернет недоступен — проверьте подключение")
+
+        if kind == "health":
+            rows: list[list[str]] = []
+            self.progress.emit(15, "Проверка свободного места…")
+            disks = disk_usage()
+            if disks:
+                free_ratio = min((total - used) / max(1, total)
+                                 for _label, used, total in disks)
+                free = sum(total - used for _label, used, total in disks)
+                if free_ratio < 0.10:
+                    state, advice = "Мало места", "Запустите очистку диска"
+                elif free_ratio < 0.20:
+                    state, advice = "Требует внимания", "Проверьте крупные файлы"
+                else:
+                    state, advice = "В порядке", f"Свободно {human_size(free)}"
+                rows.append(["Диски", state, advice])
+            else:
+                rows.append(["Диски", "Не проверено", "Нет данных о разделах"])
+
+            if self._cancelled():
+                return TableResult(note="Проверка отменена.")
+            self.progress.emit(40, "Проверка автозагрузки…")
+            startup_count = len(list_startup())
+            if startup_count <= 10:
+                state, advice = "В порядке", f"Программ: {startup_count}"
+            elif startup_count <= 20:
+                state, advice = "Требует внимания", "Проверьте лишние программы"
+            else:
+                state, advice = "Перегружена", "Отключите ненужную автозагрузку"
+            rows.append(["Автозагрузка", state, advice])
+
+            if self._cancelled():
+                return TableResult(note="Проверка отменена.")
+            self.progress.emit(65, "Проверка сети…")
+            net = dict(network_info())
+            online = net.get("Интернет") == "Доступен"
+            dns = net.get("DNS") == "Работает"
+            rows.append([
+                "Интернет",
+                "В порядке" if online and dns else "Есть проблема",
+                (f"Отклик {net.get('Отклик', '—')}" if online and dns
+                 else "Проверьте подключение и DNS"),
+            ])
+
+            self.progress.emit(85, "Проверка ресурсов…")
+            memory = _total_memory()
+            cores = os.cpu_count() or 0
+            rows.append([
+                "Ресурсы",
+                "Доступны" if memory and cores else "Частично определены",
+                f"{cores or '—'} потоков · {human_size(memory) if memory else 'память —'}",
+            ])
+            rows.append(["Время работы", "Информация", _uptime()])
+            self.progress.emit(100, "Готово")
+            problems = sum(r[1] in ("Мало места", "Требует внимания",
+                                    "Перегружена", "Есть проблема")
+                           for r in rows)
+            return TableResult(
+                headers=["Проверка", "Состояние", "Рекомендация"],
+                rows=rows,
+                note=("Важные проверки пройдены — всё выглядит хорошо"
+                      if not problems else
+                      f"Найдено пунктов, требующих внимания: {problems}"))
 
         return TableResult(note="Неизвестный инструмент.")

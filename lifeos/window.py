@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from PySide6.QtCore import (
     QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
-    QTimer, Qt, Signal,
+    QRectF, QTimer, Qt, Signal,
 )
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QIcon, QPainterPath, QRegion
 from PySide6.QtWidgets import (
     QMessageBox,
     QApplication, QGraphicsOpacityEffect, QHBoxLayout, QMenu, QPushButton,
@@ -323,7 +323,12 @@ class MainWindow(QWidget):
             # ни кэш фона от него не зависят — достаточно перерисовки.
             # Фон входит в GlowAware, поэтому обновится вместе со всеми.
             self._repaint_all()
-        elif key in ("accent", "glass_opacity", "corner_radius", "ui_scale"):
+        elif key == "glass_opacity":
+            # Перегенерация QSS всего приложения тяжёлая. Пока пользователь
+            # двигает ползунок, откладываем её до короткой паузы вместо
+            # остановки интерфейса каждые 60 мс.
+            self.restyle(delay_ms=180, trailing=True)
+        elif key in ("accent", "corner_radius", "ui_scale"):
             self.restyle()
         elif key in ("fps_limit", "anim_speed", "animations", "power_saving"):
             self._apply_runtime()
@@ -351,13 +356,19 @@ class MainWindow(QWidget):
         driver().set_enabled(settings.get("animations"))
         self.update()
 
-    def restyle(self, rebuild: bool = False):
-        """Запрашивает перестройку оформления (применится одним пакетом)."""
+    def restyle(self, rebuild: bool = False, delay_ms: int = 60,
+                trailing: bool = False):
+        """Запрашивает перестройку оформления (применится одним пакетом).
+
+        trailing=True перезапускает задержку при каждом изменении — это
+        нужно непрерывным ползункам, чтобы тяжёлый QSS применялся после
+        движения, а не блокировал каждый кадр перетаскивания.
+        """
         self._restyle_pending = True
         if rebuild:
             self._restyle_rebuild = True
-        if not self._restyle_timer.isActive():
-            self._restyle_timer.start(60)
+        if trailing or not self._restyle_timer.isActive():
+            self._restyle_timer.start(delay_ms)
 
     def _do_restyle(self):
         if not self._restyle_pending:
@@ -373,6 +384,7 @@ class MainWindow(QWidget):
             self._build_pages()
             self.sidebar.set_active(self.stack.currentIndex())
         self.bg.invalidate()
+        self._update_window_mask()
         self._do_repaint_all()
 
     # ---------------------------------------------------------------- соглашение
@@ -582,10 +594,24 @@ class MainWindow(QWidget):
         else:
             self.showMaximized()
             self.titlebar.btn_max.set_icon_name("restore")
+        # Радиус и маска различаются для обычного и развёрнутого окна.
+        QTimer.singleShot(0, lambda: (
+            self.bg.invalidate(), self._update_window_mask()))
+
+    def _update_window_mask(self):
+        """Не даёт дочерним панелям закрашивать округлые углы окна."""
+        if self.isMaximized():
+            self.clearMask()
+            return
+        radius = max(0, int(settings.get("corner_radius")))
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), radius, radius)
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
     def resizeEvent(self, e):
         self.bg.setGeometry(self.rect())
         self.bg.lower()
+        self._update_window_mask()
         if hasattr(self, "_grip"):
             self._grip.move(self.width() - 20, self.height() - 20)
         super().resizeEvent(e)

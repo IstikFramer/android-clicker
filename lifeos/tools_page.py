@@ -97,6 +97,13 @@ CATEGORIES = [
         "Проверяет доступность интернета, показывает локальный адрес, "
         "время отклика и работу DNS. Пригодится, когда сайты не открываются.",
         "table"),
+    Category(
+        "health", "Центр состояния",
+        "Быстрая проверка важных частей компьютера",
+        "shield",
+        "Собирает в одном месте состояние диска, сети, автозагрузки и "
+        "доступных ресурсов. Ничего не меняет и даёт понятные рекомендации.",
+        "table"),
 ]
 
 
@@ -118,6 +125,7 @@ COLUMN_WIDTHS = {                  # 0 — тянущийся столбец, д
     "bigfiles":  [0, 110, 170],
     "sysinfo":   [0, 420],
     "network":   [0, 420],
+    "health":    [0, 150, 360],
 }
 
 
@@ -417,19 +425,19 @@ class ToolWindow(QWidget):
         self.btn_all.setCursor(Qt.PointingHandCursor)
         self.btn_all.clicked.connect(self._toggle_all)
         self.btn_all.setVisible(False)
+        self.btn_all.setFixedWidth(132)
         fl.addWidget(self.btn_all)
 
         self.btn_close = QPushButton("Закрыть")
         self.btn_close.setObjectName("Ghost")
-        self.btn_close.setFixedHeight(42)
+        self.btn_close.setFixedSize(96, 42)
         self.btn_close.setCursor(Qt.PointingHandCursor)
         self.btn_close.clicked.connect(self.close)
         fl.addWidget(self.btn_close)
 
         self.btn_go = QPushButton(tool.action)
         self.btn_go.setObjectName("Primary")
-        self.btn_go.setFixedHeight(42)
-        self.btn_go.setMinimumWidth(180)
+        self.btn_go.setFixedSize(180, 42)
         self.btn_go.setCursor(Qt.PointingHandCursor)
         self.btn_go.setEnabled(False)
         self.btn_go.clicked.connect(self._start_clean)
@@ -477,6 +485,14 @@ class ToolWindow(QWidget):
         self._rows.clear()
 
     def _start_scan(self):
+        # Полностью нормализуем нижнюю панель при каждом новом сканировании.
+        # Иначе после состояния «готово» оставались старые подписи и кнопки.
+        self.btn_all.setVisible(False)
+        self.btn_close.setText("Закрыть")
+        self.btn_go.setVisible(True)
+        self.btn_go.setText(self._tool.action)
+        self.btn_go.setEnabled(False)
+        self.summary.clear()
         self.prog_box.setVisible(True)
         self.bar.setValue(0)
         self.prog_label.setText("Поиск…")
@@ -504,8 +520,9 @@ class ToolWindow(QWidget):
             self.list_lay.addWidget(msg)
             self.list_lay.addStretch(1)
             self.summary.setText("Чисто — удалять нечего.")
+            self.btn_all.setVisible(False)
             self.btn_go.setVisible(False)
-            self.btn_close.setText("Готово")
+            self.btn_close.setText("Закрыть")
             self.scanned.emit(res)
             return
 
@@ -526,6 +543,8 @@ class ToolWindow(QWidget):
         self.list_lay.addStretch(1)
 
         self.btn_all.setVisible(True)
+        self.btn_close.setText("Закрыть")
+        self.btn_go.setVisible(True)
         self.btn_go.setEnabled(True)
         self._refresh_summary()
         self.scanned.emit(res)
@@ -644,14 +663,13 @@ class ToolWindow(QWidget):
         self.btn_go.setEnabled(True)
         self.btn_go.clicked.disconnect()
         self.btn_go.clicked.connect(self._rescan)
-        self.btn_close.setText("Готово")
+        self.btn_all.setVisible(False)
+        self.btn_close.setText("Закрыть")
         self.cleaned_up.emit(freed)
 
     def _rescan(self):
         self.btn_go.clicked.disconnect()
         self.btn_go.clicked.connect(self._start_clean)
-        self.btn_go.setText(self._tool.action)
-        self.btn_go.setEnabled(False)
         self._clear_list()
         self._start_scan()
 
@@ -758,10 +776,12 @@ class CleanupPage(SubPage):
                 grid.addLayout(pair)
             card = ToolCard(tool)
             card.launched.connect(self.open_tool)
-            pair.addWidget(card)
+            pair.addWidget(card, 1)
             self.cards.append(card)
         if len(ALL_TOOLS) % 2:
-            pair.addStretch(1)
+            placeholder = QWidget()
+            placeholder.setObjectName("Transparent")
+            pair.addWidget(placeholder, 1)
         self.body.addLayout(grid)
         self.body.addStretch(1)
 
@@ -1075,8 +1095,12 @@ class _ToolsHome(QScrollArea):
                 grid.addLayout(pair)
             card = CategoryCard(cat)
             card.opened.connect(self.opened.emit)
-            pair.addWidget(card)
+            pair.addWidget(card, 1)
         if len(CATEGORIES) % 2:
-            pair.addStretch(1)
+            # Пустая половина сохраняет одинаковую ширину последней карточки.
+            # addStretch() оставлял «Сеть» шириной по sizeHint.
+            placeholder = QWidget()
+            placeholder.setObjectName("Transparent")
+            pair.addWidget(placeholder, 1)
         self.body.addLayout(grid)
         self.body.addStretch(1)
