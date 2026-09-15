@@ -500,9 +500,18 @@ class ToolWindow(QWidget):
         self.btn_go.setEnabled(False)
 
     def closeEvent(self, e):
+        # Дожидаемся фоновых потоков, иначе Qt ругается на уничтожение
+        # работающего QThread.
         for w in (self._scan, self._clean):
-            if w and w.isRunning():
-                w.wait(2000)
+            if w is None:
+                continue
+            if w.isRunning():
+                w.requestInterruption()
+                if not w.wait(3000):
+                    w.terminate()
+                    w.wait(1000)
+            w.setParent(None)
+        self._scan = self._clean = None
         super().closeEvent(e)
 
 
