@@ -6,16 +6,17 @@ from pathlib import Path
 
 APP_NAME = "LIFE OS"
 APP_TAGLINE = "Персональная операционная система"
-APP_VERSION = "0.3.2"
-APP_BUILD = "0.3.2-alpha"
+APP_VERSION = "0.3.5"
+APP_BUILD = "0.3.5-alpha"
 APP_CHANNEL = "ALPHA"
 
 DEV_NAME = "IKOOF inc."
 DEV_EMAIL = "IKOOF1298W@gmail.com"
 DEV_YEAR = "2026"
 
-# В собранном EXE ресурсы распаковываются во временную папку (sys._MEIPASS),
-# а пользовательские файлы остаются рядом с исполняемым файлом.
+# В собранной программе ресурсы лежат в папке _internal рядом с EXE
+# (PyInstaller сообщает путь через sys._MEIPASS), а пользовательские
+# файлы — рядом с самим исполняемым файлом.
 FROZEN = bool(getattr(sys, "frozen", False))
 if FROZEN:
     RES_ROOT = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))

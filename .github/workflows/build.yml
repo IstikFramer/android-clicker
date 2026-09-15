@@ -1,8 +1,10 @@
 name: Сборка LIFE OS для Windows
 
-# Собирает готовый EXE на настоящей Windows-машине: запускать вручную
-# или тегом вида v0.3.2. Результат прикладывается к релизу, откуда его
-# скачивает встроенный механизм обновления.
+# Собирает программу на настоящей Windows-машине: запускать вручную
+# или тегом вида v0.3.5. Результат — папка с «LIFE OS.exe» и
+# библиотеками, упакованная в zip: такая раскладка не вызывает ложных
+# срабатываний Защитника Windows. Архив прикладывается к релизу, откуда
+# его скачивает встроенный механизм обновления.
 on:
   workflow_dispatch:
   push:
@@ -30,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install PySide6 pyinstaller
 
-      - name: Собрать EXE
+      - name: Собрать программу
         shell: bash
         run: |
           set -o pipefail
@@ -44,6 +46,7 @@ jobs:
             exit 1
           fi
           ls -la dist
+          ls -la "dist/LIFE OS" | head -20
 
       - name: Прочитать версию
         id: ver
@@ -56,22 +59,20 @@ jobs:
         shell: bash
         run: |
           cd dist
-          7z a "LIFE-OS-${{ steps.ver.outputs.version }}-windows.zip" "LIFE OS.exe"
+          # В архиве лежит папка «LIFE OS» целиком: EXE рядом с библиотеками.
+          7z a -mx=5 "LIFE-OS-${{ steps.ver.outputs.version }}-windows.zip" "LIFE OS"
+          ls -la *.zip
 
       - name: Сохранить как артефакт
         uses: actions/upload-artifact@v4
         with:
           name: LIFE-OS-windows
-          path: |
-            dist/LIFE OS.exe
-            dist/*.zip
+          path: dist/*.zip
 
       - name: Опубликовать релиз
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           name: LIFE OS ${{ steps.ver.outputs.version }}
-          files: |
-            dist/LIFE OS.exe
-            dist/*.zip
+          files: dist/*.zip
           generate_release_notes: true

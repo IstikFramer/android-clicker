@@ -11,7 +11,7 @@ import json
 from PySide6.QtCore import QRectF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPainterPath
 from PySide6.QtWidgets import (
-    QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
+    QFrame, QHBoxLayout, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
 )
 
@@ -44,7 +44,6 @@ class EulaWindow(QWidget):
         self.setMinimumSize(640, 480)
 
         data = _load()
-        acc = current_accent()
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -195,8 +194,8 @@ class EulaWindow(QWidget):
         path.addRoundedRect(r, rad, rad)
         p.setClipPath(path)
         p.fillRect(self.rect(), QColor(7, 10, 18, 252))
-        acc = current_accent()
-        edge = QColor(acc.primary)
+        # Цвет рамки берём при каждой отрисовке: акцент меняется в настройках.
+        edge = QColor(current_accent().primary)
         edge.setAlpha(70)
         p.setClipping(False)
         p.setBrush(Qt.NoBrush)

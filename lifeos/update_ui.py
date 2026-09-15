@@ -7,12 +7,11 @@ from PySide6.QtCore import QRectF, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
     QSizePolicy,
-    QApplication, QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
+    QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QVBoxLayout, QWidget,
 )
 
 from . import config as cfg
-from . import icons
 from .anim import Spring, driver
 from .settings import settings
 from .theme import current_accent

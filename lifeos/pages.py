@@ -6,15 +6,15 @@ import json
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
+    QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QMessageBox,
+    QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
 )
 
 from . import config as cfg
 from . import icons
-from .anim import driver
 from .settings import settings
-from .theme import ACCENTS, build_qss, current_accent
+from .system_tools import own_autostart_enabled, set_own_autostart
+from .theme import ACCENTS, current_accent
 from .elevation import can_elevate, is_admin
 from .update_ui import UpdateBanner
 from .updater import UpdateInfo
@@ -215,6 +215,11 @@ class SettingsPage(BasePage):
         super().__init__(parent)
         self._on_restyle = on_restyle
         self._on_background = on_background
+        self._switches: dict[str, Switch] = {}
+        # настройка могла разойтись с реальностью: запись из автозагрузки
+        # мог убрать сам пользователь или другая программа
+        if settings.get("autostart") != own_autostart_enabled():
+            settings.set("autostart", own_autostart_enabled())
         self.header("Настройки", "Внешний вид, производительность и поведение программы")
 
         self._build_appearance()
@@ -364,7 +369,8 @@ class SettingsPage(BasePage):
         card = GlassCard(padding=22, spacing=14, hoverable=False)
         card.body.addWidget(make_label("СИСТЕМА", "CardKicker"))
         toggles = [
-            ("autostart", "Запускать вместе с системой", "Программа стартует при входе в учётную запись"),
+            ("autostart", "Запускать вместе с системой",
+             "Программа стартует при входе в учётную запись"),
             ("start_minimized", "Запускать свёрнутой", "Открывать сразу в области уведомлений"),
             ("close_to_tray", "Сворачивать в трей при закрытии", "Кнопка закрытия прячет окно, а не завершает работу"),
             ("tray_notifications", "Уведомления в трее", "Всплывающие подсказки при сворачивании"),
@@ -430,12 +436,27 @@ class SettingsPage(BasePage):
         lay.addStretch(1)
         sw = Switch(settings.get(key))
         sw.toggled.connect(lambda v, k=key: self._apply(k, v))
+        self._switches[key] = sw
         lay.addWidget(sw)
         return w
+
+    def _sync_autostart(self):
+        """Вернуть переключатель к настоящему состоянию автозагрузки."""
+        sw = self._switches.get("autostart")
+        if sw is not None:
+            sw.setChecked(settings.get("autostart"))
 
     # -------------------------------------------------------------- логика
     def _apply(self, key: str, value):
         settings.set(key, value)
+        if key == "autostart":
+            ok, err = set_own_autostart(bool(value))
+            if not ok:
+                settings.set("autostart", not value)
+                QMessageBox.warning(
+                    self, "Автозагрузка",
+                    "Не удалось изменить автозагрузку.\n\n" + err)
+                self._sync_autostart()
 
     def _pick_accent(self, key: str):
         settings.set("accent", key)

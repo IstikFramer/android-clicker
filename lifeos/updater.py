@@ -26,7 +26,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QThread, Signal
+from PySide6.QtCore import QThread, Signal
 
 from . import config as cfg
 
@@ -48,6 +48,8 @@ RELEASES_PAGE = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases"
 
 USER_AGENT = f"LIFE-OS/{cfg.APP_VERSION}"
 TIMEOUT = 15
+# Загрузка десятков мегабайт не должна упираться в таймаут ответа API.
+DOWNLOAD_TIMEOUT = 120
 
 # папки, которые никогда не трогаем при обновлении
 PROTECTED = {".git", ".venv", "venv", "__pycache__", "backups"}
@@ -130,13 +132,18 @@ class UpdateInfo:
 
 
 # ------------------------------------------------------------------ загрузка
-def _open(url: str):
-    req = urllib.request.Request(url, headers={
-        "User-Agent": USER_AGENT,
-        "Accept": "application/vnd.github+json",
-    })
+def _open(url: str, timeout: int | None = None, binary: bool = False):
+    """Открывает соединение.
+
+    Для загрузки файлов нужен отдельный, больший таймаут: 15 секунд
+    хватает на ответ API, но не на скачивание десятков мегабайт.
+    """
+    headers = {"User-Agent": USER_AGENT}
+    headers["Accept"] = ("application/octet-stream" if binary
+                         else "application/vnd.github+json")
+    req = urllib.request.Request(url, headers=headers)
     ctx = ssl.create_default_context()
-    return urllib.request.urlopen(req, timeout=TIMEOUT, context=ctx)
+    return urllib.request.urlopen(req, timeout=timeout or TIMEOUT, context=ctx)
 
 
 def _get_json(url: str) -> dict | None:
@@ -243,8 +250,20 @@ class InstallWorker(QThread):
     # плавно приближается к 70 % и не выглядит зависшей.
     _ASSUMED_MB = 40.0
 
-    def _download(self, url: str, dest: Path):
-        with _open(url) as r:
+    def _download(self, url: str, dest: Path, attempt: int = 1):
+        """Скачивает файл. При обрыве связи повторяет попытку."""
+        try:
+            self._download_once(url, dest)
+        except (urllib.error.URLError, TimeoutError, ConnectionError,
+                OSError):
+            if self._cancel or attempt >= 3:
+                raise
+            self.progress.emit(2, f"Обрыв связи, попытка {attempt + 1} из 3…")
+            time.sleep(2 * attempt)
+            self._download(url, dest, attempt + 1)
+
+    def _download_once(self, url: str, dest: Path):
+        with _open(url, timeout=DOWNLOAD_TIMEOUT, binary=True) as r:
             total = int(r.headers.get("Content-Length") or self._info.size or 0)
             got = 0
             last = -1
@@ -302,37 +321,81 @@ class InstallWorker(QThread):
 
     @staticmethod
     def _find_exe(root: Path) -> Path | None:
-        """Ищет .exe в распакованном архиве."""
-        for cand in sorted(root.rglob("*.exe")):
-            return cand
-        return None
+        """Ищет главный исполняемый файл в распакованном архиве.
+
+        В папке с программой встречаются служебные .exe (внутри
+        _internal), поэтому сначала ищем файл с именем программы.
+        """
+        wanted = Path(sys.executable).name.lower()
+        candidates = [c for c in sorted(root.rglob("*.exe"))
+                      if "_internal" not in c.parts]
+        for cand in candidates:
+            if cand.name.lower() in (wanted, "life os.exe"):
+                return cand
+        return candidates[0] if candidates else None
 
     @staticmethod
-    def _stage_exe_swap(new_exe: Path) -> Path:
-        """Готовит скрипт замены EXE и возвращает путь к нему."""
-        current = Path(sys.executable).resolve()
-        staged = cfg.USER_DIR / "update"
-        staged.mkdir(parents=True, exist_ok=True)
-        pending = staged / current.name
-        shutil.copy2(new_exe, pending)
+    def _app_dir() -> tuple[Path, bool]:
+        """Папка установленной программы и признак папочной раскладки.
 
-        backup = staged / f"{current.stem}-{cfg.APP_VERSION}.bak"
+        Начиная с версии 0.3.5 программа поставляется папкой: рядом с
+        «LIFE OS.exe» лежит каталог _internal с библиотеками. Старые
+        однофайловые сборки обновляются переездом в такую папку.
+        """
+        exe = Path(sys.executable).resolve()
+        mei = getattr(sys, "_MEIPASS", "")
+        onedir = bool(mei) and Path(mei).resolve().parent == exe.parent
+        onedir = onedir or (exe.parent / "_internal").exists()
+        return (exe.parent if onedir else exe.parent / exe.stem), onedir
+
+    def _stage_exe_swap(self, new_exe: Path) -> Path:
+        """Готовит скрипт замены программы и возвращает путь к нему."""
+        current = Path(sys.executable).resolve()
+        source = new_exe.parent                 # папка новой версии целиком
+        target, onedir = self._app_dir()
+        new_name = new_exe.name
+
+        staged = cfg.USER_DIR / "update"
+        if staged.exists():
+            shutil.rmtree(staged, ignore_errors=True)
+        staged.mkdir(parents=True, exist_ok=True)
+        pending = staged / "new"
+        shutil.copytree(source, pending)
+
         script = staged / "apply_update.bat"
-        # Ждём завершения программы, подменяем файл и запускаем заново.
-        script.write_text(
-            "@echo off\r\n"
-            "chcp 65001 >nul\r\n"
-            "echo Установка обновления LIFE OS...\r\n"
-            ":wait\r\n"
-            "timeout /t 1 /nobreak >nul\r\n"
-            f'tasklist /fi "imagename eq {current.name}" | find /i "{current.name}" >nul '
-            "&& goto wait\r\n"
-            f'if exist "{backup}" del /q "{backup}"\r\n'
-            f'move /y "{current}" "{backup}" >nul\r\n'
-            f'move /y "{pending}" "{current}" >nul\r\n'
-            f'start "" "{current}"\r\n'
-            'del "%~f0"\r\n',
-            encoding="utf-8")
+        lines = [
+            "@echo off",
+            "chcp 65001 >nul",
+            "echo Установка обновления LIFE OS...",
+            ":wait",
+            "timeout /t 1 /nobreak >nul",
+            f'tasklist /fi "imagename eq {current.name}" '
+            f'| find /i "{current.name}" >nul && goto wait',
+            # _internal принадлежит программе целиком — зеркалим, чтобы
+            # не копились библиотеки от прошлых версий.
+            f'robocopy "{pending}\\_internal" "{target}\\_internal" '
+            f'/MIR /NFL /NDL /NJH /NJS /NP >nul',
+            # остальное копируем, ничего лишнего не удаляя
+            f'robocopy "{pending}" "{target}" /E /XD _internal '
+            f'/NFL /NDL /NJH /NJS /NP >nul',
+            "if errorlevel 8 goto fail",
+        ]
+        if not onedir:
+            # переезд со старой однофайловой сборки: одиночный файл рядом
+            # с новой папкой больше не нужен
+            lines.append(f'if exist "{current}" del /q "{current}"')
+        lines += [
+            f'start "" "{target}\\{new_name}"',
+            f'rd /s /q "{pending}"',
+            'del "%~f0"',
+            "exit /b 0",
+            ":fail",
+            "echo Не удалось заменить файлы программы.",
+            "echo Скачайте новую версию вручную: "
+            f"{RELEASES_PAGE}",
+            "pause",
+        ]
+        script.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
         return script
 
     def _install(self, src: Path):
@@ -400,8 +463,14 @@ class InstallWorker(QThread):
             self.finished_ok.emit(str(backup))
         except InterruptedError:
             self.failed.emit("Обновление отменено.")
-        except urllib.error.URLError:
-            self.failed.emit("Не удалось скачать файл: проверьте подключение к интернету.")
+        except urllib.error.HTTPError as exc:
+            self.failed.emit(
+                f"Сервер обновлений ответил ошибкой {exc.code}. "
+                f"Попробуйте позже или скачайте версию вручную на GitHub.")
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            self.failed.emit(
+                "Не удалось скачать обновление: соединение с GitHub прервано. "
+                "Проверьте интернет и попробуйте ещё раз.")
         except zipfile.BadZipFile:
             self.failed.emit("Загруженный архив повреждён.")
         except PermissionError:

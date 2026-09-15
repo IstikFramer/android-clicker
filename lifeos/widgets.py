@@ -10,12 +10,12 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import (
-    QEasingCurve, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSize, Qt,
+    QPoint, QPointF, QRect, QRectF, QSize, Qt, QTimer,
     Signal,
 )
 from PySide6.QtGui import (
-    QBrush, QColor, QConicalGradient, QFont, QFontMetrics, QLinearGradient,
-    QPainter, QPainterPath, QPen, QPixmap, QRadialGradient,
+    QBrush, QColor, QConicalGradient, QFont, QFontMetrics, QGuiApplication,
+    QLinearGradient, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient,
 )
 from PySide6.QtWidgets import (
     QFrame, QGraphicsDropShadowEffect, QHBoxLayout, QLabel, QPushButton,
@@ -1088,4 +1088,152 @@ class RingGauge(GlowAware, QWidget):
         p.setFont(f)
         p.setPen(QColor("#EDF3FF"))
         p.drawText(rect, Qt.AlignCenter, f"{int(round(self._v.value))}%")
+        p.end()
+
+
+# ===========================================================================
+class HintTip(QWidget):
+    """Всплывающая подсказка в стиле программы.
+
+    Показывается рядом с курсором через небольшую задержку, гаснет плавно.
+    Используется значками «?» у инструментов.
+    """
+
+    _current: "HintTip | None" = None
+
+    def __init__(self, text: str, parent=None):
+        super().__init__(parent, Qt.ToolTip | Qt.FramelessWindowHint
+                         | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_ShowWithoutActivating, True)
+        self._text = text
+        self._pad = 14
+        self._max_w = 330
+        font = QFont("Inter")
+        font.setPixelSize(13)
+        self.setFont(font)
+        metrics = QFontMetrics(font)
+        rect = metrics.boundingRect(
+            QRect(0, 0, self._max_w - self._pad * 2, 4000),
+            Qt.TextWordWrap, text)
+        self._text_rect = rect
+        self.resize(min(self._max_w, rect.width() + self._pad * 2),
+                    rect.height() + self._pad * 2)
+        self._opacity = 0.0
+        self.setWindowOpacity(0.0)
+        self._fade = QTimer(self)
+        self._fade.timeout.connect(self._step)
+
+    @classmethod
+    def show_at(cls, text: str, global_pos: QPoint):
+        cls.hide_current()
+        tip = HintTip(text)
+        screen = QGuiApplication.screenAt(global_pos) or QGuiApplication.primaryScreen()
+        area = screen.availableGeometry() if screen else QRect(0, 0, 1920, 1080)
+        x = global_pos.x() + 16
+        y = global_pos.y() + 18
+        if x + tip.width() > area.right() - 8:
+            x = global_pos.x() - tip.width() - 12
+        if y + tip.height() > area.bottom() - 8:
+            y = global_pos.y() - tip.height() - 12
+        tip.move(max(area.left() + 4, x), max(area.top() + 4, y))
+        tip.show()
+        tip._fade.start(16)
+        cls._current = tip
+        return tip
+
+    @classmethod
+    def hide_current(cls):
+        if cls._current is not None:
+            cls._current.close()
+            cls._current.deleteLater()
+            cls._current = None
+
+    def _step(self):
+        self._opacity = min(1.0, self._opacity + 0.16)
+        self.setWindowOpacity(self._opacity)
+        if self._opacity >= 1.0:
+            self._fade.stop()
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        path = QPainterPath()
+        path.addRoundedRect(r, 11, 11)
+        p.fillPath(path, QColor(16, 19, 27, 250))
+        edge = QColor(current_accent().primary)
+        edge.setAlpha(90)
+        p.setPen(QPen(edge, 1.0))
+        p.drawPath(path)
+        p.setPen(QColor("#DCE3F0"))
+        p.drawText(self.rect().adjusted(self._pad, self._pad,
+                                        -self._pad, -self._pad),
+                   Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignVCenter,
+                   self._text)
+        p.end()
+
+
+class HelpDot(GlowAware, QWidget):
+    """Значок «?»: при наведении объясняет, для чего нужен инструмент."""
+
+    def __init__(self, text: str, size: int = 20, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(size, size)
+        self._text = text
+        self._hover = Spring(0.0, 22.0)
+        self.setAttribute(Qt.WA_Hover, True)
+        self.setCursor(Qt.WhatsThisCursor)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._popup)
+        driver().subscribe(self, self._tick)
+
+    def _tick(self, dt: float):
+        if self._hover.done:
+            return
+        self._hover.step(dt)
+        self.update()
+
+    def enterEvent(self, e):
+        self._hover.set(1.0)
+        self._timer.start(320)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e):
+        self._hover.set(0.0)
+        self._timer.stop()
+        HintTip.hide_current()
+        super().leaveEvent(e)
+
+    def mousePressEvent(self, e):
+        self._popup()
+        super().mousePressEvent(e)
+
+    def _popup(self):
+        if self.isVisible():
+            HintTip.show_at(self._text, self.mapToGlobal(
+                QPoint(self.width() // 2, self.height())))
+
+    def paintEvent(self, _):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        acc = current_accent()
+        r = QRectF(self.rect()).adjusted(1, 1, -1, -1)
+        k = self._hover.value
+        fill = QColor(acc.primary)
+        fill.setAlphaF(0.10 + 0.24 * k)
+        p.setBrush(QBrush(fill))
+        pen = QColor(acc.primary)
+        pen.setAlphaF(0.45 + 0.4 * k)
+        p.setPen(QPen(pen, 1.2))
+        p.drawEllipse(r)
+        f = QFont("Inter")
+        f.setPixelSize(max(11, int(self.height() * 0.62)))
+        f.setBold(True)
+        p.setFont(f)
+        col = QColor("#EAF2FF")
+        col.setAlphaF(0.72 + 0.28 * k)
+        p.setPen(col)
+        p.drawText(self.rect(), Qt.AlignCenter, "?")
         p.end()

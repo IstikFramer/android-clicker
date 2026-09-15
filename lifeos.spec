@@ -1,10 +1,17 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""Сборка LIFE OS в один исполняемый файл.
+"""Сборка LIFE OS для Windows.
 
     pyinstaller lifeos.spec --noconfirm
 
-Результат: dist/LIFE OS.exe — работает без установленного Python.
-Ресурсы (иконки, фоны, данные) упаковываются внутрь файла.
+Результат: папка dist/LIFE OS с «LIFE OS.exe» и библиотеками рядом —
+работает без установленного Python.
+
+Почему папка, а не один файл. Однофайловая сборка при каждом запуске
+распаковывает себя во временный каталог и запускает код оттуда; такое
+поведение совпадает с поведением упаковщиков вредоносных программ, и
+Защитник Windows регулярно поднимает тревогу на ровном месте. Обычная
+раскладка с библиотеками рядом выглядит для антивируса как любая другая
+установленная программа, запускается быстрее и не срабатывает ложно.
 """
 import sys
 from pathlib import Path
@@ -54,18 +61,25 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,      # библиотеки лежат рядом, а не внутри
     name="LIFE OS",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,          # оконное приложение, без чёрной консоли
     disable_windowed_traceback=False,
     icon=_icon,
     version=_version_file,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="LIFE OS",
 )

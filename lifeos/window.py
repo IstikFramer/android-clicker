@@ -5,7 +5,7 @@ from PySide6.QtCore import (
     QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
     QTimer, Qt, Signal,
 )
-from PySide6.QtGui import QAction, QColor, QIcon
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
     QMessageBox,
     QApplication, QGraphicsOpacityEffect, QHBoxLayout, QMenu, QPushButton,
@@ -18,8 +18,8 @@ from .anim import driver
 from .eula import EulaWindow
 from .pages import AboutPage, HomePage, SettingsPage
 from .settings import settings
-from .theme import build_qss, current_accent
-from .elevation import can_elevate, is_admin, relaunch_as_admin
+from .theme import build_qss
+from .elevation import can_elevate, relaunch_as_admin
 from .tools_page import ToolsPage
 from .update_ui import UpdateWindow
 from .updater import CheckWorker, UpdateInfo
@@ -208,6 +208,9 @@ class MainWindow(QWidget):
         self._update_info: UpdateInfo | None = None
         self._update_win: UpdateWindow | None = None
         self._check_worker: CheckWorker | None = None
+        app = QApplication.instance()
+        if app is not None:
+            app.aboutToQuit.connect(self._stop_check_worker)
         self._notified_version = ""
 
         # Перегенерация QSS стоит ~60 мс, поэтому при быстром изменении
@@ -292,6 +295,10 @@ class MainWindow(QWidget):
     def go(self, index: int):
         if index == self.stack.currentIndex():
             self.sidebar.set_active(index)
+            # повторное нажатие по активному разделу возвращает к его началу
+            page = self.stack.currentWidget()
+            if hasattr(page, "go_home"):
+                page.go_home()
             return
         self.sidebar.set_active(index)
         self.stack.setCurrentIndex(index)
@@ -437,6 +444,22 @@ class MainWindow(QWidget):
                 f"{cfg.APP_NAME} обновлён до {cfg.APP_VERSION}",
                 "Список изменений открыт на главной странице.",
                 QIcon(str(cfg.ORBS / "done_128.png")), 5000)
+
+    def _stop_check_worker(self):
+        """Дождаться проверки обновлений перед закрытием программы."""
+        w = self._check_worker
+        if w is None:
+            return
+        if w.isRunning():
+            w.requestInterruption()
+            if not w.wait(3000):
+                w.terminate()
+                w.wait(1000)
+        self._check_worker = None
+
+    def closeEvent(self, e):
+        self._stop_check_worker()
+        super().closeEvent(e)
 
     def check_updates(self, silent: bool = False):
         """Фоновая проверка новой версии."""
