@@ -72,6 +72,25 @@ class BasePage(QScrollArea):
 
 
 # =========================================================== Главный экран
+def _group_changes(rel: dict) -> dict[str, list[str]]:
+    """Изменения релиза по категориям.
+
+    Ранние версии хранили их списком записей с полями type и text,
+    начиная с 0.3 — отдельными списками added / improved / fixed.
+    Главная страница понимает оба формата.
+    """
+    grouped: dict[str, list[str]] = {"added": [], "improved": [], "fixed": []}
+    for key in grouped:
+        for text in rel.get(key) or []:
+            if text:
+                grouped[key].append(str(text))
+    for c in rel.get("changes") or []:
+        if isinstance(c, dict):
+            grouped.setdefault(c.get("type", "added"), []).append(
+                c.get("text", ""))
+    return grouped
+
+
 class HomePage(BasePage):
     """Что нового в текущей версии — то, что видит пользователь при запуске."""
 
@@ -100,15 +119,19 @@ class HomePage(BasePage):
         top.addWidget(ch)
         top.addStretch(1)
         col.addLayout(top)
-        col.addWidget(make_label(rel.get("title", "Обновление"), "HeroTitle"))
-        col.addWidget(make_label(rel.get("summary", ""), "HeroBody", wrap=True))
+        title = make_label(rel.get("title", "Обновление"), "HeroTitle",
+                           wrap=True)
+        title.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        col.addWidget(title)
+        summary = make_label(rel.get("summary", ""), "HeroBody", wrap=True)
+        summary.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        col.addWidget(summary)
         col.addStretch(1)
 
         stats = QHBoxLayout()
         stats.setSpacing(22)
-        counts = {"added": 0, "improved": 0, "fixed": 0}
-        for c in rel.get("changes", []):
-            counts[c.get("type", "added")] = counts.get(c.get("type", "added"), 0) + 1
+        grouped = _group_changes(rel)
+        counts = {k: len(v) for k, v in grouped.items()}
         for key, label in (("added", "новое"), ("improved", "улучшено"), ("fixed", "исправлено")):
             box = QVBoxLayout()
             box.setSpacing(0)
@@ -131,10 +154,6 @@ class HomePage(BasePage):
         # ---------- список изменений ----------
         self.body.addSpacing(4)
         self.body.addWidget(make_label("ЧТО НОВОГО В ЭТОЙ ВЕРСИИ", "SidebarSection"))
-
-        grouped: dict[str, list[str]] = {"added": [], "improved": [], "fixed": []}
-        for c in rel.get("changes", []):
-            grouped.setdefault(c.get("type", "added"), []).append(c.get("text", ""))
 
         grid = QGridLayout()
         grid.setSpacing(16)
@@ -186,8 +205,16 @@ class HomePage(BasePage):
                 head.addStretch(1)
                 head.addWidget(make_label(old.get("date", ""), "Caption"))
                 card.body.addLayout(head)
-                texts = " · ".join(c.get("text", "") for c in old.get("changes", []))
-                card.body.addWidget(make_label(texts, "CardBody", wrap=True))
+                items = [t for group in _group_changes(old).values()
+                         for t in group]
+                summary = old.get("summary") or ""
+                if items:
+                    shown = " · ".join(items[:4])
+                    if len(items) > 4:
+                        shown += f" · и ещё {len(items) - 4}"
+                else:
+                    shown = summary
+                card.body.addWidget(make_label(shown, "CardBody", wrap=True))
                 self.body.addWidget(card)
 
         self.body.addStretch(1)
