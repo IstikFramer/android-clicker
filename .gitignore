@@ -40,6 +40,8 @@ __pycache__/
 venv/
 env/
 *.spec
+# но конфигурация сборки LIFE OS нужна в репозитории
+!lifeos.spec
 dist/
 build/
 .pytest_cache/
