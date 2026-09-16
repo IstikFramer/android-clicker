@@ -32,3 +32,8 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# MANGVERSE (React + Vite)
+node_modules/
+dist/
+*.local
