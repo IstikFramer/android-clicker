@@ -1,0 +1,14 @@
+{
+  "name": "mangahub-site",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MangaHub — многостраничный каталог манги/манхвы/маньхуа (статический сайт без сборки)",
+  "scripts": {
+    "start": "python3 -m http.server 8000 --bind 0.0.0.0",
+    "data": "python3 tools/generate_data.py",
+    "test": "node tools/e2e.js"
+  },
+  "devDependencies": {
+    "jsdom": "^30.0.1"
+  }
+}
