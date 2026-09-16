@@ -218,6 +218,30 @@ def build_orb_icons():
 
 
 # ---------------------------------------------------------------- фоны
+SECURITY_ORBS = (
+    "security_center", "defender", "firewall", "secure_boot",
+    "windows_update", "uac", "startup_guard", "threat_scan",
+    "privacy", "health_check",
+)
+
+
+def build_security_orbs():
+    """Обрабатывает отдельные иконки безопасности из серии v7."""
+    dest = OUT / "orbs"
+    dest.mkdir(parents=True, exist_ok=True)
+    for name in SECURITY_ORBS:
+        src = RAW / f"v7_{name}.png"
+        if not src.exists():
+            log(f"пропуск {src.name}")
+            continue
+        icon = autocrop(chroma_key(Image.open(src), tol=0.32), pad_ratio=0.025)
+        for size in (256, 128, 96, 64, 48, 32):
+            icon.resize((size, size), Image.LANCZOS).save(
+                dest / f"{name}_{size}.png")
+        log(f"security orb: {name}")
+
+
+# ---------------------------------------------------------------- фоны
 def build_backgrounds():
     jobs = [
         ("v2_bg_main.png", "bg_main", (3840, 2160)),
@@ -295,5 +319,6 @@ if __name__ == "__main__":
     build_icons()
     build_glyph_icons()
     build_orb_icons()
+    build_security_orbs()
     build_backgrounds()
     print("Готово.")

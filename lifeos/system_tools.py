@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import platform
 import shutil
@@ -40,6 +41,29 @@ def _no_window() -> dict:
     si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     return {"startupinfo": si,
             "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+
+
+def _powershell_json(script: str, timeout: int = 25) -> dict:
+    """Выполняет только читающий PowerShell-запрос и возвращает JSON."""
+    if not IS_WIN:
+        return {}
+    prefix = (
+        "$ProgressPreference='SilentlyContinue';"
+        "$OutputEncoding=[Console]::OutputEncoding="
+        "[Text.UTF8Encoding]::new();"
+    )
+    try:
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive",
+             "-ExecutionPolicy", "Bypass", "-Command", prefix + script],
+            capture_output=True, text=True, encoding="utf-8", errors="ignore",
+            timeout=timeout, **_no_window())
+        if proc.returncode != 0 or not proc.stdout.strip():
+            return {}
+        data = json.loads(proc.stdout.strip())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return {}
 
 
 # =========================================================== автозагрузка
@@ -594,6 +618,137 @@ class SystemWorker(QThread):
                 rows=[[k, v] for k, v in rows],
                 note="Соединение в порядке" if online
                      else "Интернет недоступен — проверьте подключение")
+
+        if kind == "security":
+            if not IS_WIN:
+                return TableResult(
+                    headers=["Проверка", "Состояние", "Подробности"],
+                    rows=[["Центр безопасности", "Недоступен",
+                           "Расширенная проверка предназначена для Windows"]],
+                    note="На этой системе доступны только общие инструменты")
+
+            self.progress.emit(10, "Опрос Защитника Windows…")
+            script = r'''
+$mp = $null; $fw = @(); $svc = $null; $sb = $null; $threats = 0
+try { $mp = Get-MpComputerStatus -ErrorAction Stop } catch {}
+try { $fw = @(Get-NetFirewallProfile -ErrorAction Stop) } catch {}
+try { $svc = Get-Service wuauserv -ErrorAction Stop } catch {}
+try { $sb = Confirm-SecureBootUEFI -ErrorAction Stop } catch {}
+try { $threats = @(Get-MpThreatDetection -ErrorAction Stop).Count } catch {}
+[pscustomobject]@{
+  Antivirus = if ($null -ne $mp) {$mp.AntivirusEnabled} else {$null}
+  Realtime = if ($null -ne $mp) {$mp.RealTimeProtectionEnabled} else {$null}
+  SignatureAge = if ($null -ne $mp) {$mp.AntivirusSignatureAge} else {$null}
+  QuickScanAge = if ($null -ne $mp) {$mp.QuickScanAge} else {$null}
+  PUAProtection = if ($null -ne $mp) {$mp.PUAProtectionEnabled} else {$null}
+  FirewallTotal = @($fw).Count
+  FirewallEnabled = @($fw | Where-Object Enabled).Count
+  UpdateService = if ($null -ne $svc) {$svc.Status.ToString()} else {''}
+  SecureBoot = $sb
+  Threats = $threats
+} | ConvertTo-Json -Compress
+'''
+            data = _powershell_json(script)
+            rows: list[list[str]] = []
+
+            antivirus = data.get("Antivirus")
+            realtime = data.get("Realtime")
+            if antivirus is True and realtime is True:
+                rows.append(["Защитник Windows", "Включён",
+                             "Антивирус и защита в реальном времени работают"])
+            elif antivirus is False or realtime is False:
+                rows.append(["Защитник Windows", "Выключен",
+                             "Включите защиту в приложении «Безопасность Windows»"])
+            else:
+                rows.append(["Защитник Windows", "Не определено",
+                             "Возможно, используется другой антивирус"])
+
+            sig_age = data.get("SignatureAge")
+            try:
+                sig_days = int(sig_age)
+            except (TypeError, ValueError):
+                sig_days = -1
+            if 0 <= sig_days <= 3:
+                rows.append(["Базы угроз", "Актуальны", f"Возраст: {sig_days} дн."])
+            elif sig_days > 3:
+                rows.append(["Базы угроз", "Требует внимания",
+                             f"Не обновлялись {sig_days} дн."])
+            else:
+                rows.append(["Базы угроз", "Не определено", "Нет данных Защитника"])
+
+            pua = data.get("PUAProtection")
+            rows.append([
+                "Защита репутации",
+                "Включена" if pua is True else
+                ("Требует внимания" if pua is False else "Не определено"),
+                ("Нежелательные приложения блокируются" if pua is True else
+                 "Проверьте защиту на основе репутации в Windows"),
+            ])
+
+            fw_total = int(data.get("FirewallTotal") or 0)
+            fw_enabled = int(data.get("FirewallEnabled") or 0)
+            rows.append([
+                "Брандмауэр",
+                "Включён" if fw_total and fw_enabled == fw_total else
+                ("Выключен" if fw_total else "Не определено"),
+                (f"Активно профилей: {fw_enabled} из {fw_total}"
+                 if fw_total else "Не удалось прочитать профили"),
+            ])
+
+            self.progress.emit(55, "Проверка настроек загрузки…")
+            try:
+                import winreg
+                with winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System") as key:
+                    uac = bool(winreg.QueryValueEx(key, "EnableLUA")[0])
+            except OSError:
+                uac = None
+            rows.append(["Контроль учётных записей",
+                         "Включён" if uac else ("Выключен" if uac is False else "Не определено"),
+                         "UAC запрашивает подтверждение важных изменений" if uac
+                         else "Рекомендуется включить UAC"])
+
+            secure = data.get("SecureBoot")
+            rows.append(["Безопасная загрузка",
+                         "Включена" if secure is True else
+                         ("Выключена" if secure is False else "Не поддерживается"),
+                         "Secure Boot защищает запуск Windows" if secure is True
+                         else "Проверьте поддержку в UEFI/BIOS"])
+
+            service = str(data.get("UpdateService") or "")
+            rows.append(["Центр обновления",
+                         "Работает" if service.lower() == "running" else "Требует внимания",
+                         f"Служба Windows Update: {service or 'не определена'}"])
+
+            self.progress.emit(78, "Анализ автозагрузки…")
+            startups = list_startup()
+            markers = ("\\temp\\", "powershell", "cmd.exe", "wscript",
+                       "cscript", ".vbs", ".js")
+            suspicious = [i for i in startups
+                          if any(m in i.command.lower() for m in markers)]
+            rows.append(["Автозагрузка",
+                         "В порядке" if not suspicious else "Требует внимания",
+                         (f"Записей: {len(startups)}, необычных: {len(suspicious)}"
+                          if suspicious else f"Проверено записей: {len(startups)}")])
+
+            threats = int(data.get("Threats") or 0)
+            rows.append(["История угроз",
+                         "Чисто" if threats == 0 else "Есть записи",
+                         "Записей об обнаружениях нет" if threats == 0
+                         else f"Записей в истории Защитника: {threats}"])
+            self.progress.emit(100, "Готово")
+
+            bad_states = {"Выключен", "Выключена", "Требует внимания", "Обнаружено"}
+            problems = sum(row[1] in bad_states for row in rows)
+            return TableResult(
+                headers=["Проверка", "Состояние", "Подробности и рекомендация"],
+                rows=rows,
+                payload=[{"problems": problems,
+                          "summary": [r[0] for r in rows if r[1] in bad_states]}],
+                note=("Основные компоненты защиты работают"
+                      if not problems else
+                      f"Требуют внимания: {problems}"))
 
         if kind == "health":
             rows: list[list[str]] = []

@@ -32,6 +32,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install PySide6 pyinstaller
 
+      - name: Проверить код и Центр безопасности
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          @'
+          import json
+          from pathlib import Path
+          from lifeos.system_tools import SystemWorker
+          from lifeos.tools_page import CATEGORIES
+          assert any(c.key == "security" for c in CATEGORIES)
+          for path in Path("data").glob("*.json"):
+              json.loads(path.read_text("utf-8"))
+          result = SystemWorker("security")._collect()
+          assert result.rows, "Центр безопасности не вернул результатов"
+          print("Security Center:", result.note, len(result.rows), "checks")
+          '@ | python -
+
       - name: Прочитать версию
         id: ver
         shell: bash

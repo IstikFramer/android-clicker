@@ -1,7 +1,7 @@
 ; LIFE OS — установщик Windows (Inno Setup 6).
-; Версия передаётся из GitHub Actions: ISCC /DMyAppVersion=0.4 installer.iss
+; Версия передаётся из GitHub Actions: ISCC /DMyAppVersion=0.4.5 installer.iss
 #ifndef MyAppVersion
-  #define MyAppVersion "0.4"
+  #define MyAppVersion "0.4.5"
 #endif
 
 #define MyAppName "LIFE OS"
@@ -33,7 +33,7 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 CloseApplications=yes
 RestartApplications=no
-VersionInfoVersion=0.4.0.0
+VersionInfoVersion=0.4.5.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription=Установщик {#MyAppName}
 VersionInfoProductName={#MyAppName}

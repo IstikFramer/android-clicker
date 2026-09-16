@@ -1,6 +1,8 @@
 """LIFE OS — главное окно: титлбар, выдвижная боковая панель, страницы, трей."""
 from __future__ import annotations
 
+import time
+
 from PySide6.QtCore import (
     QEasingCurve, QParallelAnimationGroup, QPoint, QPropertyAnimation, QRect,
     QRectF, QTimer, Qt, Signal,
@@ -18,6 +20,7 @@ from .anim import driver
 from .eula import EulaWindow
 from .pages import AboutPage, HomePage, SettingsPage
 from .settings import settings
+from .system_tools import IS_WIN, SystemWorker
 from .theme import build_qss
 from .elevation import can_elevate, relaunch_as_admin
 from .tools_page import ToolsPage
@@ -208,6 +211,7 @@ class MainWindow(QWidget):
         self._update_info: UpdateInfo | None = None
         self._update_win: UpdateWindow | None = None
         self._check_worker: CheckWorker | None = None
+        self._security_worker: SystemWorker | None = None
         app = QApplication.instance()
         if app is not None:
             app.aboutToQuit.connect(self._stop_check_worker)
@@ -265,6 +269,7 @@ class MainWindow(QWidget):
         QTimer.singleShot(4000, self._first_check)
         QTimer.singleShot(1200, self._show_whats_new_if_updated)
         QTimer.singleShot(2200, self._offer_admin)
+        QTimer.singleShot(8500, self._check_security_silently)
 
     # -------------------------------------------------------------- страницы
     def _build_pages(self):
@@ -338,6 +343,9 @@ class MainWindow(QWidget):
             self.bg.reload()
         elif key in ("auto_update_check", "update_interval_h"):
             self._apply_check_interval()
+        elif key == "security_notifications" and value:
+            settings.set("last_security_check", "")
+            QTimer.singleShot(300, self._check_security_silently)
 
     def _repaint_all(self):
         if not self._repaint_timer.isActive():
@@ -452,22 +460,67 @@ class MainWindow(QWidget):
             return          # первый запуск — здороваться списком изменений не нужно
         self.go(0)
         if self.tray.isSystemTrayAvailable() and settings.get("tray_notifications"):
+            self._tray_message_action = "home"
             self.tray.showMessage(
                 f"{cfg.APP_NAME} обновлён до {cfg.APP_VERSION}",
                 "Список изменений открыт на главной странице.",
                 QIcon(str(cfg.ORBS / "done_128.png")), 5000)
 
-    def _stop_check_worker(self):
-        """Дождаться проверки обновлений перед закрытием программы."""
-        w = self._check_worker
-        if w is None:
+    def _check_security_silently(self):
+        """Не чаще раза в сутки проверяет защиту и сообщает только о важном."""
+        if not IS_WIN or not settings.get("security_notifications"):
             return
-        if w.isRunning():
-            w.requestInterruption()
-            if not w.wait(3000):
-                w.terminate()
-                w.wait(1000)
+        try:
+            last = float(settings.get("last_security_check") or 0)
+        except (TypeError, ValueError):
+            last = 0
+        if time.time() - last < 24 * 60 * 60:
+            return
+        if self._security_worker and self._security_worker.isRunning():
+            return
+        self._security_worker = SystemWorker("security", self)
+        self._security_worker.done.connect(self._on_security_checked)
+        self._security_worker.start()
+
+    def _on_security_checked(self, result):
+        settings.set("last_security_check", str(time.time()))
+        bad = {"Выключен", "Выключена", "Требует внимания", "Обнаружено"}
+        issues = [row[0] for row in result.rows
+                  if len(row) > 1 and row[1] in bad]
+        signature = "|".join(issues)
+        if not issues:
+            settings.set("last_security_alert", "")
+            return
+        # Одинаковое предупреждение второй раз не показываем: уведомления
+        # должны помогать, а не раздражать при каждом запуске.
+        if signature == settings.get("last_security_alert"):
+            return
+        settings.set("last_security_alert", signature)
+        if self.tray.isSystemTrayAvailable():
+            self._tray_message_action = "security"
+            shown = ", ".join(issues[:3])
+            if len(issues) > 3:
+                shown += f" и ещё {len(issues) - 3}"
+            self.tray.showMessage(
+                f"{cfg.APP_NAME} · требуется внимание",
+                shown + ". Откройте Центр безопасности.",
+                QIcon(str(cfg.ORBS / "security_center_128.png")), 7000)
+
+    def _stop_worker(self, worker):
+        if worker is None:
+            return
+        if worker.isRunning():
+            worker.requestInterruption()
+            if not worker.wait(3000):
+                worker.terminate()
+                worker.wait(1000)
+
+    def _stop_check_worker(self):
+        """Дождаться фоновых проверок перед закрытием программы."""
+        self._stop_worker(self._check_worker)
+        self._stop_worker(self._security_worker)
         self._check_worker = None
+        self._security_worker = None
 
     def closeEvent(self, e):
         self._stop_check_worker()
@@ -493,6 +546,7 @@ class MainWindow(QWidget):
         if info.available and info.version != self._notified_version:
             self._notified_version = info.version
             if self.tray.isSystemTrayAvailable():
+                self._tray_message_action = "update"
                 self.tray.showMessage(
                     f"{cfg.APP_NAME} · доступно обновление",
                     f"Вышла версия {info.version}. Нажмите, чтобы установить.",
@@ -501,6 +555,7 @@ class MainWindow(QWidget):
                 f"{cfg.APP_NAME} {cfg.APP_VERSION} · доступна версия {info.version}")
         elif not info.available and not silent:
             if self.tray.isSystemTrayAvailable():
+                self._tray_message_action = None
                 self.tray.showMessage(
                     cfg.APP_NAME, "Установлена последняя версия.",
                     QIcon(str(cfg.ORBS / "done_128.png")), 3000)
@@ -534,6 +589,7 @@ class MainWindow(QWidget):
 
     # --------------------------------------------------------------------- трей
     def _build_tray(self):
+        self._tray_message_action = None
         self.tray = QSystemTrayIcon(self)
         self._update_tray_icon()
         self.tray.setToolTip(f"{cfg.APP_NAME} {cfg.APP_VERSION}")
@@ -556,12 +612,27 @@ class MainWindow(QWidget):
         menu.addAction(act_upd)
         menu.addAction(act_quit)
         self.tray.setContextMenu(menu)
-        self.tray.messageClicked.connect(self.open_update_window)
+        self.tray.messageClicked.connect(self._tray_message_clicked)
         self.tray.activated.connect(self._tray_activated)
         self.tray.show()
 
     def _update_tray_icon(self):
         self.tray.setIcon(QIcon(str(cfg.LOGO / "logo_tray_256.png")))
+
+    def _tray_message_clicked(self):
+        action = self._tray_message_action
+        self._tray_message_action = None
+        if action == "update":
+            self.open_update_window()
+        elif action == "security":
+            self.restore_from_tray()
+            self.go(1)
+            tools = self.pages[1]
+            if hasattr(tools, "open_key"):
+                tools.open_key("security")
+        elif action == "home":
+            self.restore_from_tray()
+            self.go(0)
 
     def _tray_activated(self, reason):
         if reason in (QSystemTrayIcon.Trigger, QSystemTrayIcon.DoubleClick):
@@ -576,6 +647,7 @@ class MainWindow(QWidget):
     def hide_to_tray(self):
         self.hide()
         if settings.get("tray_notifications") and self.tray.isSystemTrayAvailable():
+            self._tray_message_action = None
             self.tray.showMessage(
                 cfg.APP_NAME,
                 "Программа свёрнута в область уведомлений.",

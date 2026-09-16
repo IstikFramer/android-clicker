@@ -24,6 +24,9 @@ DEFAULTS: dict[str, Any] = {
     "start_minimized": False,
     "close_to_tray": True,
     "tray_notifications": True,
+    "security_notifications": True,
+    "last_security_check": "",
+    "last_security_alert": "",
     "language": "Русский",
     "auto_update_check": True,
     "update_interval_h": 1,       # 1 / 6 / 24 часа

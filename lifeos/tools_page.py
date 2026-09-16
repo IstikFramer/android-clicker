@@ -98,9 +98,17 @@ CATEGORIES = [
         "время отклика и работу DNS. Пригодится, когда сайты не открываются.",
         "table"),
     Category(
+        "security", "Центр безопасности",
+        "Защитник, брандмауэр, обновления и UAC",
+        "security_center",
+        "Безопасно читает состояние встроенной защиты Windows, брандмауэра, "
+        "Secure Boot, обновлений и автозагрузки. Ничего не включает и не "
+        "выключает без вашего участия.",
+        "table"),
+    Category(
         "health", "Центр состояния",
         "Быстрая проверка важных частей компьютера",
-        "shield",
+        "health_check",
         "Собирает в одном месте состояние диска, сети, автозагрузки и "
         "доступных ресурсов. Ничего не меняет и даёт понятные рекомендации.",
         "table"),
@@ -126,6 +134,7 @@ COLUMN_WIDTHS = {                  # 0 — тянущийся столбец, д
     "sysinfo":   [0, 420],
     "network":   [0, 420],
     "health":    [0, 150, 360],
+    "security":  [0, 165, 390],
 }
 
 
@@ -291,12 +300,21 @@ class TableRow(QWidget):
     action = Signal(int)
 
     def __init__(self, index: int, cells: list[str], widths: list[int],
-                 action_text: str = "", header: bool = False, parent=None):
+                 action_text: str = "", header: bool = False,
+                 icon_name: str | None = None, parent=None):
         super().__init__(parent)
         self.setObjectName("Transparent")
         lay = QHBoxLayout(self)
         lay.setContentsMargins(16, 9 if header else 8, 16, 7 if header else 8)
         lay.setSpacing(14)
+        if icon_name is not None:
+            if header or not icon_name:
+                spacer = QWidget()
+                spacer.setObjectName("Transparent")
+                spacer.setFixedSize(36, 36)
+                lay.addWidget(spacer)
+            else:
+                lay.addWidget(OrbIcon(icon_name, 36), 0, Qt.AlignVCenter)
         for n, text in enumerate(cells):
             if header:
                 role = "CardKicker"
@@ -924,10 +942,22 @@ class TablePage(SubPage):
             self.cat.key, "")
         widths = COLUMN_WIDTHS.get(self.cat.key, [0, 130, 200])
         card = GlassCard(padding=6, spacing=0, hoverable=False)
+        security_icons = {
+            "Защитник Windows": "defender", "Базы угроз": "threat_scan",
+            "Брандмауэр": "firewall", "Контроль учётных записей": "uac",
+            "Безопасная загрузка": "secure_boot",
+            "Центр обновления": "windows_update",
+            "Автозагрузка": "startup_guard", "История угроз": "threat_scan",
+            "Защита репутации": "privacy",
+        }
+        icon_slot = "" if self.cat.key == "security" else None
         card.body.addWidget(TableRow(
-            -1, [h.upper() for h in res.headers], widths, action, header=True))
+            -1, [h.upper() for h in res.headers], widths, action, header=True,
+            icon_name=icon_slot))
         for i, cells in enumerate(res.rows):
-            row = TableRow(i, cells, widths, action)
+            row = TableRow(i, cells, widths, action,
+                           icon_name=(security_icons.get(cells[0], "shield")
+                                      if self.cat.key == "security" else None))
             row.action.connect(self._row_action)
             card.body.addWidget(row)
         self._slot.addWidget(card)
@@ -1001,6 +1031,11 @@ class ToolsPage(QStackedWidget):
         app = QApplication.instance()
         if app is not None:
             app.aboutToQuit.connect(self.stop_all)
+
+    def open_key(self, key: str):
+        cat = next((item for item in CATEGORIES if item.key == key), None)
+        if cat is not None:
+            self.open_category(cat)
 
     def open_category(self, cat: Category):
         page = self._pages.get(cat.key)
