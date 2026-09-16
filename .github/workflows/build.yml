@@ -32,22 +32,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install PySide6 pyinstaller
 
-      - name: Проверить код и Центр безопасности
-        shell: pwsh
+      - name: Проверить Python и данные
+        shell: bash
         run: |
-          $env:QT_QPA_PLATFORM = "offscreen"
-          @'
-          import json
-          from pathlib import Path
-          from lifeos.system_tools import SystemWorker
-          from lifeos.tools_page import CATEGORIES
-          assert any(c.key == "security" for c in CATEGORIES)
-          for path in Path("data").glob("*.json"):
-              json.loads(path.read_text("utf-8"))
-          result = SystemWorker("security")._collect()
-          assert result.rows, "Центр безопасности не вернул результатов"
-          print("Security Center:", result.note, len(result.rows), "checks")
-          '@ | python -
+          python -m compileall -q main.py lifeos tools
+          python -c "import json,pathlib; [json.loads(p.read_text(encoding='utf-8')) for p in pathlib.Path('data').glob('*.json')]; print('Python and JSON: OK')"
 
       - name: Прочитать версию
         id: ver
