@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#11120f" />
+    <meta name="description" content="MangaLive — живая платформа для открытия манги, вебтунов и новых историй." />
+    <title>MangaLive — read what moves you</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <div class="site-noise" aria-hidden="true"></div>
+    <div class="app-shell">
+      <header class="topbar" id="top">
+        <a class="brand" href="#top" aria-label="MangaLive home">
+          <span class="brand-mark">M</span>
+          <span class="brand-name">Manga<em>Live</em></span>
+        </a>
+
+        <nav class="main-nav" aria-label="Primary navigation">
+          <a class="nav-link is-active" href="#catalog" data-nav="catalog" data-i18n="nav.catalog">Каталог</a>
+          <a class="nav-link" href="#trending" data-nav="trending" data-i18n="nav.trending">В тренде</a>
+          <a class="nav-link" href="#library" data-nav="library" data-i18n="nav.library">Моя полка</a>
+          <a class="nav-link" href="#about" data-nav="about" data-i18n="nav.about">О проекте</a>
+        </nav>
+
+        <div class="top-actions">
+          <button class="round-btn search-trigger" id="searchTrigger" type="button" aria-label="Open search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"></circle><path d="m16 16 4.5 4.5"></path></svg>
+          </button>
+          <div class="language-switcher" aria-label="Language">
+            <button class="language-btn is-active" type="button" data-language="ru">RU</button>
+            <span>/</span>
+            <button class="language-btn" type="button" data-language="en">EN</button>
+          </div>
+          <button class="login-btn" id="openAuth" type="button" data-i18n="auth.login">Войти</button>
+          <button class="menu-btn" id="menuToggle" type="button" aria-label="Open menu" aria-expanded="false">
+            <span></span><span></span>
+          </button>
+        </div>
+      </header>
+
+      <div class="search-drawer" id="searchDrawer" aria-hidden="true">
+        <div class="search-drawer-inner">
+          <span class="search-kicker" data-i18n="search.kicker">БЫСТРЫЙ ПОИСК</span>
+          <label class="search-field" for="globalSearch">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"></circle><path d="m16 16 4.5 4.5"></path></svg>
+            <input id="globalSearch" type="search" autocomplete="off" data-i18n-placeholder="search.placeholder" placeholder="Название, автор или тег" />
+            <kbd>ESC</kbd>
+          </label>
+        </div>
+      </div>
+
+      <main>
+        <section class="hero section-grid" aria-labelledby="heroTitle">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="live-dot"></span><span data-i18n="hero.eyebrow">LIVE DISCOVERY / 02</span></div>
+            <h1 id="heroTitle">
+              <span data-i18n="hero.titleOne">Читай за</span><br />
+              <em data-i18n="hero.titleAccent">полшага</em> <span data-i18n="hero.titleTwo">впереди.</span>
+            </h1>
+            <p class="hero-description" data-i18n="hero.description">MangaLive собирает истории, которые хочется открыть прямо сейчас — от тихой slice of life до вселенных, где всё вот-вот взорвётся.</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="#catalog" data-i18n="hero.primary">Открыть каталог <span>↗</span></a>
+              <button class="btn btn-quiet" id="surpriseMe" type="button"><span class="btn-sticker"><img src="assets/processed/icon-star.png" alt="" /></span><span data-i18n="hero.surprise">Удиви меня</span></button>
+            </div>
+            <div class="hero-footnote">
+              <span class="footnote-line"></span>
+              <span data-i18n="hero.note">Без бесконечного скролла. Только хорошие совпадения.</span>
+            </div>
+          </div>
+
+          <div class="hero-stage" aria-label="Featured manga">
+            <div class="stage-backdrop"></div>
+            <div class="stage-orbit orbit-one"></div>
+            <div class="stage-orbit orbit-two"></div>
+            <div class="hero-issue-label"><span>ISSUE</span><strong>026</strong></div>
+            <div class="hero-cover-wrap">
+              <div class="cover-tape tape-top"></div>
+              <div class="cover-tape tape-bottom"></div>
+              <button class="hero-cover" id="heroRead" type="button" data-read="neon-afterglow" aria-label="Read Neon Afterglow">
+                <img src="assets/cover-neon-afterglow.png" alt="Neon Afterglow cover" />
+                <span class="cover-shade"></span>
+                <span class="cover-caption"><small>FEATURED SERIES</small><strong>NEON<br />AFTERGLOW</strong></span>
+              </button>
+            </div>
+            <div class="hero-float-card pulse-card">
+              <div class="float-card-top"><span class="mini-live"><i></i> LIVE</span><span>04:28</span></div>
+              <div class="pulse-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <p data-i18n="hero.pulse">Пульс читателей</p>
+              <strong>+28.4%</strong>
+            </div>
+            <div class="hero-float-card quote-card">
+              <span class="quote-mark">“</span>
+              <p data-i18n="hero.quote">Включила первую главу — и пропала на три часа.</p>
+              <div class="quote-user"><span class="avatar avatar-lime">А</span><span>anya / <b>new reader</b></span></div>
+            </div>
+            <div class="hero-sticker"><img src="assets/processed/icon-bolt.png" alt="" /><span>NEW<br />DROP</span></div>
+          </div>
+        </section>
+
+        <section class="metric-row" aria-label="MangaLive stats">
+          <div class="metric-intro"><span class="tiny-label" data-i18n="metrics.label">СЕЙЧАС НА MANGALIVE</span><p data-i18n="metrics.description">Лента, которая знает, где ты остановился — и что открыть дальше.</p></div>
+          <div class="metric"><strong>24<span>k</span></strong><span data-i18n="metrics.readers">активных читателей</span></div>
+          <div class="metric"><strong>1.8<span>k</span></strong><span data-i18n="metrics.series">серий в каталоге</span></div>
+          <div class="metric metric-accent"><span class="metric-icon"><img src="assets/processed/icon-bookmark.png" alt="" /></span><strong>86<span>%</span></strong><span data-i18n="metrics.finish">заканчивают начатое</span></div>
+        </section>
+
+        <section class="content-section trending-section" id="trending" aria-labelledby="trendingTitle">
+          <div class="section-heading">
+            <div><span class="section-index">01 / CURATED</span><h2 id="trendingTitle" data-i18n="trending.title">В тренде у своих</h2></div>
+            <a class="text-link" href="#catalog" data-filter="trending"><span data-i18n="common.seeAll">Смотреть всё</span><span>↗</span></a>
+          </div>
+          <div class="trending-grid">
+            <article class="trend-feature">
+              <div class="trend-feature-art"><img src="assets/cover-signal-zero.png" alt="Signal Zero cover" /><span class="vertical-word">SIGNAL / ZERO</span><span class="trend-number">01</span></div>
+              <div class="trend-feature-copy"><span class="card-label">EDITOR'S PICK</span><h3>Signal / Zero</h3><p data-i18n="trending.signal">Два курьера. Один последний поезд. И сигнал, который не должен был дойти.</p><div class="trend-meta"><span>Cyberpunk</span><span>·</span><span>36 chapters</span></div><button class="arrow-button" type="button" data-read="signal-zero" aria-label="Read Signal Zero">↗</button></div>
+            </article>
+            <article class="trend-mini trend-mini--orchard">
+              <div class="trend-mini-art"><img src="assets/cover-glass-orchard.png" alt="Glass Orchard cover" /><span class="mini-tag">SLOW BURN</span></div>
+              <div class="trend-mini-copy"><span class="card-label">02 / FANTASY</span><h3>Glass Orchard</h3><p data-i18n="trending.orchard">Тишина тоже умеет расти.</p><button class="mini-read" type="button" data-read="glass-orchard"><span data-i18n="common.read">Читать</span> <b>↗</b></button></div>
+            </article>
+            <article class="trend-mini trend-mini--paper">
+              <div class="trend-mini-art"><img src="assets/cover-paper-moon.png" alt="Paper Moon cover" /><span class="mini-tag">COMFORT</span></div>
+              <div class="trend-mini-copy"><span class="card-label">03 / SLICE OF LIFE</span><h3>Paper Moon</h3><p data-i18n="trending.paper">Маленькая комната. Большая ночь.</p><button class="mini-read" type="button" data-read="paper-moon"><span data-i18n="common.read">Читать</span> <b>↗</b></button></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="content-section catalog-section" id="catalog" aria-labelledby="catalogTitle">
+          <div class="section-heading catalog-heading">
+            <div><span class="section-index">02 / LIBRARY</span><h2 id="catalogTitle" data-i18n="catalog.title">Найди свою следующую obsession</h2></div>
+            <div class="catalog-tools">
+              <div class="select-wrap"><label class="sr-only" for="sortSelect" data-i18n="catalog.sortLabel">Сортировка</label><select id="sortSelect"><option value="popular" data-i18n="catalog.sortPopular">По популярности</option><option value="new" data-i18n="catalog.sortNew">Сначала новые</option><option value="rating" data-i18n="catalog.sortRating">По рейтингу</option></select></div>
+              <button class="filter-toggle" id="filterToggle" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M7 12h10M10 17h4"></path></svg><span data-i18n="catalog.filter">Фильтр</span><span class="filter-count" id="filterCount">0</span></button>
+            </div>
+          </div>
+          <div class="filter-panel" id="filterPanel" aria-hidden="true">
+            <div class="filter-group"><span class="filter-label" data-i18n="catalog.genre">Жанр</span><div class="chip-row" id="genreChips"><button class="chip is-selected" type="button" data-genre="all" data-i18n="genres.all">Все</button><button class="chip" type="button" data-genre="action" data-i18n="genres.action">Экшен</button><button class="chip" type="button" data-genre="fantasy" data-i18n="genres.fantasy">Фэнтези</button><button class="chip" type="button" data-genre="slice" data-i18n="genres.slice">Повседневность</button><button class="chip" type="button" data-genre="sci-fi" data-i18n="genres.scifi">Sci-fi</button></div></div>
+            <button class="reset-filters" id="resetFilters" type="button" data-i18n="catalog.reset">Сбросить</button>
+          </div>
+          <div class="catalog-meta"><p id="catalogResultText">Показаны 5 историй</p><div class="catalog-view-toggle"><button class="view-btn is-selected" type="button" data-view="grid" aria-label="Grid view"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"></rect><rect x="14" y="4" width="6" height="6"></rect><rect x="4" y="14" width="6" height="6"></rect><rect x="14" y="14" width="6" height="6"></rect></svg></button><button class="view-btn" type="button" data-view="list" aria-label="List view"><svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h14"></path></svg></button></div></div>
+          <div class="catalog-grid" id="catalogGrid"></div>
+          <div class="empty-state" id="emptyState" hidden><span>⌁</span><h3 data-i18n="catalog.emptyTitle">Ничего не потерялось — просто ищем иначе.</h3><p data-i18n="catalog.emptyText">Попробуй другой запрос или сбрось фильтры.</p><button class="btn btn-outline" id="emptyReset" type="button" data-i18n="catalog.reset">Сбросить</button></div>
+        </section>
+
+        <section class="library-banner" id="library" aria-labelledby="libraryTitle">
+          <div class="library-copy"><span class="section-index">03 / YOUR SPACE</span><h2 id="libraryTitle"><span data-i18n="library.titleOne">Твоя полка.</span><br /><em data-i18n="library.titleTwo">Твои правила.</em></h2><p data-i18n="library.description">Сохрани историю, которую хочется дочитать. MangaLive запомнит страницу, настроение и тот самый «ещё одну главу».</p><button class="btn btn-primary" id="openLibrary" type="button"><span data-i18n="library.cta">Открыть мою полку</span><span>↗</span></button></div>
+          <div class="library-visual"><div class="library-ring ring-a"></div><div class="library-ring ring-b"></div><div class="library-note note-one"><span>READING NOW</span><strong>78%</strong><small>Neon Afterglow</small></div><div class="library-note note-two"><span>UP NEXT</span><strong>04</strong><small>saved titles</small></div><img class="library-icon" src="assets/processed/icon-bookmark.png" alt="" /></div>
+        </section>
+
+        <section class="about-section" id="about" aria-labelledby="aboutTitle">
+          <div><span class="section-index">04 / THE IDEA</span><h2 id="aboutTitle"><span data-i18n="about.titleOne">Не просто ридер.</span><br /><em data-i18n="about.titleTwo">Место для открытия.</em></h2></div>
+          <div class="about-copy"><p data-i18n="about.description">Мы собираем каталог как зин: немного хаоса, много характера и ноль безликих рекомендаций. Каждый экран MangaLive помогает выбрать историю быстрее и остаться в ней дольше.</p><div class="about-sign"><span class="sign-line"></span><span>M / 2026</span></div></div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <a class="brand footer-brand" href="#top"><span class="brand-mark">M</span><span class="brand-name">Manga<em>Live</em></span></a>
+        <p data-i18n="footer.note">Сделано для тех, кто говорит «последняя глава» и не имеет это в виду.</p>
+        <div class="footer-links"><a href="#catalog" data-i18n="nav.catalog">Каталог</a><a href="#about" data-i18n="nav.about">О проекте</a><button type="button" id="footerLogin" data-i18n="auth.login">Войти</button></div>
+        <span class="footer-mark">© 2026 MANGALIVE</span>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-dot"></span><span id="toastText">Сохранено</span></div>
+
+    <div class="modal" id="readerModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="readerTitle">
+      <div class="modal-backdrop" data-close-modal="readerModal"></div>
+      <div class="reader-modal-card">
+        <button class="modal-close" type="button" data-close-modal="readerModal" aria-label="Close">×</button>
+        <div class="reader-sidebar"><span class="section-index">MANGALIVE READER</span><h2 id="readerTitle">Neon Afterglow</h2><p id="readerMeta">Chapter 01 / 03</p><div class="reader-progress"><span id="readerProgress"></span></div><div class="reader-actions"><button class="icon-action" id="readerSave" type="button" aria-label="Save"><img src="assets/processed/icon-bookmark.png" alt="" /></button><button class="icon-action" id="readerPlay" type="button" aria-label="Play demo"><img src="assets/processed/icon-bolt.png" alt="" /></button></div><p class="reader-tip" data-i18n="reader.tip">Демо-режим: страницы переключаются, а твой прогресс сохраняется в браузере.</p></div>
+        <div class="reader-view"><div class="reader-view-top"><span id="readerSeries">NEON AFTERGLOW</span><span><b id="readerPageNumber">01</b> / 03</span></div><div class="reader-page"><img id="readerPageImage" src="assets/cover-neon-afterglow.png" alt="Reader page" /><div class="page-overlay"><span id="readerPageCaption">THE CITY NEVER SLEEPS</span><span>↗</span></div></div><div class="reader-controls"><button type="button" id="readerPrev" disabled>← <span data-i18n="reader.previous">Назад</span></button><button type="button" id="readerNext"><span data-i18n="reader.next">Следующая</span> →</button></div></div>
+      </div>
+    </div>
+
+    <div class="modal" id="authModal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <div class="modal-backdrop" data-close-modal="authModal"></div>
+      <div class="auth-modal-card"><button class="modal-close" type="button" data-close-modal="authModal" aria-label="Close">×</button><div class="auth-art"><img src="assets/cover-paper-moon.png" alt="" /><span class="auth-art-label">MAKE SPACE<br />FOR STORIES</span></div><div class="auth-form"><span class="section-index">WELCOME BACK</span><h2 id="authTitle" data-i18n="auth.title">Вернись к своим историям.</h2><p data-i18n="auth.description">Сохрани прогресс и собери личную полку без лишних шагов.</p><label><span data-i18n="auth.email">Email</span><input type="email" placeholder="you@example.com" /></label><label><span data-i18n="auth.password">Пароль</span><input type="password" placeholder="••••••••" /></label><button class="btn btn-primary auth-submit" type="button" id="fakeLogin" data-i18n="auth.submit">Войти в демо</button><small data-i18n="auth.disclaimer">Демо-форма — аккаунт не создаётся.</small></div></div>
+    </div>
+  </body>
+</html>
