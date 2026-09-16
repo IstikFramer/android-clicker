@@ -6,11 +6,11 @@
 
   function heroSlides(items) {
     return items.map(function (m, i) {
-      var coverUri = ML.Cover.uri(m.title, m.typeName, m.slug, 600, 840);
+      var coverUri = m.cover;
       return '<div class="hero-slide' + (i === 0 ? " active" : "") + '" data-i="' + i + '">' +
         '<div class="hero-bg" style="background-image:url(\'' + coverUri + '\')"></div>' +
         '<div class="hero-content">' +
-        '<img class="hero-cover" src="' + ML.Cover.uri(m.title, m.typeName, m.slug, 300, 420) + '" alt="' + ML.escape(m.title) + '">' +
+        '<img class="hero-cover" src="' + m.cover + '" alt="' + ML.escape(m.title) + '">' +
         '<div class="hero-info">' +
         '<div class="hero-kicker">' + m.typeName + " · " + m.year + " · " + m.statusName + "</div>" +
         '<h2 class="hero-title">' + ML.escape(m.title) + "</h2>" +
@@ -93,8 +93,8 @@
       '<div class="side-card"><h3>' + ML.icon("fire", 16) + " Топ тайтлов</h3><div class=\"side-list\">" + topSide + "</div></div>" +
       '<div class="side-card"><h3>' + ML.icon("clock", 16) + " Свежие релизы</h3><div class=\"side-list\">" + newSide + "</div></div>" +
       '<div class="side-card"><h3>' + ML.icon("info", 16) + " О проекте</h3>" +
-      '<p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.55">MangaHub — демо-каталог в стиле манга-библиотек. ' +
-      "Сейчас здесь " + db.manga.length + " тайтлов-заглушек, реальные главы появятся позже.</p>" +
+      '<p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.55">MangaHub — каталог в стиле манга-библиотек. ' +
+      "Сейчас здесь " + db.manga.length + " " + ML.plural(db.manga.length, ["тайтл", "тайтла", "тайтлов"]) + ", и у «Поезда в 7:42» уже читаются настоящие страницы.</p>" +
       '<a class="btn btn-sm btn-ghost btn-block" href="#/about">Подробнее</a>' +
       "</div>" +
       "</aside>" +

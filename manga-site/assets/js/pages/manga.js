@@ -41,10 +41,10 @@
       "<span>" + ML.escape(m.title) + "</span></div>" +
 
       '<div class="manga-head">' +
-      '<div class="manga-backdrop" style="background-image:url(\'' + ML.Cover.uri(m.title, m.typeName, m.slug, 600, 840) + '\')"></div>' +
+      '<div class="manga-backdrop" style="background-image:url(\'' + m.cover + '\')"></div>' +
       '<div class="manga-head-inner">' +
       '<div class="manga-cover-wrap">' +
-      '<img class="manga-cover" src="' + ML.Cover.uri(m.title, m.typeName, m.slug, 400, 560) + '" alt="' + ML.escape(m.title) + '">' +
+      '<img class="manga-cover" src="' + m.cover + '" alt="' + ML.escape(m.title) + '">' +
       '<div class="manga-cover-actions">' +
       '<button class="icon-btn" data-fav title="В закладки" style="background:var(--surface);border:1px solid var(--line)">' +
       '<span style="color:' + (isFav ? "var(--red)" : "var(--muted)") + '">' + ML.icon("heart", 17, isFav ? 'fill="currentColor"' : "") + "</span></button>" +
@@ -109,9 +109,11 @@
       '<div style="font-size:12px;color:var(--muted);margin-top:8px" id="vote-msg">' +
       (votes ? "Ваша оценка: " + votes + " из 5" : "Поставьте оценку тайтлу") + "</div>" +
       "</div>" +
-      '<div class="side-card"><h3>' + ML.icon("layers", 15) + " Похожие тайтлы</h3><div class=\"side-list\">" +
-      similar(m, 5).map(function (x, i) { return ML.sideItemHtml(x, i); }).join("") +
-      "</div></div>" +
+      '<div class="side-card"><h3>' + ML.icon("layers", 15) + " Похожие тайтлы</h3>" +
+      (similar(m, 5).length
+        ? '<div class="side-list">' + similar(m, 5).map(function (x, i) { return ML.sideItemHtml(x, i); }).join("") + "</div>"
+        : '<p style="font-size:12.5px;color:var(--muted);margin:0">Пока не собрались похожие тайтлы — каталог молодой. Загляните позже.</p>') +
+      "</div>" +
       '<div class="side-card"><h3>' + ML.icon("info", 15) + " Дисклеймер</h3>" +
       '<p style="font-size:12px;color:var(--muted);margin:0;line-height:1.55">Страницы глав здесь — сгенерированные заглушки. ' +
       "Настоящие сканы тайтла в демо-базу не загружены.</p></div>" +

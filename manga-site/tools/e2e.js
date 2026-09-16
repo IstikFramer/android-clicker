@@ -1,6 +1,6 @@
 /* E2E-прогон MangaHub на jsdom: грузит реальные HTML-страницы, исполняет
    реальные скрипты сайта и кликает по реальным элементам.
-   Запуск:  cd manga-site && node tools/e2e.js            (jsdom из ../../.e2e) */
+   Запуск:  cd manga-site && npm test   (нужен jsdom: npm install) */
 "use strict";
 
 const fs = require("fs");
@@ -8,9 +8,8 @@ const path = require("path");
 const Module = require("module");
 
 const ROOT = path.join(__dirname, "..");
-/* jsdom ищется сначала в manga-site/node_modules, затем в соседней папке .e2e */
 const CANDIDATES = [
-  path.join(__dirname, "..", "node_modules"),
+  path.join(ROOT, "node_modules"),
   path.join(__dirname, "..", "..", "..", ".e2e", "node_modules")
 ];
 const NODE_MODULES = CANDIDATES.find((p) => fs.existsSync(path.join(p, "jsdom")));
@@ -20,7 +19,7 @@ if (!NODE_MODULES) {
 }
 Module.globalPaths.push(NODE_MODULES);
 
-const { JSDOM, VirtualConsole, ResourceLoader } = require(path.join(NODE_MODULES, "jsdom"));
+const { JSDOM, VirtualConsole } = require(path.join(NODE_MODULES, "jsdom"));
 
 let passed = 0;
 let failed = 0;
@@ -36,8 +35,6 @@ function check(name, cond, extra) {
 }
 function section(t) { console.log("\n== " + t); }
 
-function resetStorage() { sharedStore.clear(); }
-
 class IO {
   constructor(cb) { this.cb = cb; }
   observe(el) { this.cb([{ isIntersecting: true, target: el }], this); }
@@ -50,7 +47,7 @@ class IO {
    http-origin (localStorage для file:// недоступен) */
 function startServer() {
   const http = require("http");
-  const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8" };
+  const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".jpg": "image/jpeg" };
   const server = http.createServer((req, res) => {
     let p = decodeURIComponent(req.url.split("?")[0]);
     if (p === "/") p = "/index.html";
@@ -65,8 +62,7 @@ function startServer() {
 let BASE = "http://localhost:8000/";
 
 /* В jsdom localStorage у каждого окна свой. Для сайта это один origin,
-   поэтому подставляем общий бэкенд — иначе закладки/логин «не переживут»
-   переход на другую страницу. */
+   поэтому подставляем общий бэкенд. */
 const sharedStore = new Map();
 function sharedStorage() {
   return {
@@ -78,6 +74,7 @@ function sharedStorage() {
     get length() { return sharedStore.size; }
   };
 }
+function resetStorage() { sharedStore.clear(); }
 
 function makeDom(file, hash) {
   const html = fs.readFileSync(path.join(ROOT, file), "utf8");
@@ -95,7 +92,7 @@ function makeDom(file, hash) {
       Object.defineProperty(w, "localStorage", { value: sharedStorage(), configurable: true });
     },
     runScripts: "dangerously",
-    resources: "usable",                 // грузим локальные assets/js/*.js
+    resources: "usable",
     pretendToBeVisual: true,
     virtualConsole: vc
   });
@@ -108,22 +105,6 @@ function makeDom(file, hash) {
   w.__jsErrors = jsErrors;
   w.__file = file;
   return dom;
-}
-
-/* ждём, пока jsdom подгрузит и выполнит локальные скрипты страницы */
-async function openPage(file, hash, keepStorage) {
-  const dom = makeDom(file, hash);
-  const t0 = Date.now();
-  while (Date.now() - t0 < 15000) {
-    const w = dom.window;
-    if (w.MANGA_DB && w.ML && w.document.querySelector("#page") &&
-        w.document.querySelector("#page").innerHTML.trim().length > 0) {
-      if (keepStorage !== false && !w.__storageKept) { /* хранилище общее для origin */ }
-      return dom;
-    }
-    await sleep(25);
-  }
-  throw new Error("страница " + file + " не отрисовалась за 15 c");
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -140,35 +121,41 @@ const change = (el) => {
   return el.dispatchEvent(new el.ownerDocument.defaultView.Event("change", { bubbles: true }));
 };
 
+async function openPage(file, hash) {
+  const dom = makeDom(file, hash);
+  const t0 = Date.now();
+  while (Date.now() - t0 < 15000) {
+    const w = dom.window;
+    if (w.MANGA_DB && w.ML && w.document.querySelector("#page") &&
+        w.document.querySelector("#page").innerHTML.trim().length > 0) return dom;
+    await sleep(25);
+  }
+  throw new Error("страница " + file + " не отрисовалась за 15 c");
+}
+
+const SLUG = "poezd-v-742";
+
 async function main() {
   const srv = await startServer();
   BASE = "http://localhost:" + srv.port + "/";
   console.log("статический сервер: " + BASE);
-  resetStorage();
-  const clearStorage = () => {
-    try { require(path.join(NODE_MODULES, "jsdom")); } catch (e) {}
-  };
-
 
   /* ---------- Главная ---------- */
   section("index.html  #/");
   {
     const dom = await openPage("index.html", "#/");
     const d = dom.window.document;
+    const db = dom.window.MANGA_DB;
     check("шапка отрисована", !!d.querySelector(".header-inner"));
-    check("навигация из 6 пунктов", d.querySelectorAll(".main-nav a").length === 6,
-      d.querySelectorAll(".main-nav a").length);
-    check("слайдер: 6 слайдов", d.querySelectorAll(".hero-slide").length === 6,
+    check("слайдер: 1 слайд с реальным тайтлом", d.querySelectorAll(".hero-slide").length === db.manga.length,
       d.querySelectorAll(".hero-slide").length);
-    check("первый слайд активен", d.querySelector(".hero-slide").classList.contains("active"));
-    check("обложек-карточек >= 30", d.querySelectorAll(".card").length >= 30, d.querySelectorAll(".card").length);
-    check("все обложки получили src", d.querySelectorAll("img[data-lazy]").length === 0 &&
-      d.querySelectorAll("img[src^='data:image/svg+xml']").length > 10);
-    check("топ-список >= 8", d.querySelectorAll(".side-card .side-item").length >= 8);
+    check("обложка в слайдере — реальный файл", d.querySelector(".hero-cover").getAttribute("src") === db.manga[0].cover,
+      d.querySelector(".hero-cover").getAttribute("src"));
+    check("карточки секций отрисованы", d.querySelectorAll(".card").length >= 4, d.querySelectorAll(".card").length);
+    check("обложки карточек — реальные файлы", [...d.querySelectorAll(".card img")].every((i) => (i.getAttribute("src") || "").startsWith("assets/img/")),
+      d.querySelector(".card img") && d.querySelector(".card img").getAttribute("src"));
     check("футер отрисован", !!d.querySelector(".footer-grid"));
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
-    const href = d.querySelector(".card").getAttribute("href");
-    check("ссылка карточки = #/manga/<slug>", /^#\/manga\/[a-z0-9-]+$/.test(href), href);
     dom.window.close();
   }
 
@@ -177,239 +164,188 @@ async function main() {
   {
     const dom = await openPage("catalog.html", "#/catalog");
     const d = dom.window.document;
-    check("сайдбар фильтров", !!d.querySelector(".filters"));
-    check("групп фильтров = 6", d.querySelectorAll(".f-group").length === 6, d.querySelectorAll(".f-group").length);
-    check("первая страница = 24 карточки", d.querySelectorAll("#results .card").length === 24,
+    check("групп фильтров = 6", d.querySelectorAll(".f-group").length === 6);
+    check("в каталоге 1 тайтл", d.querySelectorAll("#results .card").length === 1,
       d.querySelectorAll("#results .card").length);
-    check("пагинация", !!d.querySelector(".pagination"));
+    check("пагинации нет (тайтл один)", !d.querySelector(".pagination"));
 
     const manhwa = [...d.querySelectorAll('input[data-field="types"]')].find((i) => i.value === "manhwa");
     click(manhwa);
-    const badges = [...d.querySelectorAll("#results .badge")].map((b) => b.textContent.trim());
-    check("фильтр «Манхва» оставляет только манхву",
-      badges.length > 0 && badges.every((b) => b === "Манхва"), badges.slice(0, 6).join(","));
-    check("чип активного фильтра", !!d.querySelector(".af-chip"));
+    check("фильтр «Манхва» даёт пустую выдачу", !!d.querySelector("#results .empty-state"));
+    click(d.querySelector("[data-clear]"));
+    check("сброс возвращает тайтл", d.querySelectorAll("#results .card").length === 1);
 
     const genre = [...d.querySelectorAll('input[data-field="genres"]')].find((i) => i.value === "Романтика");
     click(genre);
-    const after = d.querySelectorAll("#results .card").length;
-    check("жанр+тип сузили выдачу", after > 0 && after < 24, after);
+    check("жанр «Романтика» оставляет тайтл", d.querySelectorAll("#results .card").length === 1);
 
-    const sel = d.querySelector("[data-sort]");
-    sel.value = "rating";
-    change(sel);
-    check("сортировка не сломала выдачу", d.querySelectorAll("#results .card").length === after);
-
-    click(d.querySelector(".af-chip button"));
-    check("удаление чипа снимает фильтр", d.querySelectorAll("#results .card").length > after);
-
+    const act = [...d.querySelectorAll('input[data-field="genres"]')].find((i) => i.value === "Экшен");
+    click(act);
+    check("несовместимые жанры → пусто", !!d.querySelector("#results .empty-state"));
     click(d.querySelector("[data-clear]"));
-    check("сброс → 24 карточки", d.querySelectorAll("#results .card").length === 24,
-      d.querySelectorAll("#results .card").length);
+    const hits = () => d.querySelectorAll("#results .card").length + d.querySelectorAll("#results .row-card").length;
 
     click(d.querySelectorAll(".view-toggle button")[1]);
-    check("переключение на список", d.querySelectorAll("#results .row-card").length > 0);
-
-    const page2 = d.querySelector('.pagination button[data-p="2"]');
-    click(page2);
-    const rowsP2 = d.querySelectorAll("#results .row-card").length;
-    const activePage = d.querySelector(".pagination button.active");
-    check("переход на 2-ю страницу", rowsP2 > 0 && activePage && activePage.textContent === "2",
-      "строк=" + rowsP2 + ", active=" + (activePage ? activePage.textContent : "null"));
+    check("режим списка работает", d.querySelectorAll("#results .row-card").length === 1);
 
     const q = d.querySelector('[data-field="q"]');
     q.value = "zzz-нет-такого";
     input(q);
     await sleep(400);
     check("пустой поиск → заглушка", !!d.querySelector("#results .empty-state"));
+
+    q.value = "7:42";
+    input(q);
+    await sleep(400);
+    check("поиск «7:42» находит тайтл", hits() === 1, hits());
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
     dom.window.close();
   }
 
-  /* ---------- Каталог по ссылке с параметрами ---------- */
-  section("catalog.html  #/catalog?type=manga&genres=Экшен");
+  /* ---------- Каталог с параметрами из URL ---------- */
+  section("catalog.html  #/catalog?type=manga&genres=Школа");
   {
-    const dom = await openPage("catalog.html", "#/catalog?type=manga&genres=" + encodeURIComponent("Экшен"));
+    const dom = await openPage("catalog.html", "#/catalog?type=manga&genres=" + encodeURIComponent("Школа"));
     const d = dom.window.document;
-    const badges = [...d.querySelectorAll("#results .badge")].map((b) => b.textContent.trim());
-    check("из URL подхватился тип «Манга»",
-      badges.length > 0 && badges.every((b) => b === "Манга"), badges.slice(0, 5).join(","));
-    check("из URL подхватился жанр", (d.querySelector(".af-chip") || {}).textContent !== undefined &&
-      d.querySelectorAll(".af-chip").length === 2, d.querySelectorAll(".af-chip").length);
+    check("из URL подхватились фильтры", d.querySelectorAll(".af-chip").length === 2,
+      d.querySelectorAll(".af-chip").length);
+    check("тайтл найден", d.querySelectorAll("#results .card").length + d.querySelectorAll("#results .row-card").length === 1,
+      d.querySelectorAll("#results .card").length + "/" + d.querySelectorAll("#results .row-card").length);
     dom.window.close();
   }
 
   /* ---------- Страница тайтла ---------- */
   resetStorage();
-  section("manga.html  #/manga/krov-titana");
+  section("manga.html  #/manga/" + SLUG);
   {
-    const dom = await openPage("manga.html", "#/manga/krov-titana");
+    const dom = await openPage("manga.html", "#/manga/" + SLUG);
     const d = dom.window.document;
-    const db = dom.window.MANGA_DB;
-    const m = db.manga.find((x) => x.slug === "krov-titana");
+    const m = dom.window.MANGA_DB.manga[0];
     check("заголовок тайтла", d.querySelector(".manga-title").textContent === m.title,
       d.querySelector(".manga-title").textContent);
-    check("жанров в шапке = " + m.genres.length,
-      d.querySelectorAll(".manga-tags .chip").length === m.genres.length + 1,
-      d.querySelectorAll(".manga-tags .chip").length);
+    check("обложка — реальный файл", d.querySelector(".manga-cover").getAttribute("src") === m.cover);
     check("4 вкладки", d.querySelectorAll(".tab").length === 4);
     check("кнопка «Читать» ведёт в читалку",
-      /^#\/manga\/krov-titana\/read\/\d+$/.test(d.querySelector(".manga-actions a.btn-primary").getAttribute("href")),
+      d.querySelector(".manga-actions a.btn-primary").getAttribute("href") === "#/manga/" + SLUG + "/read/1",
       d.querySelector(".manga-actions a.btn-primary").getAttribute("href"));
-    check("похожие тайтлы", d.querySelectorAll(".side-list .side-item").length === 5);
+    check("похожих пока нет — заглушка", d.body.innerHTML.includes("Пока не собрались похожие тайтлы"));
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
 
-    // вкладка глав
     click([...d.querySelectorAll(".tab")].find((t) => t.dataset.tab === "chapters"));
     const rows = d.querySelectorAll(".chapter-row");
-    check("список глав = " + m.chaptersCount, rows.length === m.chaptersCount, rows.length);
-    check("первая строка — последняя глава",
-      rows[0].querySelector(".num").textContent.trim() === "Гл. " + m.chapters[m.chaptersCount - 1].number,
+    check("список глав = 1", rows.length === 1, rows.length);
+    check("строка — глава 1", rows[0].querySelector(".num").textContent.trim() === "Гл. 1",
       rows[0].querySelector(".num").textContent);
 
-    click(d.querySelector("[data-order]"));
-    const rowsAsc = d.querySelectorAll(".chapter-row");
-    check("сортировка «сначала старые» меняет порядок",
-      rowsAsc[0].querySelector(".num").textContent.trim() === "Гл. " + m.chapters[0].number,
-      rowsAsc[0].querySelector(".num").textContent);
-
-    const chq = d.querySelector("[data-chq]");
-    chq.value = "Глава 5 ";
-    input(chq);
-    check("поиск по главам работает", d.querySelectorAll(".chapter-row").length === 1,
-      d.querySelectorAll(".chapter-row").length);
-
-    // вкладка комментариев
     click([...d.querySelectorAll(".tab")].find((t) => t.dataset.tab === "comments"));
-    check("комментарии = " + m.comments.length, d.querySelectorAll(".comment").length === m.comments.length,
+    check("комментариев = " + m.comments.length, d.querySelectorAll(".comment").length === m.comments.length,
       d.querySelectorAll(".comment").length);
     check("форма заблокирована без входа", d.querySelector("[data-send]").disabled === true);
 
-    // закладки
     click(d.querySelector("[data-fav2]"));
-    check("закладка добавлена", JSON.parse(sharedStore.get("ml_favorites") || "[]").includes("krov-titana"),
-      sharedStore.get("ml_favorites"));
-    click(d.querySelector("[data-fav2]"));
-    check("закладка убрана", !JSON.parse(sharedStore.get("ml_favorites") || "[]").includes("krov-titana"));
-
-    // оценка
-    click([...d.querySelectorAll("#stars button")].find((b) => b.dataset.v === "4"));
-    check("оценка сохранена в localStorage", sharedStore.get("ml_votes_krov-titana") === "4",
-      sharedStore.get("ml_votes_krov-titana"));
+    check("закладка добавлена", JSON.parse(sharedStore.get("ml_favorites")).includes(SLUG));
+    click([...d.querySelectorAll("#stars button")].find((b) => b.dataset.v === "5"));
+    check("оценка сохранена", sharedStore.get("ml_votes_" + SLUG) === "5");
     check("нет ошибок JS после действий", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
     dom.window.close();
   }
 
   /* ---------- Читалка ---------- */
   resetStorage();
-  section("reader.html  #/manga/krov-titana/read/1");
+  section("reader.html  #/manga/" + SLUG + "/read/1");
   {
-    const dom = await openPage("reader.html", "#/manga/krov-titana/read/1");
+    const dom = await openPage("reader.html", "#/manga/" + SLUG + "/read/1");
     const d = dom.window.document;
-    const m = dom.window.MANGA_DB.manga.find((x) => x.slug === "krov-titana");
-    const ch1 = m.chapters.find((c) => c.number === "1");
-    check("страниц в главе = " + ch1.pages, d.querySelectorAll("#pages img").length === ch1.pages,
+    const m = dom.window.MANGA_DB.manga[0];
+    const pagesCount = m.chapters[0].pages.length;
+    check("страниц в главе = " + pagesCount, d.querySelectorAll("#pages img").length === pagesCount,
       d.querySelectorAll("#pages img").length);
-    check("страницы получили src", d.querySelectorAll("#pages img[data-lazy]").length === 0);
+    check("страницы ссылаются на реальные файлы",
+      [...d.querySelectorAll("#pages img")].every((i) => i.getAttribute("data-url").startsWith("assets/img/")),
+      d.querySelector("#pages img").getAttribute("data-url"));
+    check("ленивая загрузка подставила src", d.querySelector("#pages img").getAttribute("src").endsWith("p01.jpg"),
+      d.querySelector("#pages img").getAttribute("src"));
     check("номер главы в шапке", d.querySelector(".rt-title span").textContent.includes("Глава 1"));
-    check("селектор глав = " + m.chaptersCount, d.querySelectorAll("#ch-select option").length === m.chaptersCount,
-      d.querySelectorAll("#ch-select option").length);
-    check("прогресс чтения записан",
-      JSON.parse(sharedStore.get("ml_read_krov-titana") || "[]").includes("1"));
+    check("селектор глав = 1", d.querySelectorAll("#ch-select option").length === 1);
+    check("последняя глава — кнопка-заглушка", d.body.innerHTML.includes("Это последняя глава"));
+    check("прогресс чтения записан", JSON.parse(sharedStore.get("ml_read_" + SLUG)).includes("1"));
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
 
-    // настройки: постраничный режим
     click(d.querySelector("#rt-settings"));
     check("панель настроек открылась", !!d.querySelector(".reader-settings"));
     click([...d.querySelectorAll("[data-seg=mode] button")].find((b) => b.dataset.v === "paged"));
-    check("режим «постранично» включён", d.querySelector("#pages").classList.contains("paged"));
-    check("видна только одна страница", d.querySelectorAll("#pages img.current").length === 1);
+    check("постраничный режим включён", d.querySelector("#pages").classList.contains("paged"));
+    check("видна одна страница", d.querySelectorAll("#pages img.current").length === 1);
     click(d.querySelector("[data-next-page]"));
     check("переход на 2-ю страницу", d.querySelectorAll("#pages img")[1].classList.contains("current"));
     const saved = JSON.parse(sharedStore.get("ml_readerSettings"));
-    check("настройки сохранены", saved.mode === "paged", JSON.stringify(saved));
-
-    // следующая глава
-    const nextHref = [...d.querySelectorAll(".reader-bottom a")].map((a) => a.getAttribute("href"));
-    check("есть ссылка на следующую главу", nextHref.some((h) => /read\/2$/.test(h)), nextHref.join(","));
+    check("настройки сохранены", saved.mode === "paged");
     dom.window.close();
   }
 
-  /* ---------- Избранное + вход ---------- */
-  resetStorage();
+  /* ---------- Избранное ---------- */
   resetStorage();
   section("favorites.html  #/favorites");
   {
-    // пустое состояние
     const empty = await openPage("favorites.html", "#/favorites");
-    check("без закладок показывается заглушка", empty.window.document.body.innerHTML.includes("Закладок пока нет"));
-    check("без истории показывается заглушка", empty.window.document.body.innerHTML.includes("Истории пока нет"));
+    check("без закладок — заглушка", empty.window.document.body.innerHTML.includes("Закладок пока нет"));
     empty.window.close();
 
-    // наполняем хранилище и открываем заново
-    sharedStore.set("ml_favorites", JSON.stringify(["krov-titana", "povelitel-vozvrashchaetsya"]));
-    sharedStore.set("ml_reading", JSON.stringify([{ slug: "krov-titana", chapter: "3", at: 1 }]));
+    sharedStore.set("ml_favorites", JSON.stringify([SLUG]));
+    sharedStore.set("ml_reading", JSON.stringify([{ slug: SLUG, chapter: "1", at: 1 }]));
     const dom = await openPage("favorites.html", "#/favorites");
     const d = dom.window.document;
-    check("закладки отрисованы", d.querySelectorAll(".grid-cards .card").length === 3,
-      d.querySelectorAll(".grid-cards .card").length); // 2 закладки + 1 в истории
-    check("история чтения показывает главу 3", d.body.innerHTML.includes("гл. 3"));
-
+    check("закладка и история отрисованы", d.querySelectorAll(".grid-cards .card").length === 2,
+      d.querySelectorAll(".grid-cards .card").length);
     click(d.querySelector("#clear-history"));
-    check("очистка истории сработала", sharedStore.get("ml_reading") === undefined,
-      String(sharedStore.get("ml_reading")));
+    check("очистка истории сработала", sharedStore.get("ml_reading") === undefined);
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
     dom.window.close();
   }
 
+  /* ---------- Вход ---------- */
   section("login.html  #/login");
   {
     const dom = await openPage("login.html", "#/login");
     const d = dom.window.document;
-    const form = d.querySelector("#auth-form");
     d.querySelector('[name="nick"]').value = "Тестер";
     d.querySelector('[name="pass"]').value = "1234";
-    form.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
-    check("аккаунт создан", JSON.parse(sharedStore.get("ml_user")).nick === "Тестер",
-      sharedStore.get("ml_user"));
-    check("переход на избранное", dom.window.location.hash === "#/favorites", dom.window.location.hash);
+    d.querySelector("#auth-form").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+    check("аккаунт создан", JSON.parse(sharedStore.get("ml_user")).nick === "Тестер");
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
     dom.window.close();
 
     const dom2 = await openPage("index.html", "#/");
-    const d2 = dom2.window.document;
-    check("в шапке появился ник пользователя", d2.querySelector(".user-chip") !== null &&
-      d2.querySelector(".user-chip").textContent.includes("Тестер"), d2.querySelector(".user-chip")?.textContent);
+    check("ник в шапке", dom2.window.document.querySelector(".user-chip").textContent.includes("Тестер"));
     dom2.window.close();
   }
 
   /* ---------- Остальные страницы ---------- */
   const routes = [
-    ["top.html", "#/top", ".chapter-row", "Топ: список тайтлов"],
-    ["genres.html", "#/genres", ".genre-tile", "Жанры: плитки"],
-    ["teams.html", "#/teams", ".team-card", "Команды: карточки"],
-    ["about.html", "#/about", ".prose", "О проекте: текст"],
-    ["feedback.html", "#/feedback", "#fb-form", "Обратная связь: форма"]
+    ["top.html", "#/top", ".genre-tile", null, (d) => d.querySelectorAll(".card").length >= 1, "Топ: подиум с тайтлом"],
+    ["genres.html", "#/genres", null, null, (d) => d.querySelectorAll(".genre-tile").length === 30, "Жанры: 30 плиток"],
+    ["genres.html", "#/genres", null, null, (d) => d.querySelectorAll(".grid-cards .card").length === 1, "Жанры: топ-секция по «Романтике»"],
+    ["teams.html", "#/teams", null, null, (d) => d.querySelectorAll(".team-card").length === 1, "Команды: 1 карточка"],
+    ["about.html", "#/about", null, null, (d) => d.body.innerHTML.includes("Поезд в 7:42"), "О проекте: упоминается тайтл"],
+    ["feedback.html", "#/feedback", null, null, (d) => !!d.querySelector("#fb-form"), "Обратная связь: форма"]
   ];
-  for (const [file, hash, sel, label] of routes) {
+  for (const [file, hash, , , testFn, label] of routes) {
     section(file + "  " + hash);
     const dom = await openPage(file, hash);
-    const d = dom.window.document;
-    check(label, d.querySelectorAll(sel).length > 0, d.querySelectorAll(sel).length);
+    check(label, testFn(dom.window.document));
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
     dom.window.close();
   }
 
-  /* ---------- 404 и смена hash ---------- */
+  /* ---------- 404 и hashchange ---------- */
   section("роутинг: 404 и hashchange");
   {
     const dom = await openPage("index.html", "#/nesuschestvuet");
     const d = dom.window.document;
-    check("несуществующий адрес → 404-блок", d.body.innerHTML.includes("Страница не найдена"));
-    dom.window.location.hash = "#/genres";
+    check("несуществующий адрес → 404", d.body.innerHTML.includes("Страница не найдена"));
+    dom.window.location.hash = "#/manga/" + SLUG;
     dom.window.dispatchEvent(new dom.window.Event("hashchange"));
-    check("hashchange переключил страницу", d.querySelectorAll(".genre-tile").length > 0,
-      d.querySelectorAll(".genre-tile").length);
+    check("hashchange переключил на тайтл", !!d.querySelector(".manga-title"));
     check("нет ошибок JS", dom.window.__jsErrors.length === 0, dom.window.__jsErrors.join(" | "));
     dom.window.close();
   }

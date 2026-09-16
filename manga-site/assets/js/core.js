@@ -306,14 +306,10 @@
   };
 
   ML.applyLazy = function (img) {
-    var slug = img.getAttribute("data-slug") || "";
-    var title = img.getAttribute("data-title") || slug;
-    var sub = img.getAttribute("data-sub") || "";
-    var w = parseInt(img.getAttribute("data-w") || "300", 10);
-    var h = parseInt(img.getAttribute("data-h") || "420", 10);
+    var url = img.getAttribute("data-url") || "";
     img.removeAttribute("data-lazy");
-    img.src = ML.Cover.uri(title, sub, slug, w, h);
     img.onerror = function () { img.style.background = "var(--surface-3)"; };
+    if (url) img.src = url;
   };
 
   /* ---------- Общие рендеры ---------- */
@@ -331,10 +327,8 @@
   };
 
   ML.coverImg = function (m, w, h, cls) {
-    return '<img class="' + (cls || "") + '" data-lazy="cover" data-slug="' + m.slug +
-      '" data-title="' + ML.escape(m.title) + '" data-sub="' + ML.escape(m.typeName) + '" ' +
-      'data-w="' + (w || 300) + '" data-h="' + (h || 420) + '" ' +
-      'alt="' + ML.escape(m.title) + '" loading="lazy">';
+    return '<img class="' + (cls || "") + '" data-lazy="cover" data-url="' + ML.escape(m.cover || "") + '" ' +
+      'alt="' + ML.escape(m.title) + '">';
   };
 
   ML.cardHtml = function (m, opts) {

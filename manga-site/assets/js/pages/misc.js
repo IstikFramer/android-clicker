@@ -43,7 +43,7 @@
         podium.map(function (m, i) {
           return '<a class="card" href="#/manga/' + m.slug + '" style="position:relative">' +
             '<div class="card-cover" style="aspect-ratio:3/4">' +
-            '<img data-lazy="cover" data-slug="' + m.slug + '" data-title="' + ML.escape(m.title) + '" data-sub="' + m.typeName + '" data-w="360" data-h="480">' +
+            ML.coverImg(m, 360, 480) +
             '<span class="c-rating" style="top:10px;right:10px;font-size:14px;padding:4px 9px">' + ML.icon("star", 14) + m.rating.toFixed(1) + "</span>" +
             '<span class="c-badge" style="font-size:22px;font-weight:900;color:#fff;text-shadow:0 2px 8px #000;top:8px;left:10px">#' + (i + 1) + "</span>" +
             "</div>" +
@@ -52,18 +52,18 @@
             "</a>";
         }).join("") + "</div>" : "") +
 
-      '<div class="chapter-list">' +
+      (rest.length ? '<div class="chapter-list">' +
       rest.map(function (m, i) {
         return '<a class="chapter-row" style="grid-template-columns:44px 60px 1fr 120px 110px 30px" href="#/manga/' + m.slug + '">' +
           '<span class="num" style="color:var(--muted)">' + (i + 4) + "</span>" +
-          '<img data-lazy="cover" data-slug="' + m.slug + '" data-title="' + ML.escape(m.title) + '" data-sub="' + m.typeName + '" data-w="90" data-h="126" style="width:44px;height:62px;border-radius:4px;object-fit:cover">' +
+          '<span style="width:44px;height:62px;border-radius:4px;overflow:hidden;flex:none">' + ML.coverImg(m, 90, 126) + "</span>" +
           '<span class="ttl" style="color:var(--text);font-weight:600">' + ML.escape(m.title) + "</span>" +
           '<span>' + ML.typeBadge(m) + "</span>" +
           '<span class="views">' + ML.icon("star", 13) + " " + m.rating.toFixed(1) + " · " + ML.fmtNum(m.views) + "</span>" +
           '<span class="go">' + ML.icon("chevron", 16) + "</span>" +
           "</a>";
       }).join("") +
-      "</div></div>";
+      "</div>" : "") + "</div>";
   });
 
   /* ---------------- Жанры ---------------- */
@@ -86,12 +86,15 @@
       }).join("") +
       "</div>" +
 
-      '<section class="section"><div class="section-head"><h2 class="section-title"><span class="bar"></span>Топ по жанрам</h2></div>' +
-      '<div class="grid-cards">' +
-      ML.all().filter(function (m) { return m.genres.indexOf("Фэнтези") !== -1; })
-        .sort(function (a, b) { return b.rating - a.rating; }).slice(0, 6)
-        .map(function (m) { return ML.cardHtml(m); }).join("") +
-      "</div></section>" +
+      '<section class="section"><div class="section-head"><h2 class="section-title"><span class="bar"></span>Лучшее в жанре «' + ML.escape(genres[0].name) + '»</h2></div>' +
+      (genres[0].count
+        ? '<div class="grid-cards">' +
+          ML.all().filter(function (m) { return m.genres.indexOf(genres[0].name) !== -1; })
+            .sort(function (a, b) { return b.rating - a.rating; }).slice(0, 6)
+            .map(function (m) { return ML.cardHtml(m); }).join("") +
+          "</div>"
+        : '<div class="empty-state"><p>В этом жанре пока пусто.</p></div>') +
+      "</section>" +
       "</div>";
   });
 
@@ -140,7 +143,7 @@
       ? '<div class="grid-cards">' + history.slice(0, 12).map(function (rec) {
           return '<a class="card" href="#/manga/' + rec.m.slug + "/read/" + rec.chapter + '">' +
             '<div class="card-cover">' +
-            '<img data-lazy="cover" data-slug="' + rec.m.slug + '" data-title="' + ML.escape(rec.m.title) + '" data-sub="' + rec.m.typeName + '" data-w="300" data-h="420">' +
+            ML.coverImg(rec.m) +
             '<span class="c-chapter">гл. ' + rec.chapter + "</span></div>" +
             '<div class="card-title">' + ML.escape(rec.m.title) + "</div>" +
             '<div class="card-meta">Продолжить чтение</div></a>';
@@ -229,7 +232,9 @@
       '<div class="page-head"><h1 class="page-title">О проекте</h1></div>' +
       '<div class="prose">' +
       "<p>MangaHub — многостраничный каталог манги, манхвы, маньхуа и комиксов, собранный как статический сайт " +
-      "без сборки и зависимостей: чистый HTML, CSS и JavaScript, данные лежат в одном JSON-файле.</p>" +
+      "без сборки и зависимостей: чистый HTML, CSS и JavaScript, данные лежат в одном файле data.js.</p>" +
+      "<p>Первая серия — «Поезд в 7:42» Аяцуки Канамэ: цветная обложка и чёрно-белая первая глава из девяти страниц, " +
+      "пузыри с текстом на русском, вывески и ономатопея на японском.</p>" +
 
       "<h2>Что уже работает</h2><ul>" +
       "<li>Главная со слайдером, лентами «Последние обновления», «Сейчас читают», «Новинки»</li>" +
@@ -241,17 +246,17 @@
       "</ul>" +
 
       "<h2>Что сейчас в базе</h2><ul>" +
-      "<li>" + db.manga.length + " тайтлов-заглушек и " + chapters + " глав, сгенерированных скриптом</li>" +
-      "<li>Все обложки и страницы глав — сгенерированные SVG-заглушки, реальных сканов нет</li>" +
+      "<li>" + db.manga.length + " " + ML.plural(db.manga.length, ["тайтл", "тайтла", "тайтлов"]) + " и " + chapters + " " + ML.plural(chapters, ["глава", "главы", "глав"]) + " с настоящими страницами</li>" +
+      "<li>Обложка — цветная, страницы главы — чёрно-белые сканы с русскими пузырями</li>" +
       "<li>Аккаунт, комментарии и оценки работают локально, без сервера</li>" +
       "</ul>" +
 
-      "<h2>Как добавить настоящую мангу</h2>" +
-      "<p>Данные генерируются скриптом <code>manga-site/tools/generate_data.py</code> в " +
-      "<code>manga-site/assets/js/data.js</code>. Чтобы подключить реальный контент, достаточно:</p>" +
-      "<ul><li>добавить тайтл в список SEEDS и перезапустить генератор,</li>" +
-      "<li>или подменить <code>window.MANGA_DB</code> на ответ вашего API — структура та же,</li>" +
-      "<li>в обложках вернуть из данных поле <code>cover</code> (URL картинки) вместо генерации.</li></ul>" +
+      "<h2>Как добавить новую мангу</h2>" +
+      "<p>База ведётся вручную в <code>manga-site/assets/js/data.js</code>:</p>" +
+      "<ul><li>положите обложку и страницы главы в <code>assets/img/&lt;slug&gt;/</code>,</li>" +
+      "<li>добавьте объект тайтла в массив <code>manga</code>: поле <code>cover</code> — путь к обложке, " +
+      "массив <code>pages</code> у главы — пути к страницам по порядку,</li>" +
+      "<li>или подмените <code>window.MANGA_DB</code> ответом API — структура та же.</li></ul>" +
 
       "<h2>Как запустить</h2>" +
       "<p>Из папки <code>manga-site</code>:</p>" +

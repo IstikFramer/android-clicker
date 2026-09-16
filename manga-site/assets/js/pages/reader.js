@@ -31,8 +31,9 @@
     ML.reading.mark(m.slug, ch.number);
     ML.reading.markChapter(m.slug, ch.number);
 
-    var pages = [];
-    for (var i = 1; i <= ch.pages; i++) pages.push(i);
+    // реальные сканы главы; если у главы нет pages — показываем заглушку-анонс
+    var pageUrls = Array.isArray(ch.pages) ? ch.pages : [];
+    var pages = pageUrls.map(function (_, i) { return i + 1; });
     var current = 0;
 
     root.setAttribute("data-title", m.title + " — глава " + ch.number);
@@ -42,7 +43,7 @@
       '<div class="reader-topbar"><div class="container"><div class="rt-inner">' +
       '<a class="icon-btn" href="#/manga/' + m.slug + '" title="К тайтлу">' + ML.icon("chevronLeft", 19) + "</a>" +
       '<div class="rt-title"><a href="#/manga/' + m.slug + '">' + ML.escape(m.title) + "</a>" +
-      "<span>Глава " + ch.number + " — " + ML.escape(ch.title) + " · " + ch.pages + " стр.</span></div>" +
+      "<span>Глава " + ch.number + " — " + ML.escape(ch.title) + " · " + pageUrls.length + " стр.</span></div>" +
       '<div class="rt-progress"><i id="rt-progress"></i></div>' +
       '<div class="rt-actions">' +
       '<a class="icon-btn" title="Предыдущая глава"' + (prev ? ' href="#/manga/' + m.slug + "/read/" + prev.number + '"' : " disabled") + ">" + ML.icon("chevronLeft", 18) + "</a>" +
@@ -52,17 +53,20 @@
       "</div></div></div></div>" +
 
       '<div class="reader-body">' +
-      '<div class="reader-notice">' + ML.icon("info", 18) +
-      "<span><b>Это демо-читалка.</b> Вместо настоящих сканов генерируются страницы-заглушки с нумерацией. " +
-      "Когда появится реальная манга, сюда подставятся изображения глав.</span></div>" +
+      (pageUrls.length
+        ? '<div class="reader-notice">' + ML.icon("info", 18) +
+          "<span><b>Глава с реальными сканами.</b> Пузыри с текстом — на русском, вывески и ономатопея — на японском. " +
+          "Прогресс чтения сохраняется в браузере.</span></div>"
+        : '<div class="reader-notice">' + ML.icon("info", 18) +
+          "<span><b>Сканы этой главы ещё не загружены.</b> Файлы кладутся в assets/img/&lt;slug&gt;/ и прописываются в data.js.</span></div>") +
 
       '<div class="reader-pages' + (settings.mode === "paged" ? " paged" : "") + '" id="pages" style="max-width:' + settings.width + 'px;gap:' + settings.gap + 'px">' +
-      pages.map(function (n) {
+      pageUrls.map(function (url, idx) {
+        var n = idx + 1;
         return '<div class="reader-page-wrap' + (settings.mode === "paged" && n === 1 ? " current-wrap" : "") + '">' +
           '<img class="' + (n === 1 ? "current" : "") + '" data-page="' + n + '" data-lazy="page" ' +
-          'data-title="' + ML.escape(m.title) + '" data-chapter="' + ch.number + '" data-total="' + ch.pages + '" ' +
-          'alt="Страница ' + n + '">' +
-          '<span class="reader-page-num">' + n + " / " + ch.pages + "</span>" +
+          'data-url="' + url + '" alt="Страница ' + n + '">' +
+          '<span class="reader-page-num">' + n + " / " + pageUrls.length + "</span>" +
           "</div>";
       }).join("") +
       "</div>" +
@@ -84,23 +88,9 @@
       "</div>" +
       "</div></div>";
 
-    /* ---------- ленивые страницы ---------- */
+    /* ---------- ленивые страницы (src подставляется из data-url) ---------- */
     var imgs = ML.qsa("#pages img", root);
-    function paintPage(img) {
-      var n = parseInt(img.getAttribute("data-page"), 10);
-      img.src = ML.Cover.pageUri(m.title, ch.number, n, ch.pages);
-      img.removeAttribute("data-lazy");
-    }
-    if ("IntersectionObserver" in window) {
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting) { paintPage(e.target); io.unobserve(e.target); }
-        });
-      }, { rootMargin: "600px" });
-      imgs.forEach(function (img) { io.observe(img); });
-    } else {
-      imgs.forEach(paintPage);
-    }
+    ML.lazy(root);
 
     /* ---------- прогресс ---------- */
     var bar = ML.qs("#rt-progress", root);
@@ -128,9 +118,8 @@
       current = Math.max(0, Math.min(pages.length - 1, i));
       imgs.forEach(function (img, k) {
         img.classList.toggle("current", k === current);
-        if (k === current) paintPage(img);
       });
-      if (indicator) indicator.textContent = "Страница " + (current + 1) + " из " + pages.length;
+      if (indicator) indicator.textContent = "Страница " + (current + 1) + " из " + pageUrls.length;
       bar.style.width = Math.round((current + 1) / pages.length * 100) + "%";
       if (scroll) window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -205,7 +194,7 @@
             n.style.display = settings.mode === "paged" ? "flex" : "none";
           });
           if (settings.mode === "paged") setPage(0, false);
-          else { imgs.forEach(paintPage); window.scrollTo(0, 0); }
+          else window.scrollTo(0, 0);
         });
       });
 
