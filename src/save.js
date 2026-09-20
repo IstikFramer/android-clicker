@@ -22,6 +22,10 @@ export function defaultState() {
     lastSeen: Date.now(),
     boostUntil: 0,
     gems: 0,
+    lastAdAt: 0,
+    perks: {},
+    hats: { owned: ['none'], active: 'none' },
+    event: null,
     bestScore: 0,
   };
 }
@@ -54,6 +58,9 @@ export async function loadState() {
   const state = Object.assign(defaultState(), chosen ? chosen.s : {});
   state.settings = Object.assign({ sound: true, music: true, lang: null }, state.settings || {});
   state.upgrades = state.upgrades || {};
+  state.perks = state.perks || {};
+  state.hats = Object.assign({ owned: ['none'], active: 'none' }, state.hats || {});
+  if (!state.hats.owned.includes('none')) state.hats.owned.push('none');
   return { state, savedAt: chosen ? (chosen.t || Date.now()) : Date.now() };
 }
 

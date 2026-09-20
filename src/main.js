@@ -3,9 +3,13 @@ import Phaser from 'phaser';
 import { t, setLanguage, getLanguage, LANGS } from './i18n.js';
 import {
   UPGRADES, upgradeCost, EVOLUTIONS, evolutionIndex, pendingStars,
-  PRESTIGE_MIN, starMultiplier, dailyReward, BOOST_DURATION, BOOST_MULT,
+  PRESTIGE_MIN, starMultiplier, dailyReward, BOOST_DURATION, BOOST_MULT, nextPrestigeNeed,
   OFFLINE_RATE, OFFLINE_CAP_SEC, ACHIEVEMENTS, totalUpgrades, makeQuest, IAP_PRODUCTS,
   GEM_BOOST_COST, GEM_BOOST_DURATION, EXCHANGE_GEMS, EXCHANGE_COINS, DAILY_GEMS_DAY7,
+  REWARDED_COOLDOWN, PERKS, perkLevel, autoClickRate, offlineBonus, critChance,
+  HATS, COIN_PACKS, packCoins,
+  EVENT, eventActive, eventDaysLeft, PASS_TIERS, PASS_PREMIUM_COST, passTierReached,
+  EVENT_TASKS, dayKey, makeEventTasks,
 } from './config.js';
 import { SFX, setSound, setMusic, unlockAudio, startMusic } from './audio.js';
 import * as Y from './yandex.js';
@@ -47,12 +51,12 @@ function cps() { return cpsBase() * starMultiplier(STATE.stars) * boostMult(); }
 function pickBg(W, H) {
   const now = new Date();
   const land = W > H;
-  if (now.getMonth() === 11) return land ? 'bgpc_winter' : 'bg_winter'; // festive December
   const h = now.getHours();
+  const tod = (h >= 20 || h < 6) ? 'night' : ((h >= 6 && h < 8) || (h >= 17 && h < 20)) ? 'sunset' : 'day';
+  if (eventActive(now.getTime())) return land ? 'bgpc_autumn' : 'bg_autumn_' + tod; // autumn event art
+  if (now.getMonth() === 11) return land ? 'bgpc_winter' : 'bg_winter'; // festive December
   const p = land ? 'bgpc_' : 'bg_';
-  if (h >= 20 || h < 6) return p + 'night';
-  if ((h >= 6 && h < 8) || (h >= 17 && h < 20)) return p + 'sunset';
-  return p + 'day';
+  return p + tod;
 }
 
 // ================================================================
@@ -77,11 +81,16 @@ class BootScene extends Phaser.Scene {
     this.load.image('icon_gift', 'assets/ui/icon_gift.png?v=3');
     for (const k of ['coin_gold', 'strip_gold', 'mound', 'cloud', 'burst', 'heart_big', 'crown']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const k of ['icon_boost', 'icon_gem', 'chest_closed', 'chest_open', 'firework', 'star_big', 'icon_medal', 'trophy', 'icon_tv']) this.load.image(k, `assets/ui/${k}.png?v=1`);
+    for (const k of ['layer_hills', 'layer_trees', 'pumpkin', 'hat_pumpkin', 'hat_leaf', 'hat_beanie']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bg_' + b, `assets/backgrounds/bg_${b}.jpg?v=3`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bgpc_' + b, `assets/backgrounds/bgpc_${b}.jpg?v=1`);
+    this.load.image('bgpc_autumn', 'assets/backgrounds/bgpc_autumn.jpg?v=1');
+    for (const b of ['day', 'sunset', 'night']) this.load.image('bg_autumn_' + b, `assets/backgrounds/bg_autumn_${b}.jpg?v=1`);
     this.load.image('part_coin', 'assets/particles/part_coin.png?v=3');
     this.load.image('part_spark', 'assets/particles/part_spark.png?v=3');
     this.load.image('part_heart', 'assets/particles/part_heart.png?v=3');
+    this.load.image('part_leaf', 'assets/particles/part_leaf.png?v=1');
+    this.load.image('part_snow', 'assets/particles/part_snow.png?v=1');
     this.load.image('icon_star', 'assets/particles/part_spark.png?v=3');
     this.load.once('complete', () => {
       this.time.delayedCall(300, () => this.scene.start('game'));
@@ -113,14 +122,17 @@ class GameScene extends Phaser.Scene {
     // ---- persistent world objects ----
     const W = this.scale.width, H = this.scale.height;
     this.bg = this.add.image(W / 2, H / 2, pickBg(W, H));
+    this.layerHills = this.add.image(W / 2, H * 0.30, 'layer_hills').setDepth(1);
+    this.layerTrees = this.add.image(W / 2, H * 0.34, 'layer_trees').setDepth(2);
     this.clouds = [];
     for (let i = 0; i < 3; i++) this.clouds.push(this.add.image(-200, 100, 'cloud').setAlpha(0.92));
-    this.mound = this.add.image(W / 2, H * 0.4, 'mound');
-    this.capy = this.add.image(W / 2, H * 0.38, 'capy_evo1');
+    this.mound = this.add.image(W / 2, H * 0.4, 'mound').setDepth(4);
+    this.capy = this.add.image(W / 2, H * 0.38, 'capy_evo1').setDepth(5);
+    this.hat = this.add.image(W / 2, H * 0.38, 'hat_pumpkin').setDepth(6).setVisible(false);
     this.capy.setInteractive({ useHandCursor: true });
     this.capy.on('pointerdown', p => this.onCapyClick(p));
     this.combo = 0; this.lastClickT = 0; this.comboTimer = null;
-    this.comboTxt = this.add.text(W / 2, H * 0.2, '', { fontFamily: FONT, fontSize: '12px', padding: { x: 2, y: 4 }, color: '#7dff8a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setVisible(false);
+    this.comboTxt = this.add.text(W / 2, H * 0.2, '', { fontFamily: FONT, fontSize: '12px', padding: { x: 2, y: 4 }, color: '#7dff8a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setVisible(false).setDepth(10);
 
     this.emitterCoin = this.add.particles(0, 0, 'part_coin', {
       speed: { min: 80, max: 220 }, angle: { min: 200, max: 340 },
@@ -137,6 +149,13 @@ class GameScene extends Phaser.Scene {
     this.emitterStar = this.add.particles(0, 0, 'star_big', { speed: { min: 80, max: 200 }, lifespan: 700, scale: { start: 0.9, end: 0.1 }, emitting: false });
     for (const e of [this.emitterCoin, this.emitterSpark, this.emitterBurst, this.emitterHeart, this.emitterFire, this.emitterStar]) e.setDepth(150);
 
+    // event state
+    if (!STATE.event || STATE.event.id !== EVENT.id) {
+      STATE.event = { id: EVENT.id, pumpkins: 0, pumpkinsTotal: 0, tierClaimed: 0, premium: false, claimedFree: [], claimedPrem: [], tasks: null, taskDay: '' };
+    }
+    this.rollEventTasks();
+    this.applyHat();
+
     // quests init
     if (!STATE.quests || STATE.quests.length === 0) {
       STATE.quests = [makeQuest(this.questCtx(), 0), makeQuest(this.questCtx(), 1), makeQuest(this.questCtx(), 2)];
@@ -146,11 +165,23 @@ class GameScene extends Phaser.Scene {
     this.startCapyIdle();
     this.scale.on('resize', () => { this.closeModal(); this.layout(); });
 
-    // ---- income tick ----
+    // ---- income tick (+ auto-clicker perk) ----
+    this.autoAcc = 0;
     this.time.addEvent({ delay: 100, loop: true, callback: () => {
       const gain = cps() / 10;
       if (gain > 0) this.earn(gain, false);
+      const rate = autoClickRate(STATE);
+      if (rate > 0 && !this.modal) {
+        this.autoAcc += rate / 10;
+        let guard = 0;
+        while (this.autoAcc >= 1 && guard++ < 20) { this.autoAcc -= 1; this.autoClick(); }
+      }
       this.updateHud();
+    }});
+
+    // ---- passive pumpkin drops during the event ----
+    this.time.addEvent({ delay: 8000, loop: true, callback: () => {
+      if (eventActive() && Math.random() < 0.4) this.addPumpkins(1 + Math.floor(Math.random() * 3));
     }});
 
     // ---- autosave ----
@@ -193,10 +224,10 @@ class GameScene extends Phaser.Scene {
   }
 
   // ---------------- layout / UI ----------------
-  U(obj) { this.ui.push(obj); return obj; }
+  U(obj) { if (obj && obj.setDepth) obj.setDepth(10); this.ui.push(obj); return obj; }
 
   clearUI() {
-    for (const o of this.ui) { if (o && o.destroy) o.destroy(); }
+    for (const o of this.ui) { if (o && o.destroy) { this.tweens.killTweensOf(o); o.destroy(); } }
     this.ui = [];
   }
 
@@ -213,6 +244,19 @@ class GameScene extends Phaser.Scene {
     this.capyBaseScaleY = this.capy.scaleY;
     this.mound.setPosition(cx, H * 0.36 + capySize * 0.40).setDisplaySize(capySize * 1.15, capySize * 0.5);
     this.comboTxt.setPosition(cx, H * 0.36 - capySize * 0.75);
+    // parallax bands: anchored to the horizon behind the capybara (distant hills, nearer treeline)
+    const lw = Math.max(W, CW) * 1.25;
+    const feetY = H * 0.36 + capySize * 0.42;
+    const hillH = capySize * 0.45, treeH = capySize * 0.62;
+    this.layerHills.setDisplaySize(lw, hillH).setPosition(cx, feetY - capySize * 0.13 - hillH / 2);
+    this.layerTrees.setDisplaySize(lw, treeH).setPosition(cx, feetY - capySize * 0.10 - treeH / 2);
+    this.layerHills.setVisible(H > 520); this.layerTrees.setVisible(H > 520);
+    this.pxBase = { hills: cx, trees: cx };
+    this.hatSize = capySize * 0.42;
+    this.hatDy = -capySize * 0.27;
+    this.hat.setDisplaySize(this.hatSize, this.hatSize).setPosition(cx, H * 0.36 + this.hatDy);
+    this.applyHat();
+    this.setupWeather();
     this.applyEvolutionSprite(false);
 
     // ---- top HUD ----
@@ -228,6 +272,13 @@ class GameScene extends Phaser.Scene {
     this.gemIcon = this.U(this.add.image(0, 46, 'icon_gem').setDisplaySize(22, 22));
     const dz = this.U(this.add.zone(cx + CW / 2 - 50, 32, 100, 52).setInteractive({ useHandCursor: true }));
     dz.on('pointerdown', () => { SFX.ui(); this.openDonate(); });
+    // event currency counter (left side of the HUD)
+    const evOn = eventActive();
+    this.pumpIcon = this.U(this.add.image(cx - CW / 2 + 20, 26, 'pumpkin').setDisplaySize(24, 24).setVisible(evOn));
+    this.txtPump = this.U(this.add.text(cx - CW / 2 + 40, 26, '0', { fontFamily: FONT, fontSize: '11px', padding: { x: 2, y: 4 }, color: '#ffb347', stroke: '#000', strokeThickness: 3 }).setOrigin(0, 0.5).setVisible(evOn));
+    const pz = this.U(this.add.zone(cx - CW / 2 + 44, 26, 90, 44).setInteractive({ useHandCursor: true }));
+    pz.on('pointerdown', () => { SFX.ui(); this.openEvent(); });
+    if (!evOn) { pz.disableInteractive(); }
 
     // ---- bottom bar ----
     const barH = 64;
@@ -261,6 +312,15 @@ class GameScene extends Phaser.Scene {
       this['bar_' + b.key] = { zone, img, lbl, x, y };
     });
 
+    if (evOn) { // floating event button (keeps the bottom bar at 6 tabs)
+      const ex = cx + CW / 2 - 36, ey = H * 0.62;
+      const ring = this.U(this.add.circle(ex, ey, 27, 0x2a1a5a, 0.95).setStrokeStyle(3, 0xffb347));
+      this.U(this.add.image(ex, ey - 5, 'pumpkin').setDisplaySize(28, 28));
+      this.U(this.add.text(ex, ey + 15, t('eventTab'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#ffb347' }).setOrigin(0.5));
+      const ez = this.U(this.add.zone(ex, ey, 58, 58).setInteractive({ useHandCursor: true }));
+      ez.on('pointerdown', () => { SFX.ui(); this.openEvent(); });
+      this.tweens.add({ targets: ring, scaleX: 1.09, scaleY: 1.09, duration: 750, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
     this.dailyBadge = this.U(this.add.circle(0, 0, 6, 0xff4a6a).setVisible(false));
     this.prestigeBadge = this.U(this.add.circle(0, 0, 6, 0xffd24a).setVisible(false));
     this.boostPill = this.U(this.add.rectangle(0, 0, 60, 20, 0x081a33, 0.9).setVisible(false));
@@ -283,6 +343,7 @@ class GameScene extends Phaser.Scene {
     this.txtCps.setText(fmt(cps()) + ' ' + t('perSec'));
     this.txtClick.setText('+' + fmt(clickPower()) + ' ' + t('perClick'));
     this.txtStars.setText(STATE.stars > 0 ? '*' + STATE.stars : '');
+    if (this.txtPump && STATE.event) this.txtPump.setText(fmt(STATE.event.pumpkins));
     if (this.txtGems) {
       this.txtGems.setText(fmt(STATE.gems || 0));
       if (this.gemIcon) this.gemIcon.setPosition(this.txtGems.x - this.txtGems.width - 16, 46);
@@ -291,7 +352,7 @@ class GameScene extends Phaser.Scene {
     if (this.bar_daily) {
       const canDaily = this.canClaimDaily();
       this.dailyBadge.setPosition(this.bar_daily.x + 22, this.bar_daily.y - 26).setVisible(canDaily);
-      const pend = pendingStars(STATE.totalEarnedRun);
+      const pend = pendingStars(STATE.totalEarnedRun, STATE.prestiges);
       this.prestigeBadge.setPosition(this.bar_prestige.x + 22, this.bar_prestige.y - 26).setVisible(pend > 0);
       const left = (STATE.boostUntil - Date.now()) / 1000;
       if (left > 0) {
@@ -313,7 +374,7 @@ class GameScene extends Phaser.Scene {
     if (this.comboTimer) this.comboTimer.remove();
     this.comboTimer = this.time.delayedCall(1100, () => { this.combo = 0; this.comboTxt.setVisible(false); });
     const comboMult = 1 + Math.min(this.combo, 100) * 0.01;
-    const crit = Math.random() < 0.05;
+    const crit = Math.random() < critChance(STATE);
     const gain = clickPower() * comboMult * (crit ? 5 : 1);
     STATE.totalClicks++;
     this.earn(gain, true);
@@ -337,10 +398,12 @@ class GameScene extends Phaser.Scene {
       this.emitterFire.explode(2, p.x || this.capy.x, p.y || this.capy.y);
       this.cameras.main.shake(120, 0.004);
     }
+    this.eventTask('clicks', 1);
+    if (eventActive() && Math.random() < 0.10) this.dropPumpkin(p.x || this.capy.x, p.y || this.capy.y);
     if (this.combo >= 5) this.comboTxt.setVisible(true).setText(t('combo') + ' x' + this.combo);
     if (this.combo > 0 && this.combo % 25 === 0) this.emitterHeart.explode(8, this.capy.x, this.capy.y);
     // floating text
-    const ft = this.add.text(p.x || this.capy.x, (p.y || this.capy.y) - 30, (crit ? t('crit') + ' +' : '+') + fmt(gain), { fontFamily: FONT, fontSize: crit ? '18px' : '12px', color: crit ? '#ff6a3d' : '#ffd24a', stroke: '#000', strokeThickness: crit ? 5 : 3, padding: { x: 2, y: crit ? 6 : 4 } }).setOrigin(0.5);
+    const ft = this.add.text(p.x || this.capy.x, (p.y || this.capy.y) - 30, (crit ? t('crit') + ' +' : '+') + fmt(gain), { fontFamily: FONT, fontSize: crit ? '18px' : '12px', color: crit ? '#ff6a3d' : '#ffd24a', stroke: '#000', strokeThickness: crit ? 5 : 3, padding: { x: 2, y: crit ? 6 : 4 } }).setOrigin(0.5).setDepth(12);
     this.tweens.add({ targets: ft, y: ft.y - 60, alpha: 0, duration: 700, onComplete: () => ft.destroy() });
     this.updateHud();
   }
@@ -403,7 +466,22 @@ class GameScene extends Phaser.Scene {
         c.x += c.getData('sp');
         if (c.x - c.displayWidth / 2 > W) c.x = -c.displayWidth / 2;
       }
+      // parallax breathing (subtle life even without a pointer)
+      const t = this.time.now / 1000;
+      if (this.pxBase) {
+        if (this.layerHills) this.layerHills.x = this.pxBase.hills + Math.sin(t * 0.12) * 6;
+        if (this.layerTrees) this.layerTrees.x = this.pxBase.trees + Math.sin(t * 0.09 + 1) * 14;
+      }
+      if (this.hat && this.capy) this.hat.setPosition(this.capy.x, this.capy.y + this.hatDy);
     }});
+    // pointer parallax (desktop)
+    this.input.on('pointermove', p => {
+      if (!this.pxBase) return;
+      const W = this.scale.width;
+      const k = (p.x / W - 0.5) * 2;
+      if (this.layerHills) this.layerHills.x = this.pxBase.hills - k * 10;
+      if (this.layerTrees) this.layerTrees.x = this.pxBase.trees - k * 26;
+    });
   }
 
   capySetHappy(ms) {
@@ -569,38 +647,7 @@ class GameScene extends Phaser.Scene {
       this.shopRows = rows;
       let contentH = 48 + UPGRADES.length * (rowH + 6);
       // (IAP moved to the Donate modal)
-      // mask for scrolling
-      const maskShape = this.add.graphics();
-      maskShape.fillStyle(0xffffff).fillRect(area.left - 4, area.top, area.width + 8, area.height);
-      content.setMask(maskShape.createGeometryMask());
-      maskShape.setVisible(false); // mask Graphics must not render (only define geometry)
-      m.add(maskShape); // added (invisible) so it is destroyed together with the modal
-      let offsetY = 0;
-      const maxY = 0;
-      const minY = -(contentH - area.height + 30);
-      const applyScroll = () => {
-        offsetY = Phaser.Math.Clamp(offsetY, Math.min(minY, 0), maxY);
-        content.y = offsetY;
-      };
-      // drag scroll
-      let dragStart = null;
-      this.input.on('pointermove', p => {
-        if (dragStart !== null && p.isDown) {
-          offsetY += p.y - dragStart;
-          dragStart = p.y;
-          applyScroll();
-        }
-      });
-      this.input.on('pointerup', () => { dragStart = null; });
-      const downHandler = p => {
-        if (p.x > area.left && p.x < area.right && p.y > area.top && p.y < area.top + area.height) dragStart = p.y;
-      };
-      this.input.on('pointerdown', downHandler);
-      this.modalCleanup = () => {
-        this.input.off('pointermove');
-        this.input.off('pointerup');
-        this.input.off('pointerdown', downHandler);
-      };
+      this.attachDragScroll(content, area, contentH);
     }, 0.78);
   }
 
@@ -612,6 +659,7 @@ class GameScene extends Phaser.Scene {
     STATE.upgrades[u.id] = owned + 1;
     STATE.cpsBase = cpsBase();
     this.questProgress('buy', 1);
+    this.eventTask('buy', 1);
     SFX.buy();
     try {
       const mm = txt ? txt.getWorldTransformMatrix() : null;
@@ -625,43 +673,132 @@ class GameScene extends Phaser.Scene {
   }
 
   openDonate() {
+    const tab = this.donateTab || 'packs';
+    const TABS = [['packs', t('iap')], ['perks', t('perks')], ['coins', t('coinsPacks')], ['skins', t('cosmetics')]];
     this.openModal('iap', async (m, area) => {
-      m.add(this.add.text(m.cx, area.top + 2, t('iapDesc'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));
-      let catalog = [];
-      if (Y.hasPayments()) { try { catalog = await Y.getCatalog(); } catch (e) { catalog = []; } }
-      if (!this.modal) return;
-      const demo = !Y.hasPayments();
-      const priceOf = (p) => {
-        const found = catalog.find(c => c.id === p.id);
-        if (found && found.priceValue) return String(found.priceValue).replace(/ /g, ' ');
-        return p.price + ' ₽';
-      };
-      const rowH = 58;
-      IAP_PRODUCTS.forEach((p, j) => {
-        const y = area.top + 52 + j * (rowH + 8) + rowH / 2;
-        m.add(this.add.rectangle(m.cx, y, area.width, rowH, 0x2a1a5a, 0.9));
-        m.add(this.add.rectangle(area.left + 2, y, 4, rowH - 10, 0x7df9ff, 0.9));
-        m.add(this.add.image(area.left + 28, y, 'icon_gem').setDisplaySize(38, 38));
-        m.add(this.add.text(area.left + 56, y - 8, '+' + fmt(p.gems) + ' ' + t('gems'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#7df9ff' }).setOrigin(0, 0.5));
-        const b = this.makeButton(area.right - 52, y, 84, 34, demo ? 'DEMO' : priceOf(p), () => this.buyIAP(p, area.right - 52, y), 'blue', 8);
+      // tab strip
+      const tw = (area.width - 12) / TABS.length;
+      TABS.forEach((tb, i) => {
+        const x = area.left + 6 + tw * i + tw / 2;
+        const b = this.makeButton(x, area.top + 12, tw - 4, 28, tb[1], () => {
+          this.donateTab = tb[0];
+          SFX.ui();
+          this.closeModal();
+          this.openDonate();
+        }, tab === tb[0] ? 'orange' : 'blue', 7);
         m.add([b.img, b.txt]);
       });
-      // coin exchange for gems
-      const yEx = area.top + 52 + IAP_PRODUCTS.length * (rowH + 8) + 26;
-      m.add(this.add.text(m.cx, yEx - 14, t('exchangeD'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
-      const bEx = this.makeButton(m.cx, yEx + 16, 190, 38, t('exchange'), () => {
-        if ((STATE.gems || 0) < EXCHANGE_GEMS) { SFX.error(); this.toast(t('noGems')); return; }
-        STATE.gems -= EXCHANGE_GEMS;
-        STATE.coins += EXCHANGE_COINS;
-        STATE.totalEarnedRun += EXCHANGE_COINS;
-        STATE.totalEarnedAll += EXCHANGE_COINS;
-        SFX.coin();
-        this.emitterCoin.explode(10, m.cx, yEx + 16);
-        this.questProgress('coins', EXCHANGE_COINS);
+      const rowH = 56;
+      const rowY = (j) => area.top + 52 + j * (rowH + 8) + rowH / 2;
+      const addRow = (y, icon, title, desc, btnLabel, style, cb) => {
+        m.add(this.add.rectangle(m.cx, y, area.width, rowH, 0x2a1a5a, 0.9));
+        m.add(this.add.rectangle(area.left + 2, y, 4, rowH - 10, 0x7df9ff, 0.9));
+        m.add(this.add.image(area.left + 28, y, icon).setDisplaySize(38, 38));
+        m.add(this.add.text(area.left + 56, y - 10, title, { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
+        m.add(this.add.text(area.left + 56, y + 6, desc, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
+        const b = this.makeButton(area.right - 52, y, 84, 34, btnLabel, cb, style, 8);
+        m.add([b.img, b.txt]);
+        return b;
+      };
+      const spend = (cost) => {
+        if ((STATE.gems || 0) < cost) { SFX.error(); this.toast(t('noGems')); return false; }
+        STATE.gems -= cost;
+        return true;
+      };
+      const afterBuy = (x, y) => {
+        SFX.buy();
+        this.emitterStar.explode(8, x, y);
         this.updateHud();
         saveState(STATE, true);
-      }, 'green', 9);
-      m.add([bEx.img, bEx.txt]);
+        this.closeModal();
+        this.openDonate();
+      };
+
+      if (tab === 'packs') {
+        m.add(this.add.text(m.cx, area.top + 34, t('iapDesc'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));
+        let catalog = [];
+        if (Y.hasPayments()) { try { catalog = await Y.getCatalog(); } catch (e) { catalog = []; } }
+        if (!this.modal) return;
+        const demo = !Y.hasPayments();
+        const priceOf = (p) => {
+          const found = catalog.find(c => c.id === p.id);
+          if (found && found.priceValue) return String(found.priceValue).replace(/\xa0/g, ' ');
+          return p.price + ' \u20bd';
+        };
+        IAP_PRODUCTS.forEach((p, j) => {
+          const y = rowY(j);
+          addRow(y, 'icon_gem', '+' + fmt(p.gems) + ' ' + t('gems'), demo ? 'DEMO' : 'YANDEX',
+            demo ? 'DEMO' : priceOf(p), 'blue', () => this.buyIAP(p, area.right - 52, y));
+        });
+      } else if (tab === 'perks') {
+        m.add(this.add.text(m.cx, area.top + 34, t('perks'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }).setOrigin(0.5, 0));
+        PERKS.forEach((pk, j) => {
+          const lv = perkLevel(STATE, pk.id);
+          const max = lv >= pk.levels.length;
+          const cost = max ? 0 : pk.levels[lv].cost;
+          const y = rowY(j);
+          const b = addRow(y, pk.icon, t('perk_' + pk.id), t('perk_' + pk.id + '_d') + '  ' + t('level') + ':' + lv,
+            max ? t('max') : fmt(cost), max ? 'green' : 'blue', () => {
+              if (max) return;
+              if (!spend(cost)) return;
+              STATE.perks[pk.id] = lv + 1;
+              afterBuy(area.right - 52, y);
+            });
+          if (max) { this.setDisabled(b, true); b.img.disableInteractive(); }
+        });
+      } else if (tab === 'coins') {
+        m.add(this.add.text(m.cx, area.top + 34, t('exchangeD'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff', align: 'center' }).setOrigin(0.5, 0));
+        COIN_PACKS.forEach((p, j) => {
+          const y = rowY(j);
+          addRow(y, 'coin_gold', fmt(packCoins(p, cps())) + ' ' + t('coins'), p.gems + ' ' + t('gems'),
+            fmt(p.gems), 'green', () => {
+              if (!spend(p.gems)) return;
+              const c = packCoins(p, cps());
+              STATE.coins += c;
+              STATE.totalEarnedRun += c;
+              STATE.totalEarnedAll += c;
+              this.questProgress('coins', c);
+              this.emitterCoin.explode(10, m.cx, y);
+              afterBuy(area.right - 52, y);
+            });
+        });
+      } else {
+        m.add(this.add.text(m.cx, area.top + 34, t('cosmetics'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }).setOrigin(0.5, 0));
+        HATS.forEach((h, j) => {
+          const y = rowY(j);
+          const owned = STATE.hats.owned.includes(h.id);
+          const active = STATE.hats.active === h.id;
+          if (h.id === 'none') {
+            const b = addRow(y, 'crown', t('hat_none'), t('cosmetics'), active ? t('worn') : t('wear'),
+              active ? 'green' : 'blue', () => {
+                STATE.hats.active = 'none';
+                this.applyHat();
+                SFX.ui();
+                this.closeModal();
+                this.openDonate();
+              });
+            if (active) { this.setDisabled(b, true); b.img.disableInteractive(); }
+            return;
+          }
+          const b = addRow(y, 'hat_' + h.id, t('hat_' + h.id), owned ? (active ? t('worn') : t('wear')) : fmt(h.cost),
+            owned ? (active ? t('worn') : t('wear')) : t('buy'), owned ? (active ? 'green' : 'blue') : 'orange', () => {
+              if (!owned) {
+                if (!spend(h.cost)) return;
+                STATE.hats.owned.push(h.id);
+                STATE.hats.active = h.id;
+                this.applyHat();
+                afterBuy(area.right - 52, y);
+                return;
+              }
+              STATE.hats.active = h.id;
+              this.applyHat();
+              SFX.ui();
+              this.closeModal();
+              this.openDonate();
+            });
+          if (active) { this.setDisabled(b, true); b.img.disableInteractive(); }
+        });
+      }
     }, 0.72);
   }
 
@@ -679,6 +816,232 @@ class GameScene extends Phaser.Scene {
     const product = await Y.purchase(p.id);
     if (product) grant();
     else { SFX.error(); this.toast(t('iapFail')); }
+  }
+
+  // ---------------- WEATHER / HAT ----------------
+  setupWeather() {
+    if (this.weather) { this.weather.destroy(); this.weather = null; }
+    const W = this.scale.width;
+    const month = new Date().getMonth();
+    let tex = 'part_spark';
+    if (eventActive()) tex = 'part_leaf';
+    else if (month === 11 || month === 0 || month === 1) tex = 'part_snow';
+    this.weather = this.add.particles(0, 0, tex, {
+      x: { min: -30, max: W + 30 }, y: -30,
+      lifespan: 11000, speedY: { min: 25, max: 70 }, speedX: { min: -20, max: 20 },
+      rotate: { start: 0, end: 360 }, scale: { start: 0.9, end: 0.9 },
+      alpha: { start: 0.95, end: 0.3 }, frequency: 650, quantity: 1,
+    });
+    this.weather.setDepth(8);
+  }
+
+  applyHat() {
+    if (!this.hat) return;
+    const id = (STATE.hats && STATE.hats.active) || 'none';
+    if (id === 'none') { this.hat.setVisible(false); return; }
+    this.hat.setTexture('hat_' + id).setVisible(true);
+  }
+
+  // ---------------- EVENT ----------------
+  rollEventTasks() {
+    const ev = STATE.event;
+    if (!ev) return;
+    if (!ev.tasks || !ev.tasks.length || ev.taskDay !== dayKey()) {
+      ev.taskDay = dayKey();
+      ev.tasks = makeEventTasks();
+      saveState(STATE, true);
+    }
+  }
+
+  addPumpkins(n) {
+    if (!eventActive() || !STATE.event) return;
+    STATE.event.pumpkins += n;
+    STATE.event.pumpkinsTotal = (STATE.event.pumpkinsTotal || 0) + n;
+    this.eventTask('pumpkins', n);
+    this.updateHud();
+  }
+
+  eventTask(id, n) {
+    const ev = STATE.event;
+    if (!ev || !ev.tasks) return;
+    const tk = ev.tasks.find(x => x.id === id);
+    if (tk && !tk.claimed) tk.progress = Math.min(tk.target, tk.progress + n);
+  }
+
+  dropPumpkin(x, y) {
+    this.addPumpkins(1);
+    if (!this.pumpIcon) return;
+    const ico = this.add.image(x, y, 'pumpkin').setDisplaySize(30, 30).setDepth(12);
+    this.tweens.add({
+      targets: ico, x: this.pumpIcon.x, y: this.pumpIcon.y, scaleX: 0.5, scaleY: 0.5,
+      duration: 620, ease: 'Cubic.easeIn', onComplete: () => ico.destroy(),
+    });
+  }
+
+  eventCoins(sec) { return Math.max(100, Math.ceil(cps() * sec)); }
+
+  rewardLabel(r) {
+    if (r.hat) return t('hat_' + r.hat);
+    if (r.boost) return t('boost') + ' ' + r.boost + 'm';
+    if (r.gems) return '+' + r.gems;
+    return fmt(this.eventCoins(r.sec));
+  }
+
+  claimTier(i, prem) {
+    const ev = STATE.event;
+    const tr = PASS_TIERS[i];
+    if (!ev || ev.pumpkins < tr.need) { SFX.error(); return; }
+    if (prem && !ev.premium) { SFX.error(); this.toast(t('passPremium')); return; }
+    const key = prem ? 'claimedPrem' : 'claimedFree';
+    if (ev[key].includes(i)) return;
+    ev[key].push(i);
+    ev.tierClaimed = ev.claimedFree.length + ev.claimedPrem.length;
+    const r = prem ? tr.prem : tr.free;
+    if (r.sec) {
+      const c = this.eventCoins(r.sec);
+      STATE.coins += c; STATE.totalEarnedRun += c; STATE.totalEarnedAll += c;
+      this.questProgress('coins', c);
+    }
+    if (r.gems) STATE.gems = (STATE.gems || 0) + r.gems;
+    if (r.hat) {
+      if (!STATE.hats.owned.includes(r.hat)) STATE.hats.owned.push(r.hat);
+      STATE.hats.active = r.hat;
+      this.applyHat();
+    }
+    if (r.boost) STATE.boostUntil = Math.max(STATE.boostUntil, Date.now()) + r.boost * 60000;
+    SFX.daily();
+    this.emitterStar.explode(10, this.scale.width / 2, this.scale.height / 2);
+    this.emitterFire.explode(2, this.scale.width / 2, this.scale.height / 2);
+    this.updateHud();
+    saveState(STATE, true);
+    this.closeModal();
+    this.openEvent();
+  }
+
+  claimEventTask(tk) {
+    if (tk.claimed || tk.progress < tk.target) return;
+    tk.claimed = true;
+    const spec = EVENT_TASKS.find(x => x.id === tk.id);
+    if (spec) {
+      this.addPumpkins(spec.rewardP);
+      const c = this.eventCoins(spec.sec);
+      STATE.coins += c; STATE.totalEarnedRun += c; STATE.totalEarnedAll += c;
+      this.questProgress('coins', c);
+    }
+    SFX.daily();
+    this.emitterCoin.explode(10, this.scale.width / 2, this.scale.height / 2);
+    this.updateHud();
+    saveState(STATE, true);
+    this.closeModal();
+    this.openEvent();
+  }
+
+  openEvent() {
+    if (!eventActive()) { this.toast(t('eventOff')); return; }
+    this.rollEventTasks();
+    const ev = STATE.event;
+    this.openModal('eventTitle', (m, area) => {
+      const content = this.add.container(0, 0);
+      m.add(content);
+      let y = area.top;
+      content.add(this.add.image(area.left + 14, y + 12, 'pumpkin').setDisplaySize(26, 26));
+      content.add(this.add.text(area.left + 32, y + 2, fmt(ev.pumpkins) + ' ' + t('pumpkins'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffb347' }));
+      content.add(this.add.text(area.right, y + 2, t('eventEnds') + ': ' + eventDaysLeft() + ' ' + t('days'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(1, 0));
+      y += 30;
+      content.add(this.add.text(area.left + 4, y + 2, t('pass') + ' ' + passTierReached(ev.pumpkins) + '/' + PASS_TIERS.length, { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
+      const pb = this.makeButton(area.right - 62, y + 10, 124, 28, ev.premium ? t('passOwned') : t('passPremium'), (img) => {
+        if (ev.premium || img.getData('claimed')) return;
+        if ((STATE.gems || 0) < PASS_PREMIUM_COST) { SFX.error(); this.toast(t('noGems')); return; }
+        STATE.gems -= PASS_PREMIUM_COST;
+        ev.premium = true;
+        SFX.buy();
+        this.emitterStar.explode(10, area.right - 62, y + 10);
+        saveState(STATE, true);
+        this.closeModal();
+        this.openEvent();
+      }, ev.premium ? 'green' : 'orange', 7);
+      if (ev.premium) { this.setDisabled(pb, true); pb.img.disableInteractive(); }
+      content.add([pb.img, pb.txt]);
+      y += 40;
+      content.add(this.add.text(area.left + 4, y, t('tasks'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#7dff8a' }));
+      y += 20;
+      for (const tk of ev.tasks) {
+        const done = tk.progress >= tk.target;
+        content.add(this.add.rectangle(m.cx, y + 17, area.width, 34, 0x0d2c55, 0.85));
+        content.add(this.add.text(area.left + 10, y + 4, t('task_' + tk.id), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#ffffff' }));
+        content.add(this.add.text(area.left + 10, y + 20, fmt(tk.progress) + '/' + fmt(tk.target), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: done ? '#7dff8a' : '#9fd0ff' }));
+        const frac = Math.min(1, tk.progress / tk.target);
+        content.add(this.add.rectangle(area.left + 92, y + 24, 80, 6, 0x081a33));
+        content.add(this.add.rectangle(area.left + 92 - 40 + 40 * frac, y + 24, 80 * frac, 6, 0x7dff8a).setOrigin(0.5, 0.5));
+        const b = this.makeButton(area.right - 44, y + 17, 76, 26, tk.claimed ? t('claimed') : t('dailyClaim'), () => this.claimEventTask(tk), tk.claimed ? 'green' : (done ? 'orange' : 'red'), 7);
+        this.setDisabled(b, tk.claimed || !done);
+        if (tk.claimed || !done) b.img.disableInteractive();
+        content.add([b.img, b.txt]);
+        y += 40;
+      }
+      y += 10;
+      content.add(this.add.text(area.left + 4, y, t('tier') + ' | ' + t('dailyClaim'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
+      y += 20;
+      PASS_TIERS.forEach((tr, i) => {
+        const reached = ev.pumpkins >= tr.need;
+        const gotF = ev.claimedFree.includes(i);
+        const gotP = ev.claimedPrem.includes(i);
+        content.add(this.add.rectangle(m.cx, y + 19, area.width, 38, i % 2 ? 0x0d2c55 : 0x14386a, 0.85));
+        if (reached) content.add(this.add.rectangle(area.left + 2, y + 19, 4, 30, 0xffb347, 0.9));
+        content.add(this.add.text(area.left + 12, y + 4, (i + 1) + '. ' + fmt(tr.need), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: reached ? '#ffb347' : '#5f8fbf' }));
+        content.add(this.add.text(area.left + 12, y + 22, fmt(ev.pumpkins) + '/' + fmt(tr.need), { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
+        const bxF = area.left + 118, bxP = area.left + 236;
+        const bF = this.makeButton(bxF, y + 19, 108, 28, gotF ? t('claimed') : this.rewardLabel(tr.free), () => this.claimTier(i, false), gotF ? 'green' : (reached ? 'orange' : 'red'), 7);
+        this.setDisabled(bF, gotF || !reached);
+        if (gotF || !reached) bF.img.disableInteractive();
+        const bP = this.makeButton(bxP, y + 19, 108, 28, gotP ? t('claimed') : this.rewardLabel(tr.prem), () => this.claimTier(i, true), gotP ? 'green' : ((reached && ev.premium) ? 'blue' : 'red'), 7);
+        this.setDisabled(bP, gotP || !reached || !ev.premium);
+        if (gotP || !reached || !ev.premium) bP.img.disableInteractive();
+        content.add([bF.img, bF.txt, bP.img, bP.txt]);
+        y += 42;
+      });
+      this.attachDragScroll(content, area, y + 30);
+    }, 0.8);
+  }
+
+  // ---------------- AUTO-CLICK (perk) ----------------
+  autoClick() {
+    const crit = Math.random() < critChance(STATE);
+    const gain = clickPower() * (crit ? 5 : 1);
+    STATE.totalClicks++;
+    this.earn(gain, true);
+    this.questProgress('clicks', 1);
+    this.eventTask('clicks', 1);
+    if (eventActive() && Math.random() < 0.10) this.addPumpkins(1);
+    if (Math.random() < 0.12) this.emitterCoin.explode(1, this.capy.x, this.capy.y - this.capy.displayHeight * 0.3);
+  }
+
+  // ---------------- SHARED DRAG SCROLL ----------------
+  attachDragScroll(content, area, contentH) {
+    const maskShape = this.add.graphics();
+    maskShape.fillStyle(0xffffff).fillRect(area.left - 4, area.top, area.width + 8, area.height);
+    content.setMask(maskShape.createGeometryMask());
+    maskShape.setVisible(false); // geometry only
+    if (this.modal) this.modal.add(maskShape);
+    let offsetY = 0;
+    const applyScroll = () => {
+      offsetY = Phaser.Math.Clamp(offsetY, Math.min(-(contentH - area.height + 30), 0), 0);
+      content.y = offsetY;
+    };
+    let dragStart = null;
+    const move = p => { if (dragStart !== null && p.isDown) { offsetY += p.y - dragStart; dragStart = p.y; applyScroll(); } };
+    const up = () => { dragStart = null; };
+    const down = p => { if (p.x > area.left && p.x < area.right && p.y > area.top && p.y < area.top + area.height) dragStart = p.y; };
+    this.input.on('pointermove', move);
+    this.input.on('pointerup', up);
+    this.input.on('pointerdown', down);
+    const prev = this.modalCleanup;
+    this.modalCleanup = () => {
+      if (prev) prev();
+      this.input.off('pointermove', move);
+      this.input.off('pointerup', up);
+      this.input.off('pointerdown', down);
+    };
   }
 
   // ---------------- QUESTS ----------------
@@ -799,7 +1162,10 @@ class GameScene extends Phaser.Scene {
       m.add(this.add.image(m.cx, y0 + 26, 'icon_boost').setDisplaySize(52, 52));
       m.add(this.add.text(m.cx, y0 + 62, left > 0 ? t('boostActive') + ' ' + fmtTime(left) : t('boostDesc'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: left > 0 ? '#7dff8a' : '#9fd0ff' }).setOrigin(0.5));
       const yAd = y0 + 108;
-      const bAd = this.makeButton(m.cx, yAd, 220, 40, t('boostAd'), () => {
+      const cd = Math.max(0, REWARDED_COOLDOWN - (Date.now() - (STATE.lastAdAt || 0)) / 1000);
+      const bAd = this.makeButton(m.cx, yAd, 220, 40, cd > 0 ? t('adWait') + ' ' + fmtTime(cd) : t('boostAd'), () => {
+        if (cd > 0) { SFX.error(); return; }
+        STATE.lastAdAt = Date.now();
         Y.showRewarded(() => {
           STATE.boostUntil = Math.max(STATE.boostUntil, Date.now()) + BOOST_DURATION * 1000;
           SFX.daily();
@@ -808,7 +1174,8 @@ class GameScene extends Phaser.Scene {
           this.closeModal();
           this.openBoost();
         });
-      }, 'green', 8);
+      }, cd > 0 ? 'red' : 'green', 8);
+      if (cd > 0) { this.setDisabled(bAd, true); bAd.img.disableInteractive(); }
       m.add([bAd.img, bAd.txt, this.add.image(m.cx - 128, yAd, 'icon_tv').setDisplaySize(32, 32)]);
       const yGem = yAd + 54;
       const bGem = this.makeButton(m.cx, yGem, 220, 40, t('boostGem'), () => {
@@ -835,7 +1202,7 @@ class GameScene extends Phaser.Scene {
       m.add(this.add.text(m.cx, area.top + 80, '* ' + STATE.stars + '  (x' + starMultiplier(STATE.stars).toFixed(2) + ')', { fontFamily: FONT, fontSize: '11px', padding: { x: 2, y: 4 }, color: '#ffd24a' }).setOrigin(0.5));
       m.add(this.add.text(m.cx, area.top + 110, t('prestigeStars') + ': ' + pend, { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: pend > 0 ? '#7dff8a' : '#ff8899' }).setOrigin(0.5));
       if (pend <= 0) {
-        m.add(this.add.text(m.cx, area.top + 140, t('prestigeNeed') + ': ' + fmt(PRESTIGE_MIN), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
+        m.add(this.add.text(m.cx, area.top + 140, t('prestigeNeed') + ': ' + fmt(nextPrestigeNeed(STATE.prestiges)), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
         const db = this.makeButton(m.cx, area.top + 190, 200, 44, t('prestigeNow') + ' +0*', null, 'red', 9);
         this.setDisabled(db, true);
         db.img.disableInteractive();
@@ -853,7 +1220,7 @@ class GameScene extends Phaser.Scene {
     STATE.coins = 0;
     STATE.totalEarnedRun = 0;
     STATE.upgrades = {};
-    STATE.boostUntil = 0;
+    // NOTE: boost, gems, perks, hats and event progress survive a prestige
     STATE.cpsBase = 0;
     this.evoIdx = 0;
     this.applyEvolutionSprite(false);
@@ -902,16 +1269,17 @@ class GameScene extends Phaser.Scene {
       y += 40;
       m.add(this.add.text(area.left + 10, y, `${t('bestScore')}: ${fmt(STATE.bestScore)}`, { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
       y += 20;
-      m.add(this.add.text(area.left + 10, y, `v1.3 | Yandex Games`, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#5f8fbf' }));
+      m.add(this.add.text(area.left + 10, y, `v1.4 | Yandex Games`, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#5f8fbf' }));
     }, 0.6);
   }
 
   // ---------------- OFFLINE ----------------
   checkOffline() {
     const now = Date.now();
-    const elapsed = Math.min(OFFLINE_CAP_SEC, (now - (STATE.lastSeen || now)) / 1000);
+    const ob = offlineBonus(STATE);
+    const elapsed = Math.min(ob.cap, (now - (STATE.lastSeen || now)) / 1000);
     if (elapsed > 60 && cpsBase() > 0) {
-      const gain = Math.ceil(cpsBase() * starMultiplier(STATE.stars) * elapsed * OFFLINE_RATE);
+      const gain = Math.ceil(cpsBase() * starMultiplier(STATE.stars) * elapsed * ob.rate);
       this.time.delayedCall(600, () => {
         this.openModal('offlineTitle', (m, area) => {
           m.add(this.add.text(m.cx, area.top + 20, t('offlineDesc'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffffff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));

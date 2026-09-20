@@ -171,13 +171,16 @@ def main():
         assert s["gems"] == 10, f"IAP demo buy failed: gems={s['gems']}"
         print("[iap] demo purchase OK: +10 gems")
         shot(page, "ext_12_donate_bought.png")
-        # exchange 5 gems -> +1000 coins
-        c0 = s["coins"]
-        page.mouse.click(g["cx"], g["top"] + 52 + 3 * 66 + 26 + 16)
+        # coin packs tab (index 2): spend 5 gems -> +1000 coins
+        tw = (g["right"] - g["left"] - 12) / 4
+        page.mouse.click(g["left"] + 6 + tw * 2 + tw / 2, g["top"] + 12)
+        page.wait_for_timeout(400)
+        c0 = st(page)["coins"]
+        page.mouse.click(g["right"] - 52, g["top"] + 80)
         page.wait_for_timeout(400)
         s = st(page)
-        assert s["gems"] == 5 and s["coins"] >= c0 + 1000, f"exchange failed: {s['gems']},{s['coins']}"  # >= : earn1 achievement (+150) may pop
-        print("[iap] exchange OK: 5 gems -> +1000 coins")
+        assert s["gems"] == 5 and s["coins"] >= c0 + 1000, f"coin pack failed: {s['gems']},{s['coins']}"
+        print("[iap] coin pack OK: 5 gems -> +1000 coins")
         close_modal(page)
         # boost modal: ad button grants x2
         open_modal(page, "openBoost")
