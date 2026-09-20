@@ -9,10 +9,16 @@ import sys
 from collections import deque
 from PIL import Image
 
+KEY = ["green"]
+
 def is_bg(r, g, b):
+    if KEY[0] == "magenta":
+        return r > 110 and b > 110 and (min(r, b) - g) > 60
     return g > 110 and (g - max(r, b)) > 60
 
 def is_edge(r, g, b):
+    if KEY[0] == "magenta":
+        return r > 90 and b > 90 and (min(r, b) - g) > 18
     return g > 90 and (g - max(r, b)) > 18
 
 def remove_green(im: Image.Image) -> Image.Image:
@@ -74,9 +80,23 @@ def fit_square(im: Image.Image, size: str) -> Image.Image:
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     no_crop = "--no-crop" in sys.argv[1:]
+    global KEY
+    for a in sys.argv[1:]:
+        if a.startswith("--key="):
+            KEY = [a.split("=", 1)[1]]
+        if a == "--all":
+            KEY.append("all")
     src, dst, size = args[0], args[1], args[2]
     im = Image.open(src)
     im = remove_green(im)
+    if "all" in KEY:  # silhouettes: also kill any leftover key-colour pixels (no interior art of that hue)
+        px = im.load()
+        w, h = im.size
+        for y in range(h):
+            for x in range(w):
+                r, g, b, a = px[x, y]
+                if a and is_bg(r, g, b):
+                    px[x, y] = (0, 0, 0, 0)
     if not no_crop:
         bbox = im.getbbox()
         if bbox:

@@ -91,15 +91,15 @@ def main():
         # grant pumpkins, claim free tier 1 (need 20) + buy premium
         page.evaluate("window.__capy.state().gems = 300; window.__capy.state().event.pumpkins = 150")
         open_modal(page, "openEvent")
-        g = modal_geom(0.8)
-        page.mouse.click(g["right"] - 62, g["top"] + 40)  # buy premium (100 gems)
+        g = modal_geom(0.85)
+        page.mouse.click(g["right"] - 62, g["top"] + 62)  # buy premium (100 gems), below the banner
         page.wait_for_timeout(450)
         s = st(page)
         assert s["event"]["premium"] and s["gems"] == 200, f"premium pass failed: {s['gems']}"
         print("[event] premium pass OK: gems 300 -> 200")
         shot(page, "ft_02_event_premium.png")
         # free tier 0 button: x = left + 118, y = top + (30+40+20+3*40+10+20) + 19
-        tier0_y = g["top"] + 30 + 40 + 20 + 3 * 40 + 10 + 20 + 19
+        tier0_y = g["top"] + 52 + 40 + 20 + 3 * 40 + 10 + 20 + 19  # banner(52) + pass + tasks + tiers
         c0 = st(page)["coins"]
         page.mouse.click(g["left"] + 118, tier0_y)
         page.wait_for_timeout(450)
@@ -124,7 +124,7 @@ def main():
           t.progress = t.target;
         }""")
         open_modal(page, "openEvent")
-        task_y = g["top"] + 30 + 40 + 20 + 40 + 17  # task row 2 (clicks) center
+        task_y = g["top"] + 52 + 40 + 20 + 40 + 17  # task row 2 (clicks) center
         p0 = st(page)["event"]["pumpkins"]
         page.mouse.click(g["right"] - 44, task_y)
         page.wait_for_timeout(450)

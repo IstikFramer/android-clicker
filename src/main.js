@@ -7,7 +7,7 @@ import {
   OFFLINE_RATE, OFFLINE_CAP_SEC, ACHIEVEMENTS, totalUpgrades, makeQuest, IAP_PRODUCTS,
   GEM_BOOST_COST, GEM_BOOST_DURATION, EXCHANGE_GEMS, EXCHANGE_COINS, DAILY_GEMS_DAY7,
   REWARDED_COOLDOWN, PERKS, perkLevel, autoClickRate, offlineBonus, critChance,
-  HATS, COIN_PACKS, packCoins,
+  HATS, COIN_PACKS, packCoins, HEADS,
   EVENT, eventActive, eventDaysLeft, PASS_TIERS, PASS_PREMIUM_COST, passTierReached,
   EVENT_TASKS, dayKey, makeEventTasks,
 } from './config.js';
@@ -81,7 +81,7 @@ class BootScene extends Phaser.Scene {
     this.load.image('icon_gift', 'assets/ui/icon_gift.png?v=3');
     for (const k of ['coin_gold', 'strip_gold', 'mound', 'cloud', 'burst', 'heart_big', 'crown']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const k of ['icon_boost', 'icon_gem', 'chest_closed', 'chest_open', 'firework', 'star_big', 'icon_medal', 'trophy', 'icon_tv']) this.load.image(k, `assets/ui/${k}.png?v=1`);
-    for (const k of ['layer_hills', 'layer_trees', 'pumpkin', 'hat_pumpkin', 'hat_leaf', 'hat_beanie']) this.load.image(k, `assets/ui/${k}.png?v=1`);
+    for (const k of ['layer_hills', 'layer_trees', 'pumpkin', 'hat_pumpkin', 'hat_leaf', 'hat_beanie', 'pedestal', 'bar_frame', 'banner']) this.load.image(k, `assets/ui/${k}.png?v=2`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bg_' + b, `assets/backgrounds/bg_${b}.jpg?v=3`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bgpc_' + b, `assets/backgrounds/bgpc_${b}.jpg?v=1`);
     this.load.image('bgpc_autumn', 'assets/backgrounds/bgpc_autumn.jpg?v=1');
@@ -122,8 +122,9 @@ class GameScene extends Phaser.Scene {
     // ---- persistent world objects ----
     const W = this.scale.width, H = this.scale.height;
     this.bg = this.add.image(W / 2, H / 2, pickBg(W, H));
-    this.layerHills = this.add.image(W / 2, H * 0.30, 'layer_hills').setDepth(1);
-    this.layerTrees = this.add.image(W / 2, H * 0.34, 'layer_trees').setDepth(2);
+    this.layerHills = this.add.tileSprite(W / 2, H * 0.30, W + 120, 90, 'layer_hills').setDepth(1);
+    this.layerTrees = this.add.tileSprite(W / 2, H * 0.34, W + 120, 130, 'layer_trees').setDepth(2);
+    this.autoT = 0; this.pxOff = 0; this.pxTarget = 0; // parallax state (single source of truth)
     this.clouds = [];
     for (let i = 0; i < 3; i++) this.clouds.push(this.add.image(-200, 100, 'cloud').setAlpha(0.92));
     this.mound = this.add.image(W / 2, H * 0.4, 'mound').setDepth(4);
@@ -244,18 +245,21 @@ class GameScene extends Phaser.Scene {
     this.capyBaseScaleY = this.capy.scaleY;
     this.mound.setPosition(cx, H * 0.36 + capySize * 0.40).setDisplaySize(capySize * 1.15, capySize * 0.5);
     this.comboTxt.setPosition(cx, H * 0.36 - capySize * 0.75);
-    // parallax bands: anchored to the horizon behind the capybara (distant hills, nearer treeline)
-    const lw = Math.max(W, CW) * 1.25;
+    // parallax bands: seamless tiling tiles, anchored to the horizon (no stretching, no gaps)
+    const bandW = Math.max(W, CW) + 140;
     const feetY = H * 0.36 + capySize * 0.42;
-    const hillH = capySize * 0.45, treeH = capySize * 0.62;
-    this.layerHills.setDisplaySize(lw, hillH).setPosition(cx, feetY - capySize * 0.13 - hillH / 2);
-    this.layerTrees.setDisplaySize(lw, treeH).setPosition(cx, feetY - capySize * 0.10 - treeH / 2);
+    const hillH = capySize * 0.30, treeH = capySize * 0.42;
+    const fitTile = (ts, key, h, cyy) => {
+      // NOTE: ts.texture.getSourceImage() is the tile's own fill canvas - use the real asset instead
+      const img = this.textures.get(key).getSourceImage();
+      const s = h / img.height; // keep the art's own aspect; the tile repeats to fill the width
+      ts.setSize(bandW, h).setPosition(cx, cyy);
+      ts.tileScaleX = s; ts.tileScaleY = s;
+    };
+    fitTile(this.layerHills, 'layer_hills', hillH, feetY - capySize * 0.13 - hillH / 2);
+    fitTile(this.layerTrees, 'layer_trees', treeH, feetY - capySize * 0.10 - treeH / 2);
     this.layerHills.setVisible(H > 520); this.layerTrees.setVisible(H > 520);
-    this.pxBase = { hills: cx, trees: cx };
-    this.hatSize = capySize * 0.42;
-    this.hatDy = -capySize * 0.27;
-    this.hat.setDisplaySize(this.hatSize, this.hatSize).setPosition(cx, H * 0.36 + this.hatDy);
-    this.applyHat();
+    this.placeHat();
     this.setupWeather();
     this.applyEvolutionSprite(false);
 
@@ -466,21 +470,16 @@ class GameScene extends Phaser.Scene {
         c.x += c.getData('sp');
         if (c.x - c.displayWidth / 2 > W) c.x = -c.displayWidth / 2;
       }
-      // parallax breathing (subtle life even without a pointer)
-      const t = this.time.now / 1000;
-      if (this.pxBase) {
-        if (this.layerHills) this.layerHills.x = this.pxBase.hills + Math.sin(t * 0.12) * 6;
-        if (this.layerTrees) this.layerTrees.x = this.pxBase.trees + Math.sin(t * 0.09 + 1) * 14;
-      }
-      if (this.hat && this.capy) this.hat.setPosition(this.capy.x, this.capy.y + this.hatDy);
+      // parallax: continuous drift + eased pointer offset (tilePosition only -> no jitter)
+      this.autoT += 0.35;
+      this.pxOff += (this.pxTarget - this.pxOff) * 0.12;
+      if (this.layerHills) this.layerHills.tilePositionX = -(this.autoT * 0.35 + this.pxOff * 14);
+      if (this.layerTrees) this.layerTrees.tilePositionX = -(this.autoT + this.pxOff * 40);
+      if (this.hat && this.capy) this.placeHat();
     }});
-    // pointer parallax (desktop)
+    // pointer parallax: records a target only, the timer applies it smoothly
     this.input.on('pointermove', p => {
-      if (!this.pxBase) return;
-      const W = this.scale.width;
-      const k = (p.x / W - 0.5) * 2;
-      if (this.layerHills) this.layerHills.x = this.pxBase.hills - k * 10;
-      if (this.layerTrees) this.layerTrees.x = this.pxBase.trees - k * 26;
+      this.pxTarget = (p.x / this.scale.width - 0.5) * 2;
     });
   }
 
@@ -835,11 +834,32 @@ class GameScene extends Phaser.Scene {
     this.weather.setDepth(8);
   }
 
-  applyHat() {
-    if (!this.hat) return;
+  applyHat() { return this.placeHat(); }
+
+  // seats the hat on the capybara's head using measured per-evolution head geometry
+  placeHat() {
+    if (!this.hat || !this.capy) return;
     const id = (STATE.hats && STATE.hats.active) || 'none';
     if (id === 'none') { this.hat.setVisible(false); return; }
     this.hat.setTexture('hat_' + id).setVisible(true);
+    const head = HEADS[Math.min(HEADS.length - 1, this.evoIdx || 0)];
+    const scale = this.capy.displayHeight / 128;
+    const headTopY = this.capy.y - this.capy.displayHeight / 2 + head.top * scale;
+    const headCx = this.capy.x + (head.cx - 64) * scale;
+    const size = Math.max(38, head.w * 1.05) * scale;
+    const hat = HATS.find(h => h.id === id) || HATS[1];
+    const bottom = (hat.bb && hat.bb.bottom) || 96;
+    this.hat.setDisplaySize(size, size);
+    const targetY = headTopY + 10 * scale; // brim rests just onto the head
+    this.hat.setPosition(headCx, targetY - (bottom / 96 - 0.5) * size);
+  }
+
+  // one consistent progress bar: frame below, fill inset, grows from the left edge
+  progressBar(x, y, w, h, frac, fill = 0x7dff8a) {
+    const f = Math.min(1, Math.max(0, frac || 0));
+    const frame = this.add.image(x, y, 'bar_frame').setDisplaySize(w + 10, h + 14);
+    const inner = this.add.rectangle(x - w / 2, y, w * f, h - 2, fill).setOrigin(0, 0.5);
+    return [frame, inner];
   }
 
   // ---------------- EVENT ----------------
@@ -944,10 +964,13 @@ class GameScene extends Phaser.Scene {
       const content = this.add.container(0, 0);
       m.add(content);
       let y = area.top;
-      content.add(this.add.image(area.left + 14, y + 12, 'pumpkin').setDisplaySize(26, 26));
-      content.add(this.add.text(area.left + 32, y + 2, fmt(ev.pumpkins) + ' ' + t('pumpkins'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffb347' }));
-      content.add(this.add.text(area.right, y + 2, t('eventEnds') + ': ' + eventDaysLeft() + ' ' + t('days'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(1, 0));
-      y += 30;
+      content.add([
+        this.add.image(m.cx, y + 20, 'banner').setDisplaySize(area.width, 46),
+        this.add.image(area.left + 26, y + 20, 'pumpkin').setDisplaySize(30, 30),
+        this.add.text(m.cx + 10, y + 8, fmt(ev.pumpkins) + ' ' + t('pumpkins'), { fontFamily: FONT, fontSize: '10px', padding: { x: 2, y: 3 }, color: '#5a2b0e' }).setOrigin(0.5, 0),
+        this.add.text(m.cx + 10, y + 26, t('eventEnds') + ': ' + eventDaysLeft() + ' ' + t('days'), { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#5a2b0e' }).setOrigin(0.5, 0),
+      ]);
+      y += 52;
       content.add(this.add.text(area.left + 4, y + 2, t('pass') + ' ' + passTierReached(ev.pumpkins) + '/' + PASS_TIERS.length, { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
       const pb = this.makeButton(area.right - 62, y + 10, 124, 28, ev.premium ? t('passOwned') : t('passPremium'), (img) => {
         if (ev.premium || img.getData('claimed')) return;
@@ -971,8 +994,7 @@ class GameScene extends Phaser.Scene {
         content.add(this.add.text(area.left + 10, y + 4, t('task_' + tk.id), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#ffffff' }));
         content.add(this.add.text(area.left + 10, y + 20, fmt(tk.progress) + '/' + fmt(tk.target), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: done ? '#7dff8a' : '#9fd0ff' }));
         const frac = Math.min(1, tk.progress / tk.target);
-        content.add(this.add.rectangle(area.left + 92, y + 24, 80, 6, 0x081a33));
-        content.add(this.add.rectangle(area.left + 92 - 40 + 40 * frac, y + 24, 80 * frac, 6, 0x7dff8a).setOrigin(0.5, 0.5));
+        content.add(this.progressBar(area.left + 128, y + 24, 76, 8, frac));
         const b = this.makeButton(area.right - 44, y + 17, 76, 26, tk.claimed ? t('claimed') : t('dailyClaim'), () => this.claimEventTask(tk), tk.claimed ? 'green' : (done ? 'orange' : 'red'), 7);
         this.setDisabled(b, tk.claimed || !done);
         if (tk.claimed || !done) b.img.disableInteractive();
@@ -1001,7 +1023,7 @@ class GameScene extends Phaser.Scene {
         y += 42;
       });
       this.attachDragScroll(content, area, y + 30);
-    }, 0.8);
+    }, 0.85);
   }
 
   // ---------------- AUTO-CLICK (perk) ----------------
@@ -1022,6 +1044,7 @@ class GameScene extends Phaser.Scene {
     maskShape.fillStyle(0xffffff).fillRect(area.left - 4, area.top, area.width + 8, area.height);
     content.setMask(maskShape.createGeometryMask());
     maskShape.setVisible(false); // geometry only
+    content.setData('clip', { y0: area.top, y1: area.top + area.height });
     if (this.modal) this.modal.add(maskShape);
     let offsetY = 0;
     const applyScroll = () => {
@@ -1070,10 +1093,9 @@ class GameScene extends Phaser.Scene {
         } else if (q.claimed) {
           m.add(this.add.text(area.right - 55, y + 8, t('claimed'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#7dff8a' }).setOrigin(0.5));
         } else {
-          // progress bar
+          // progress bar (shared frame, left-anchored fill)
           const frac = Math.min(1, q.progress / q.target);
-          m.add(this.add.rectangle(area.right - 55, y + 8, 90, 10, 0x081a33));
-          m.add(this.add.rectangle(area.right - 55 - 45 + 45 * frac, y + 8, 90 * frac, 10, 0x7dff8a).setOrigin(0.5, 0.5));
+          m.add(this.progressBar(area.right - 55, y + 8, 90, 10, frac));
         }
       });
       // achievements summary
@@ -1108,10 +1130,11 @@ class GameScene extends Phaser.Scene {
         m.add(this.add.text(x, y - 8, String(d + 1), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: cur ? '#ffd24a' : '#9fd0ff' }).setOrigin(0.5));
         m.add(this.add.text(x, y + 10, fmt(dailyReward(d + 1, cpsBase())), { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#ffffff' }).setOrigin(0.5));
       }
-      const chestY = area.top + 72;
-      const chest = this.add.image(m.cx, chestY, can ? 'chest_closed' : 'chest_open').setDisplaySize(44, 44);
-      m.add(chest);
-      const yBtn = area.top + 118;
+      const chestY = area.top + 116;
+      const ped = this.add.image(m.cx, chestY + 56, 'pedestal').setDisplaySize(150, 62);
+      const chest = this.add.image(m.cx, chestY, can ? 'chest_closed' : 'chest_open').setDisplaySize(104, 104);
+      m.add([ped, chest]);
+      const yBtn = area.top + 226;
       if (can) {
         const nextStreak = this.nextStreak();
         const dayNum = ((nextStreak - 1) % 7) + 1;
@@ -1143,8 +1166,8 @@ class GameScene extends Phaser.Scene {
       } else {
         m.add(this.add.text(m.cx, yBtn, t('dailyComeBack'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
       }
-      m.add(this.add.text(m.cx, yBtn + 40, `${t('streak')}: ${STATE.dailyStreak}`, { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }).setOrigin(0.5));
-    }, 0.5);
+      m.add(this.add.text(m.cx, yBtn + 42, `${t('streak')}: ${STATE.dailyStreak}`, { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }).setOrigin(0.5));
+    }, 0.62);
   }
 
   nextStreak() {

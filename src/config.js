@@ -142,12 +142,22 @@ export function offlineBonus(s) {
 }
 export function critChance(s) { return 0.05 + perkLevel(s, 'crit') * 0.05; }
 
-// Cosmetics: hats worn by the capybara (permanent)
+// Cosmetics: hats worn by the capybara (permanent).
+// bb.bottom = y of the art's bottom edge inside the 96x96 canvas (used to sit the hat on the head)
 export const HATS = [
-  { id: 'none',    cost: 0 },
-  { id: 'pumpkin', cost: 60 },
-  { id: 'leaf',    cost: 120 },
-  { id: 'beanie',  cost: 200 },
+  { id: 'none',    cost: 0,   bb: { bottom: 96 } },
+  { id: 'pumpkin', cost: 60,  bb: { bottom: 78 } },
+  { id: 'leaf',    cost: 120, bb: { bottom: 62 } },
+  { id: 'beanie',  cost: 200, bb: { bottom: 96 } },
+];
+
+// Measured head geometry per evolution sprite (128x128 units), used to seat hats
+export const HEADS = [
+  { top: 4,  cx: 63,   w: 74 },
+  { top: 6,  cx: 63.5, w: 55 },
+  { top: 2,  cx: 62.5, w: 46 },
+  { top: 13, cx: 63,   w: 46 },
+  { top: 12, cx: 63,   w: 74 },
 ];
 
 // Coin packs: gems -> coins scaled to current CPS

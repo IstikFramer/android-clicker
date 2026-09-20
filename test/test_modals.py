@@ -96,10 +96,10 @@ def main():
 
         open_modal(page, "openDaily")
         shot(page, "ext_02_daily_en.png")
-        # claim daily: button at (cx, top+118), frac 0.5
-        g = modal_geom(0.5)
+        # claim daily: button at (cx, top+226), frac 0.62
+        g = modal_geom(0.62)
         c0 = st(page)["coins"]
-        page.mouse.click(g["cx"], g["top"] + 118)
+        page.mouse.click(g["cx"], g["top"] + 226)
         page.wait_for_timeout(400)
         s = st(page)
         assert s["coins"] > c0 and s["dailyStreak"] == 1, "daily claim failed"
