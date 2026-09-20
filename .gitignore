@@ -32,3 +32,13 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Web / Node
+node_modules/
+tools/chromehelper/node_modules/
+dist/
+*.log
+.DS_Store
+
+# Intermediate generated art (final assets live in public/assets/)
+assets_gen/

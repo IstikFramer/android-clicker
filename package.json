@@ -1,0 +1,17 @@
+{
+  "name": "capybara-clicker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capybara Clicker — HTML5 pixel clicker for Yandex Games",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 4173"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
