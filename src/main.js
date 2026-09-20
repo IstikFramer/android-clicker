@@ -5,6 +5,7 @@ import {
   UPGRADES, upgradeCost, EVOLUTIONS, evolutionIndex, pendingStars,
   PRESTIGE_MIN, starMultiplier, dailyReward, BOOST_DURATION, BOOST_MULT,
   OFFLINE_RATE, OFFLINE_CAP_SEC, ACHIEVEMENTS, totalUpgrades, makeQuest, IAP_PRODUCTS,
+  GEM_BOOST_COST, GEM_BOOST_DURATION, EXCHANGE_GEMS, EXCHANGE_COINS, DAILY_GEMS_DAY7,
 } from './config.js';
 import { SFX, setSound, setMusic, unlockAudio, startMusic } from './audio.js';
 import * as Y from './yandex.js';
@@ -46,7 +47,7 @@ function cps() { return cpsBase() * starMultiplier(STATE.stars) * boostMult(); }
 function pickBg(W, H) {
   const now = new Date();
   const land = W > H;
-  if (now.getMonth() === 11 && !land) return 'bg_winter'; // festive December
+  if (now.getMonth() === 11) return land ? 'bgpc_winter' : 'bg_winter'; // festive December
   const h = now.getHours();
   const p = land ? 'bgpc_' : 'bg_';
   if (h >= 20 || h < 6) return p + 'night';
@@ -60,8 +61,8 @@ class BootScene extends Phaser.Scene {
   create() {
     const W = this.scale.width, H = this.scale.height;
     this.add.rectangle(W / 2, H / 2, W, H, 0x4aa0ff);
-    const title = this.add.text(W / 2, H * 0.4, t('title'), { fontFamily: FONT, fontSize: '18px', color: '#ffffff', stroke: '#1a4a8a', strokeThickness: 4, align: 'center' }).setOrigin(0.5);
-    const load = this.add.text(W / 2, H * 0.5, t('loading'), { fontFamily: FONT, fontSize: '10px', color: '#ffffff' }).setOrigin(0.5);
+    const title = this.add.text(W / 2, H * 0.4, t('title'), { fontFamily: FONT, fontSize: '18px', padding: { x: 2, y: 6 }, color: '#ffffff', stroke: '#1a4a8a', strokeThickness: 4, align: 'center' }).setOrigin(0.5);
+    const load = this.add.text(W / 2, H * 0.5, t('loading'), { fontFamily: FONT, fontSize: '10px', padding: { x: 2, y: 4 }, color: '#ffffff' }).setOrigin(0.5);
     const bar = this.add.rectangle(W / 2, H * 0.56, 200, 10, 0x1a4a8a);
     const fill = this.add.rectangle(W / 2 - 98, H * 0.56, 4, 6, 0xffd24a).setOrigin(0, 0.5);
     this.load.on('progress', p => { fill.width = Math.max(4, 196 * p); });
@@ -75,8 +76,9 @@ class BootScene extends Phaser.Scene {
     this.load.image('btn_red', 'assets/ui/btn_red.png?v=3');
     this.load.image('icon_gift', 'assets/ui/icon_gift.png?v=3');
     for (const k of ['coin_gold', 'strip_gold', 'mound', 'cloud', 'burst', 'heart_big', 'crown']) this.load.image(k, `assets/ui/${k}.png?v=1`);
+    for (const k of ['icon_boost', 'icon_gem', 'chest_closed', 'chest_open', 'firework', 'star_big', 'icon_medal', 'trophy', 'icon_tv']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bg_' + b, `assets/backgrounds/bg_${b}.jpg?v=3`);
-    for (const b of ['day', 'sunset', 'night']) this.load.image('bgpc_' + b, `assets/backgrounds/bgpc_${b}.jpg?v=1`);
+    for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bgpc_' + b, `assets/backgrounds/bgpc_${b}.jpg?v=1`);
     this.load.image('part_coin', 'assets/particles/part_coin.png?v=3');
     this.load.image('part_spark', 'assets/particles/part_spark.png?v=3');
     this.load.image('part_heart', 'assets/particles/part_heart.png?v=3');
@@ -118,7 +120,7 @@ class GameScene extends Phaser.Scene {
     this.capy.setInteractive({ useHandCursor: true });
     this.capy.on('pointerdown', p => this.onCapyClick(p));
     this.combo = 0; this.lastClickT = 0; this.comboTimer = null;
-    this.comboTxt = this.add.text(W / 2, H * 0.2, '', { fontFamily: FONT, fontSize: '12px', color: '#7dff8a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setVisible(false);
+    this.comboTxt = this.add.text(W / 2, H * 0.2, '', { fontFamily: FONT, fontSize: '12px', padding: { x: 2, y: 4 }, color: '#7dff8a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setVisible(false);
 
     this.emitterCoin = this.add.particles(0, 0, 'part_coin', {
       speed: { min: 80, max: 220 }, angle: { min: 200, max: 340 },
@@ -131,6 +133,9 @@ class GameScene extends Phaser.Scene {
     });
     this.emitterBurst = this.add.particles(0, 0, 'burst', { speed: { min: 100, max: 300 }, lifespan: 500, scale: { start: 1.2, end: 0 }, emitting: false });
     this.emitterHeart = this.add.particles(0, 0, 'heart_big', { speed: { min: 60, max: 160 }, angle: { min: 230, max: 310 }, gravityY: -200, lifespan: 900, scale: { start: 0.8, end: 0.2 }, emitting: false });
+    this.emitterFire = this.add.particles(0, 0, 'firework', { speed: { min: 60, max: 240 }, lifespan: 800, scale: { start: 1, end: 0 }, emitting: false });
+    this.emitterStar = this.add.particles(0, 0, 'star_big', { speed: { min: 80, max: 200 }, lifespan: 700, scale: { start: 0.9, end: 0.1 }, emitting: false });
+    for (const e of [this.emitterCoin, this.emitterSpark, this.emitterBurst, this.emitterHeart, this.emitterFire, this.emitterStar]) e.setDepth(150);
 
     // quests init
     if (!STATE.quests || STATE.quests.length === 0) {
@@ -214,11 +219,15 @@ class GameScene extends Phaser.Scene {
     const hudH = 96;
     this.U(this.add.rectangle(cx, hudH / 2, CW, hudH, 0x123a6a, 1));
     this.U(this.add.rectangle(cx, hudH - 2, CW, 4, 0x3a7ac9, 1));
-    this.txtCoins = this.U(this.add.text(cx, 26, '0', { fontFamily: FONT, fontSize: '20px', color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
+    this.txtCoins = this.U(this.add.text(cx, 26, '0', { fontFamily: FONT, fontSize: '20px', padding: { x: 2, y: 7 }, color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
     this.coinIcon = this.U(this.add.image(0, 26, 'coin_gold').setDisplaySize(24, 24));
-    this.txtCps = this.U(this.add.text(cx, 56, '', { fontFamily: FONT, fontSize: '9px', color: '#bfe3ff' }).setOrigin(0.5));
-    this.txtClick = this.U(this.add.text(cx, 74, '', { fontFamily: FONT, fontSize: '9px', color: '#ffe9b0' }).setOrigin(0.5));
-    this.txtStars = this.U(this.add.text(cx + CW / 2 - 10, 12, '', { fontFamily: FONT, fontSize: '10px', color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(1, 0));
+    this.txtCps = this.U(this.add.text(cx, 56, '', { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#bfe3ff' }).setOrigin(0.5));
+    this.txtClick = this.U(this.add.text(cx, 74, '', { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffe9b0' }).setOrigin(0.5));
+    this.txtStars = this.U(this.add.text(cx + CW / 2 - 10, 12, '', { fontFamily: FONT, fontSize: '10px', padding: { x: 2, y: 4 }, color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(1, 0));
+    this.txtGems = this.U(this.add.text(cx + CW / 2 - 10, 46, '', { fontFamily: FONT, fontSize: '10px', padding: { x: 2, y: 4 }, color: '#7df9ff', stroke: '#000', strokeThickness: 3 }).setOrigin(1, 0.5));
+    this.gemIcon = this.U(this.add.image(0, 46, 'icon_gem').setDisplaySize(22, 22));
+    const dz = this.U(this.add.zone(cx + CW / 2 - 50, 32, 100, 52).setInteractive({ useHandCursor: true }));
+    dz.on('pointerdown', () => { SFX.ui(); this.openDonate(); });
 
     // ---- bottom bar ----
     const barH = 64;
@@ -233,9 +242,9 @@ class GameScene extends Phaser.Scene {
     }
     const btns = [
       { key: 'shop', icon: 'icon_orange', cb: () => this.openShop() },
-      { key: 'quests', icon: 'icon_grass', cb: () => this.openQuests() },
+      { key: 'quests', icon: 'icon_medal', cb: () => this.openQuests() },
       { key: 'daily', icon: 'icon_gift', cb: () => this.openDaily() },
-      { key: 'boost', icon: 'part_spark', cb: () => this.tryBoost() },
+      { key: 'boost', icon: 'icon_boost', cb: () => this.openBoost() },
       { key: 'prestige', icon: 'crown', cb: () => this.openPrestige() },
       { key: 'settings', icon: 'icon_duck', cb: () => this.openSettings() },
     ];
@@ -247,14 +256,15 @@ class GameScene extends Phaser.Scene {
       const zone = this.U(this.add.zone(x, y, bw + 8, barH).setInteractive({ useHandCursor: true }));
       this.U(this.add.circle(x, y - 8, bw * 0.34, 0x0d2c55, 1));
       const img = this.U(this.add.image(x, y - 8, b.icon).setDisplaySize(bw * 0.56, bw * 0.56));
-      const lbl = this.U(this.add.text(x, y + 20, t('tabs')[b.key], { fontFamily: FONT, fontSize: '6px', color: '#bfe3ff' }).setOrigin(0.5));
-      zone.on('pointerdown', () => { SFX.ui(); b.cb(); });
+      const lbl = this.U(this.add.text(x, y + 20, t('tabs')[b.key], { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#bfe3ff' }).setOrigin(0.5));
+      zone.on('pointerdown', () => { SFX.ui(); b.cb(); const s0 = img.scaleX; this.tweens.killTweensOf(img); img.setScale(s0); this.tweens.add({ targets: img, scaleX: s0 * 0.85, scaleY: s0 * 0.85, duration: 90, yoyo: true }); });
       this['bar_' + b.key] = { zone, img, lbl, x, y };
     });
 
     this.dailyBadge = this.U(this.add.circle(0, 0, 6, 0xff4a6a).setVisible(false));
     this.prestigeBadge = this.U(this.add.circle(0, 0, 6, 0xffd24a).setVisible(false));
-    this.boostTimer = this.U(this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '8px', color: '#7dff8a', stroke: '#000', strokeThickness: 3 }).setVisible(false));
+    this.boostPill = this.U(this.add.rectangle(0, 0, 60, 20, 0x081a33, 0.9).setVisible(false));
+    this.boostTimer = this.U(this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#7dff8a', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5).setVisible(false));
     // clouds spread
     const cloudY = [0.12, 0.2, 0.27];
     this.clouds.forEach((c, i) => {
@@ -273,6 +283,10 @@ class GameScene extends Phaser.Scene {
     this.txtCps.setText(fmt(cps()) + ' ' + t('perSec'));
     this.txtClick.setText('+' + fmt(clickPower()) + ' ' + t('perClick'));
     this.txtStars.setText(STATE.stars > 0 ? '*' + STATE.stars : '');
+    if (this.txtGems) {
+      this.txtGems.setText(fmt(STATE.gems || 0));
+      if (this.gemIcon) this.gemIcon.setPosition(this.txtGems.x - this.txtGems.width - 16, 46);
+    }
     // badges
     if (this.bar_daily) {
       const canDaily = this.canClaimDaily();
@@ -281,9 +295,11 @@ class GameScene extends Phaser.Scene {
       this.prestigeBadge.setPosition(this.bar_prestige.x + 22, this.bar_prestige.y - 26).setVisible(pend > 0);
       const left = (STATE.boostUntil - Date.now()) / 1000;
       if (left > 0) {
-        this.boostTimer.setVisible(true).setText(fmtTime(left))
-          .setPosition(this.bar_boost.x, this.bar_boost.y - 34);
-      } else this.boostTimer.setVisible(false);
+        this.boostTimer.setVisible(true).setText('x2 ' + fmtTime(left))
+          .setPosition(this.bar_boost.x, this.bar_boost.y - 44);
+        this.boostPill.setVisible(true).setPosition(this.bar_boost.x, this.bar_boost.y - 44)
+          .setDisplaySize(this.boostTimer.width + 16, 20);
+      } else { this.boostTimer.setVisible(false); this.boostPill.setVisible(false); }
     }
   }
 
@@ -318,12 +334,13 @@ class GameScene extends Phaser.Scene {
     this.emitterCoin.explode(crit ? 10 : 3, this.capy.x, this.capy.y - this.capy.displayHeight * 0.3);
     if (crit) {
       this.emitterBurst.explode(6, p.x || this.capy.x, p.y || this.capy.y);
+      this.emitterFire.explode(2, p.x || this.capy.x, p.y || this.capy.y);
       this.cameras.main.shake(120, 0.004);
     }
     if (this.combo >= 5) this.comboTxt.setVisible(true).setText(t('combo') + ' x' + this.combo);
     if (this.combo > 0 && this.combo % 25 === 0) this.emitterHeart.explode(8, this.capy.x, this.capy.y);
     // floating text
-    const ft = this.add.text(p.x || this.capy.x, (p.y || this.capy.y) - 30, (crit ? t('crit') + ' +' : '+') + fmt(gain), { fontFamily: FONT, fontSize: crit ? '18px' : '12px', color: crit ? '#ff6a3d' : '#ffd24a', stroke: '#000', strokeThickness: crit ? 5 : 3 }).setOrigin(0.5);
+    const ft = this.add.text(p.x || this.capy.x, (p.y || this.capy.y) - 30, (crit ? t('crit') + ' +' : '+') + fmt(gain), { fontFamily: FONT, fontSize: crit ? '18px' : '12px', color: crit ? '#ff6a3d' : '#ffd24a', stroke: '#000', strokeThickness: crit ? 5 : 3, padding: { x: 2, y: crit ? 6 : 4 } }).setOrigin(0.5);
     this.tweens.add({ targets: ft, y: ft.y - 60, alpha: 0, duration: 700, onComplete: () => ft.destroy() });
     this.updateHud();
   }
@@ -361,6 +378,7 @@ class GameScene extends Phaser.Scene {
     if (celebrate) {
       SFX.evolve();
       this.emitterSpark.explode(40, this.capy.x, this.capy.y);
+      this.emitterFire.explode(4, this.capy.x, this.capy.y);
       this.toast(t('evolution') + ' ' + t('evoNames')[idx]);
       this.flash();
       Y.showInterstitial();
@@ -461,22 +479,32 @@ class GameScene extends Phaser.Scene {
     const pw = Math.min(W - 24, 460);
     const ph = Math.min(H - 100, H * heightFrac);
     const panel = this.add.rectangle(W / 2, H / 2, pw, ph, 0x1c4f8f, 0.97).setStrokeStyle(4, 0x0d2c55);
-    const title = this.add.text(W / 2, H / 2 - ph / 2 + 26, t(titleKey), { fontFamily: FONT, fontSize: '13px', color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
+    const title = this.add.text(W / 2, H / 2 - ph / 2 + 26, t(titleKey), { fontFamily: FONT, fontSize: '13px', padding: { x: 2, y: 5 }, color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
     // close btn
     const cb = this.add.image(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 24, 'part_heart').setDisplaySize(20, 20).setInteractive({ useHandCursor: true }).setTint(0xff2244);
     cb.on('pointerdown', () => { SFX.ui(); this.closeModal(); });
-    const closeTxt = this.add.text(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 44, 'X', { fontFamily: FONT, fontSize: '8px', color: '#ff8899' }).setOrigin(0.5);
+    const closeTxt = this.add.text(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 44, 'X', { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ff8899' }).setOrigin(0.5);
     const inner = this.add.rectangle(W / 2, H / 2, pw - 10, ph - 10, 0x000000, 0).setStrokeStyle(2, 0x3a7ac9, 0.9);
     const under = this.add.image(W / 2, H / 2 - ph / 2 + 42, 'strip_gold').setDisplaySize(140, 12);
     m.add([dim, panel, inner, title, under, cb, closeTxt]);
     this.modal = { container: m, W, H, pw, ph, cx: W / 2, cy: H / 2, add: (o) => { m.add(o); return o; } };
     builder(this.modal, { top: H / 2 - ph / 2 + 60, left: W / 2 - pw / 2 + 14, right: W / 2 + pw / 2 - 14, width: pw - 28, height: ph - 80 });
+    // pop-in: panel scale + contents fade
+    panel.setScale(0.92); inner.setScale(0.92);
+    this.tweens.add({ targets: [panel, inner], scaleX: 1, scaleY: 1, duration: 170, ease: 'Back.easeOut' });
+    for (const o of m.list.slice()) {
+      if (o === panel || o === inner || o === dim) continue;
+      const a = o.alpha;
+      o.setAlpha(0);
+      this.tweens.add({ targets: o, alpha: a, duration: 140 });
+    }
     return this.modal;
   }
 
   closeModal() {
     if (this.modal) {
       if (this.modalCleanup) { this.modalCleanup(); this.modalCleanup = null; }
+      for (const ch of this.modal.container.list) this.tweens.killTweensOf(ch);
       this.modal.container.destroy();
       this.modal = null;
       this.shopRows = null;
@@ -488,8 +516,17 @@ class GameScene extends Phaser.Scene {
     const TEX = { orange: 'btn_orange', blue: 'btn_blue', green: 'btn_green', red: 'btn_red' };
     const INK = { orange: '#5a2b0e', blue: '#0e2a5a', green: '#0e4a1a', red: '#5a0e1a' };
     const img = this.add.image(x, y, TEX[style] || TEX.orange).setDisplaySize(w, h).setInteractive({ useHandCursor: true });
-    const txt = this.add.text(x, y, label, { fontFamily: FONT, fontSize: fontSize + 'px', color: INK[style] || INK.orange, stroke: '#ffffff', strokeThickness: 0 }).setOrigin(0.5);
-    img.on('pointerdown', () => cb && cb(img, txt));
+    const txt = this.add.text(x, y, label, { fontFamily: FONT, fontSize: fontSize + 'px', color: INK[style] || INK.orange, stroke: '#ffffff', strokeThickness: 0, padding: { x: 2, y: Math.max(3, Math.round(fontSize * 0.35)) } }).setOrigin(0.5);
+    img.on('pointerdown', () => {
+      if (!img.getData('disabled')) {
+        const sx = img.scaleX, sy = img.scaleY;
+        this.tweens.killTweensOf([img, txt]);
+        img.setScale(sx, sy); txt.setScale(1);
+        this.tweens.add({ targets: img, scaleX: sx * 0.92, scaleY: sy * 0.92, duration: 80, yoyo: true, onComplete: () => img.setScale(sx, sy) });
+        this.tweens.add({ targets: txt, scaleX: 0.92, scaleY: 0.92, duration: 80, yoyo: true, onComplete: () => txt.setScale(1) });
+      }
+      cb && cb(img, txt);
+    });
     img.on('pointerover', () => { if (!img.getData('disabled')) img.setTint(0xffe0c0); });
     img.on('pointerout', () => { img.clearTint(); if (img.getData('disabled')) img.setTint(0x888888); });
     return { img, txt };
@@ -503,20 +540,23 @@ class GameScene extends Phaser.Scene {
 
   // ---------------- SHOP ----------------
   openShop() {
-    this.openModal('shop', async (m, area) => {
+    this.openModal('shop', (m, area) => {
       const rows = [];
       const rowH = 56;
       const content = this.add.container(0, 0);
       m.add(content);
+      // donate entry (always visible at top)
+      const dg = this.makeButton(m.cx - 40, area.top + 22, 190, 36, t('iap'), () => this.openDonate(), 'blue', 9);
+      content.add([dg.img, dg.txt, this.add.image(m.cx + 78, area.top + 22, 'icon_gem').setDisplaySize(28, 28)]);
       UPGRADES.forEach((u, i) => {
-        const y = area.top + 14 + i * (rowH + 6);
+        const y = area.top + 14 + 48 + i * (rowH + 6);
         const row = this.add.container(0, y);
         const bgRow = this.add.rectangle(m.cx, 0, area.width, rowH, i % 2 ? 0x0d2c55 : 0x14386a, 0.85);
         const accent = this.add.rectangle(area.left + 2, 0, 4, rowH - 10, 0xffd24a, 0.9);
         const icon = this.add.image(area.left + 26, 0, u.icon).setDisplaySize(40, 40);
         const owned = STATE.upgrades[u.id] || 0;
-        const name = this.add.text(area.left + 54, -14, t('up_' + u.id), { fontFamily: FONT, fontSize: '8px', color: '#ffffff' });
-        const desc = this.add.text(area.left + 54, 2, `${t('up_' + u.id + '_d')}  ${t('level')}:${owned}`, { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff' });
+        const name = this.add.text(area.left + 54, -14, t('up_' + u.id), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffffff' });
+        const desc = this.add.text(area.left + 54, 2, `${t('up_' + u.id + '_d')}  ${t('level')}:${owned}`, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' });
         const cost = upgradeCost(u, owned);
         const btn = this.makeButton(area.right - 52, 0, 84, 34, fmt(cost), null, 'orange', 8);
         btn.img.removeAllListeners('pointerdown');
@@ -527,39 +567,8 @@ class GameScene extends Phaser.Scene {
         content.add(row);
       });
       this.shopRows = rows;
-      let contentH = UPGRADES.length * (rowH + 6);
-      // ---- IAP (gems) section: real Yandex Payments, or ?demo_pay=1 mock preview ----
-      {
-        const demoPay = new URLSearchParams(location.search).has('demo_pay') && !Y.hasPayments();
-        if (Y.hasPayments() || demoPay) {
-          let catalog = [];
-          if (Y.hasPayments()) { try { catalog = await Y.getCatalog(); } catch (e) { catalog = []; } }
-          if (!this.modal) return; // closed while catalog was loading
-          const priceOf = (p) => {
-            const found = catalog.find(c => c.id === p.id);
-            if (found && found.priceValue) return String(found.priceValue).replace(/\u00A0/g, ' ');
-            return p.price + ' \u20BD';
-          };
-          const y0 = area.top + 14 + contentH + 6;
-          content.add(this.add.text(m.cx, y0, t('iap'), { fontFamily: FONT, fontSize: '10px', color: '#7df9ff', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5, 0));
-          content.add(this.add.text(m.cx, y0 + 22, t('iapDesc'), { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff', align: 'center', wordWrap: { width: area.width - 20 } }).setOrigin(0.5, 0));
-          IAP_PRODUCTS.forEach((p, j) => {
-            const y = y0 + 52 + j * (rowH + 6) + rowH / 2;
-            const row = this.add.container(0, y);
-            const bgRow = this.add.rectangle(m.cx, 0, area.width, rowH, 0x2a1a5a, 0.85);
-            const accent = this.add.rectangle(area.left + 2, 0, 4, rowH - 10, 0x7df9ff, 0.9);
-            const icon = this.add.image(area.left + 26, 0, 'coin_gold').setDisplaySize(36, 36);
-            const name = this.add.text(area.left + 54, -10, '+' + fmt(p.coins) + ' ' + t('coins'), { fontFamily: FONT, fontSize: '8px', color: '#ffd24a' });
-            const desc = this.add.text(area.left + 54, 6, demoPay ? 'DEMO' : 'YANDEX', { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff' });
-            const btn = this.makeButton(area.right - 52, 0, 84, 34, priceOf(p), null, 'blue', 7);
-            btn.img.removeAllListeners('pointerdown');
-            btn.img.on('pointerdown', () => this.buyIAP(p));
-            row.add([bgRow, accent, icon, name, desc, btn.img, btn.txt]);
-            content.add(row);
-          });
-          contentH += 6 + 52 + IAP_PRODUCTS.length * (rowH + 6);
-        }
-      }
+      let contentH = 48 + UPGRADES.length * (rowH + 6);
+      // (IAP moved to the Donate modal)
       // mask for scrolling
       const maskShape = this.add.graphics();
       maskShape.fillStyle(0xffffff).fillRect(area.left - 4, area.top, area.width + 8, area.height);
@@ -604,6 +613,10 @@ class GameScene extends Phaser.Scene {
     STATE.cpsBase = cpsBase();
     this.questProgress('buy', 1);
     SFX.buy();
+    try {
+      const mm = txt ? txt.getWorldTransformMatrix() : null;
+      if (mm) this.emitterStar.explode(6, mm.tx, mm.ty);
+    } catch (e) {}
     if (this.shopRows) for (const r of this.shopRows) this.setDisabled(r.btn, STATE.coins < upgradeCost(r.u, STATE.upgrades[r.u.id] || 0));
     if (txt) txt.setText(fmt(upgradeCost(u, owned + 1)));
     if (desc) desc.setText(`${t('up_' + u.id + '_d')}  ${t('level')}:${owned + 1}`);
@@ -611,20 +624,58 @@ class GameScene extends Phaser.Scene {
     saveState(STATE, true);
   }
 
-  async buyIAP(p) {
-    const demoPay = new URLSearchParams(location.search).has('demo_pay') && !Y.hasPayments();
+  openDonate() {
+    this.openModal('iap', async (m, area) => {
+      m.add(this.add.text(m.cx, area.top + 2, t('iapDesc'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));
+      let catalog = [];
+      if (Y.hasPayments()) { try { catalog = await Y.getCatalog(); } catch (e) { catalog = []; } }
+      if (!this.modal) return;
+      const demo = !Y.hasPayments();
+      const priceOf = (p) => {
+        const found = catalog.find(c => c.id === p.id);
+        if (found && found.priceValue) return String(found.priceValue).replace(/ /g, ' ');
+        return p.price + ' ₽';
+      };
+      const rowH = 58;
+      IAP_PRODUCTS.forEach((p, j) => {
+        const y = area.top + 52 + j * (rowH + 8) + rowH / 2;
+        m.add(this.add.rectangle(m.cx, y, area.width, rowH, 0x2a1a5a, 0.9));
+        m.add(this.add.rectangle(area.left + 2, y, 4, rowH - 10, 0x7df9ff, 0.9));
+        m.add(this.add.image(area.left + 28, y, 'icon_gem').setDisplaySize(38, 38));
+        m.add(this.add.text(area.left + 56, y - 8, '+' + fmt(p.gems) + ' ' + t('gems'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#7df9ff' }).setOrigin(0, 0.5));
+        const b = this.makeButton(area.right - 52, y, 84, 34, demo ? 'DEMO' : priceOf(p), () => this.buyIAP(p, area.right - 52, y), 'blue', 8);
+        m.add([b.img, b.txt]);
+      });
+      // coin exchange for gems
+      const yEx = area.top + 52 + IAP_PRODUCTS.length * (rowH + 8) + 26;
+      m.add(this.add.text(m.cx, yEx - 14, t('exchangeD'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
+      const bEx = this.makeButton(m.cx, yEx + 16, 190, 38, t('exchange'), () => {
+        if ((STATE.gems || 0) < EXCHANGE_GEMS) { SFX.error(); this.toast(t('noGems')); return; }
+        STATE.gems -= EXCHANGE_GEMS;
+        STATE.coins += EXCHANGE_COINS;
+        STATE.totalEarnedRun += EXCHANGE_COINS;
+        STATE.totalEarnedAll += EXCHANGE_COINS;
+        SFX.coin();
+        this.emitterCoin.explode(10, m.cx, yEx + 16);
+        this.questProgress('coins', EXCHANGE_COINS);
+        this.updateHud();
+        saveState(STATE, true);
+      }, 'green', 9);
+      m.add([bEx.img, bEx.txt]);
+    }, 0.72);
+  }
+
+  async buyIAP(p, bx, by) {
+    const demo = !Y.hasPayments(); // preview without SDK: clearly-labeled DEMO grants
     const grant = () => {
-      STATE.coins += p.coins;
-      STATE.totalEarnedRun += p.coins;
-      STATE.totalEarnedAll += p.coins;
-      this.questProgress('coins', p.coins);
+      STATE.gems = (STATE.gems || 0) + p.gems;
       SFX.buy();
-      this.toast('+' + fmt(p.coins));
-      this.checkEvolution();
+      this.toast('+' + fmt(p.gems) + ' ' + t('gems'));
+      if (bx !== undefined) { this.emitterStar.explode(10, bx, by); this.emitterFire.explode(2, bx, by); }
       this.updateHud();
       saveState(STATE, true);
     };
-    if (demoPay) { grant(); return; } // mock purchase for local preview/testing
+    if (demo) { grant(); return; }
     const product = await Y.purchase(p.id);
     if (product) grant();
     else { SFX.error(); this.toast(t('iapFail')); }
@@ -637,11 +688,12 @@ class GameScene extends Phaser.Scene {
         const y = area.top + 30 + i * 92;
         m.add(this.add.rectangle(m.cx, y, area.width, 82, 0x0d2c55, 0.8));
         const typeKey = 'quest_' + q.type;
-        m.add(this.add.text(area.left + 10, y - 26, t(typeKey) + ': ' + fmt(q.target), { fontFamily: FONT, fontSize: '8px', color: '#ffffff' }));
-        m.add(this.add.text(area.left + 10, y - 6, t('questProgress') + ': ' + fmt(Math.floor(q.progress)) + '/' + fmt(q.target), { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff' }));
-        m.add(this.add.text(area.left + 10, y + 12, t('questReward') + ': ' + fmt(q.reward), { fontFamily: FONT, fontSize: '7px', color: '#ffd24a' }));
+        m.add(this.add.text(area.left + 10, y - 26, t(typeKey) + ': ' + fmt(q.target), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffffff' }));
+        m.add(this.add.text(area.left + 10, y - 6, t('questProgress') + ': ' + fmt(Math.floor(q.progress)) + '/' + fmt(q.target), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
+        m.add(this.add.text(area.left + 10, y + 12, t('questReward') + ': ' + fmt(q.reward), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
         if (q.done && !q.claimed) {
           const b = this.makeButton(area.right - 55, y + 8, 90, 30, t('dailyClaim'), () => {
+            this.emitterStar.explode(8, area.right - 55, y + 8);
             STATE.coins += q.reward;
             q.claimed = true;
             SFX.coin();
@@ -653,7 +705,7 @@ class GameScene extends Phaser.Scene {
           }, 'green', 8);
           m.add([b.img, b.txt]);
         } else if (q.claimed) {
-          m.add(this.add.text(area.right - 55, y + 8, t('claimed'), { fontFamily: FONT, fontSize: '7px', color: '#7dff8a' }).setOrigin(0.5));
+          m.add(this.add.text(area.right - 55, y + 8, t('claimed'), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#7dff8a' }).setOrigin(0.5));
         } else {
           // progress bar
           const frac = Math.min(1, q.progress / q.target);
@@ -663,9 +715,9 @@ class GameScene extends Phaser.Scene {
       });
       // achievements summary
       const yA = area.top + 30 + 3 * 92 + 8;
-      m.add(this.add.text(area.left + 10, yA, `${t('achievements')}: ${STATE.achievements.length}/${ACHIEVEMENTS.length}`, { fontFamily: FONT, fontSize: '8px', color: '#ffd24a' }));
-      m.add(this.add.text(area.left + 10, yA + 20, `${t('totalClicks')}: ${fmt(STATE.totalClicks)}`, { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff' }));
-      m.add(this.add.text(area.left + 10, yA + 36, `${t('totalEarned')}: ${fmt(STATE.totalEarnedAll)}`, { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff' }));
+      m.add(this.add.text(area.left + 10, yA, `${t('achievements')}: ${STATE.achievements.length}/${ACHIEVEMENTS.length}`, { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
+      m.add(this.add.text(area.left + 10, yA + 20, `${t('totalClicks')}: ${fmt(STATE.totalClicks)}`, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
+      m.add(this.add.text(area.left + 10, yA + 36, `${t('totalEarned')}: ${fmt(STATE.totalEarnedAll)}`, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
     }, 0.8);
   }
 
@@ -690,28 +742,45 @@ class GameScene extends Phaser.Scene {
         const claimed = d < claimedCount;
         const cur = d === dayInCycle;
         m.add(this.add.rectangle(x, y, cell - 6, cell - 6, claimed ? 0x2f8f4f : 0x0d2c55, 1, cur ? 0xffd24a : 0x000000, cur ? 3 : 0));
-        m.add(this.add.text(x, y - 8, String(d + 1), { fontFamily: FONT, fontSize: '8px', color: cur ? '#ffd24a' : '#9fd0ff' }).setOrigin(0.5));
-        m.add(this.add.text(x, y + 10, fmt(dailyReward(d + 1, cpsBase())), { fontFamily: FONT, fontSize: '6px', color: '#ffffff' }).setOrigin(0.5));
+        m.add(this.add.text(x, y - 8, String(d + 1), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: cur ? '#ffd24a' : '#9fd0ff' }).setOrigin(0.5));
+        m.add(this.add.text(x, y + 10, fmt(dailyReward(d + 1, cpsBase())), { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#ffffff' }).setOrigin(0.5));
       }
-      const yBtn = area.top + 100;
+      const chestY = area.top + 72;
+      const chest = this.add.image(m.cx, chestY, can ? 'chest_closed' : 'chest_open').setDisplaySize(44, 44);
+      m.add(chest);
+      const yBtn = area.top + 118;
       if (can) {
         const nextStreak = this.nextStreak();
-        const reward = dailyReward(((nextStreak - 1) % 7) + 1, cpsBase());
+        const dayNum = ((nextStreak - 1) % 7) + 1;
+        const reward = dailyReward(dayNum, cpsBase());
+        const gemBonus = dayNum === 7 ? DAILY_GEMS_DAY7 : 0;
         const b = this.makeButton(m.cx, yBtn, 180, 44, t('dailyClaim') + ' +' + fmt(reward), () => {
+          if (b.img.getData('claimed')) return;
+          b.img.setData('claimed', true);
+          this.setDisabled(b, true);
+          b.img.disableInteractive();
           STATE.coins += reward;
+          if (gemBonus) STATE.gems = (STATE.gems || 0) + gemBonus;
           STATE.dailyLast = today.getTime();
           STATE.dailyStreak = nextStreak;
           STATE.dailyTotal++;
           SFX.daily();
+          // chest opening ceremony
+          chest.setTexture('chest_open');
+          this.tweens.add({ targets: chest, scaleX: chest.scaleX * 1.15, scaleY: chest.scaleY * 1.15, duration: 200, yoyo: true });
+          this.emitterCoin.explode(12, m.cx, chestY - 20);
+          this.emitterStar.explode(6, m.cx, chestY - 10);
+          this.emitterFire.explode(3, m.cx, chestY);
           this.updateHud();
           saveState(STATE, true);
-          this.closeModal();
+          const mref = this.modal;
+          this.time.delayedCall(950, () => { if (this.modal === mref) this.closeModal(); });
         }, 'green', 9);
         m.add([b.img, b.txt]);
       } else {
-        m.add(this.add.text(m.cx, yBtn, t('dailyComeBack'), { fontFamily: FONT, fontSize: '9px', color: '#9fd0ff' }).setOrigin(0.5));
+        m.add(this.add.text(m.cx, yBtn, t('dailyComeBack'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
       }
-      m.add(this.add.text(m.cx, yBtn + 40, `${t('streak')}: ${STATE.dailyStreak}`, { fontFamily: FONT, fontSize: '8px', color: '#ffd24a' }).setOrigin(0.5));
+      m.add(this.add.text(m.cx, yBtn + 40, `${t('streak')}: ${STATE.dailyStreak}`, { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }).setOrigin(0.5));
     }, 0.5);
   }
 
@@ -722,26 +791,51 @@ class GameScene extends Phaser.Scene {
     return 1;
   }
 
-  // ---------------- BOOST (rewarded) ----------------
-  tryBoost() {
-    if (STATE.boostUntil > Date.now()) { this.toast(t('boostActive')); return; }
-    Y.showRewarded(() => {
-      STATE.boostUntil = Date.now() + BOOST_DURATION * 1000;
-      SFX.daily();
-      this.toast(t('boostActive') + ' 2:00');
-      this.updateHud();
-    });
+  // ---------------- BOOST ----------------
+  openBoost() {
+    const left = Math.max(0, (STATE.boostUntil - Date.now()) / 1000);
+    this.openModal('boostTitle', (m, area) => {
+      const y0 = area.top + 6;
+      m.add(this.add.image(m.cx, y0 + 26, 'icon_boost').setDisplaySize(52, 52));
+      m.add(this.add.text(m.cx, y0 + 62, left > 0 ? t('boostActive') + ' ' + fmtTime(left) : t('boostDesc'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: left > 0 ? '#7dff8a' : '#9fd0ff' }).setOrigin(0.5));
+      const yAd = y0 + 108;
+      const bAd = this.makeButton(m.cx, yAd, 220, 40, t('boostAd'), () => {
+        Y.showRewarded(() => {
+          STATE.boostUntil = Math.max(STATE.boostUntil, Date.now()) + BOOST_DURATION * 1000;
+          SFX.daily();
+          this.updateHud();
+          saveState(STATE, true);
+          this.closeModal();
+          this.openBoost();
+        });
+      }, 'green', 8);
+      m.add([bAd.img, bAd.txt, this.add.image(m.cx - 128, yAd, 'icon_tv').setDisplaySize(32, 32)]);
+      const yGem = yAd + 54;
+      const bGem = this.makeButton(m.cx, yGem, 220, 40, t('boostGem'), () => {
+        if ((STATE.gems || 0) < GEM_BOOST_COST) { SFX.error(); this.toast(t('noGems')); return; }
+        STATE.gems -= GEM_BOOST_COST;
+        STATE.boostUntil = Math.max(STATE.boostUntil, Date.now()) + GEM_BOOST_DURATION * 1000;
+        SFX.daily();
+        this.emitterStar.explode(8, m.cx, yGem);
+        this.updateHud();
+        saveState(STATE, true);
+        this.closeModal();
+        this.openBoost();
+      }, 'blue', 8);
+      m.add([bGem.img, bGem.txt, this.add.image(m.cx - 128, yGem, 'icon_gem').setDisplaySize(30, 30)]);
+    }, 0.55);
   }
 
   // ---------------- PRESTIGE ----------------
   openPrestige() {
     const pend = pendingStars(STATE.totalEarnedRun);
     this.openModal('prestigeTitle', (m, area) => {
-      m.add(this.add.text(m.cx, area.top + 20, t('prestigeDesc'), { fontFamily: FONT, fontSize: '8px', color: '#ffffff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));
-      m.add(this.add.text(m.cx, area.top + 80, '* ' + STATE.stars + '  (x' + starMultiplier(STATE.stars).toFixed(2) + ')', { fontFamily: FONT, fontSize: '11px', color: '#ffd24a' }).setOrigin(0.5));
-      m.add(this.add.text(m.cx, area.top + 110, t('prestigeStars') + ': ' + pend, { fontFamily: FONT, fontSize: '9px', color: pend > 0 ? '#7dff8a' : '#ff8899' }).setOrigin(0.5));
+      m.add(this.add.image(m.cx - 120, area.top - 18, 'trophy').setDisplaySize(40, 40));
+      m.add(this.add.text(m.cx, area.top + 20, t('prestigeDesc'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffffff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));
+      m.add(this.add.text(m.cx, area.top + 80, '* ' + STATE.stars + '  (x' + starMultiplier(STATE.stars).toFixed(2) + ')', { fontFamily: FONT, fontSize: '11px', padding: { x: 2, y: 4 }, color: '#ffd24a' }).setOrigin(0.5));
+      m.add(this.add.text(m.cx, area.top + 110, t('prestigeStars') + ': ' + pend, { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: pend > 0 ? '#7dff8a' : '#ff8899' }).setOrigin(0.5));
       if (pend <= 0) {
-        m.add(this.add.text(m.cx, area.top + 140, t('prestigeNeed') + ': ' + fmt(PRESTIGE_MIN), { fontFamily: FONT, fontSize: '8px', color: '#9fd0ff' }).setOrigin(0.5));
+        m.add(this.add.text(m.cx, area.top + 140, t('prestigeNeed') + ': ' + fmt(PRESTIGE_MIN), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
         const db = this.makeButton(m.cx, area.top + 190, 200, 44, t('prestigeNow') + ' +0*', null, 'red', 9);
         this.setDisabled(db, true);
         db.img.disableInteractive();
@@ -766,6 +860,7 @@ class GameScene extends Phaser.Scene {
     SFX.prestige();
     this.flash();
     this.emitterSpark.explode(60, this.capy.x, this.capy.y);
+    this.emitterFire.explode(5, this.capy.x, this.capy.y);
     this.closeModal();
     this.updateHud();
     saveState(STATE, true);
@@ -778,7 +873,7 @@ class GameScene extends Phaser.Scene {
     this.openModal('settings', (m, area) => {
       let y = area.top + 16;
       const mkToggle = (labelKey, get, set) => {
-        m.add(this.add.text(area.left + 10, y, t(labelKey), { fontFamily: FONT, fontSize: '9px', color: '#ffffff' }));
+        m.add(this.add.text(area.left + 10, y, t(labelKey), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffffff' }));
         const b = this.makeButton(area.right - 50, y + 6, 80, 30, get() ? t('on') : t('off'), (img, txt) => {
           set(!get());
           txt.setText(get() ? t('on') : t('off'));
@@ -789,7 +884,7 @@ class GameScene extends Phaser.Scene {
       };
       mkToggle('sound', () => STATE.settings.sound, v => { STATE.settings.sound = v; setSound(v); saveState(STATE, true); });
       mkToggle('music', () => STATE.settings.music, v => { STATE.settings.music = v; setMusic(v); if (v) startMusic(); saveState(STATE, true); });
-      m.add(this.add.text(area.left + 10, y, t('language'), { fontFamily: FONT, fontSize: '9px', color: '#ffffff' }));
+      m.add(this.add.text(area.left + 10, y, t('language'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffffff' }));
       y += 26;
       LANGS.forEach((lng, i) => {
         const x = area.left + 30 + i * 70;
@@ -805,9 +900,9 @@ class GameScene extends Phaser.Scene {
         m.add([b.img, b.txt]);
       });
       y += 40;
-      m.add(this.add.text(area.left + 10, y, `${t('bestScore')}: ${fmt(STATE.bestScore)}`, { fontFamily: FONT, fontSize: '8px', color: '#9fd0ff' }));
+      m.add(this.add.text(area.left + 10, y, `${t('bestScore')}: ${fmt(STATE.bestScore)}`, { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
       y += 20;
-      m.add(this.add.text(area.left + 10, y, `v1.1 | Yandex Games`, { fontFamily: FONT, fontSize: '7px', color: '#5f8fbf' }));
+      m.add(this.add.text(area.left + 10, y, `v1.3 | Yandex Games`, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#5f8fbf' }));
     }, 0.6);
   }
 
@@ -819,9 +914,9 @@ class GameScene extends Phaser.Scene {
       const gain = Math.ceil(cpsBase() * starMultiplier(STATE.stars) * elapsed * OFFLINE_RATE);
       this.time.delayedCall(600, () => {
         this.openModal('offlineTitle', (m, area) => {
-          m.add(this.add.text(m.cx, area.top + 20, t('offlineDesc'), { fontFamily: FONT, fontSize: '9px', color: '#ffffff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));
-          m.add(this.add.text(m.cx, area.top + 70, '+' + fmt(gain), { fontFamily: FONT, fontSize: '16px', color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
-          m.add(this.add.text(m.cx, area.top + 100, fmtTime(elapsed), { fontFamily: FONT, fontSize: '8px', color: '#9fd0ff' }).setOrigin(0.5));
+          m.add(this.add.text(m.cx, area.top + 20, t('offlineDesc'), { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffffff', align: 'center', wordWrap: { width: area.width } }).setOrigin(0.5, 0));
+          m.add(this.add.text(m.cx, area.top + 70, '+' + fmt(gain), { fontFamily: FONT, fontSize: '16px', padding: { x: 2, y: 6 }, color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
+          m.add(this.add.text(m.cx, area.top + 100, fmtTime(elapsed), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }).setOrigin(0.5));
           const b = this.makeButton(m.cx, area.top + 150, 180, 44, t('offlineClaim'), () => {
             STATE.coins += gain;
             STATE.totalEarnedRun += gain;

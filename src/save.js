@@ -21,6 +21,7 @@ export function defaultState() {
     settings: { sound: true, music: true, lang: null },
     lastSeen: Date.now(),
     boostUntil: 0,
+    gems: 0,
     bestScore: 0,
   };
 }

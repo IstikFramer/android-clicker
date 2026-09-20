@@ -101,11 +101,18 @@ export function makeQuest(state, slot) {
   return { type, target, reward, progress: 0, done: false, claimed: false };
 }
 
-// IAP products (Yandex Payments)
+// IAP products: gem packs (Yandex Payments; DEMO grants in preview without SDK)
 export const IAP_PRODUCTS = [
-  { id: 'coins_small', coins: 10000,    price: '29' },
-  { id: 'coins_big',   coins: 100000,   price: '199' },
-  { id: 'coins_mega',  coins: 1000000,  price: '999' },
+  { id: 'gems_small', gems: 10,  price: '29' },
+  { id: 'gems_mid',   gems: 60,  price: '199' },
+  { id: 'gems_big',   gems: 350, price: '999' },
 ];
+
+// Gem sinks: x2 boost + coin exchange + day-7 drip
+export const GEM_BOOST_COST = 15;
+export const GEM_BOOST_DURATION = 300; // seconds
+export const EXCHANGE_GEMS = 5;
+export const EXCHANGE_COINS = 1000;
+export const DAILY_GEMS_DAY7 = 5;
 
 export const SAVE_KEY = 'capy_clicker_save_v1';

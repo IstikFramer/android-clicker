@@ -96,10 +96,10 @@ def main():
 
         open_modal(page, "openDaily")
         shot(page, "ext_02_daily_en.png")
-        # claim daily: button at (cx, top+100), frac 0.5
+        # claim daily: button at (cx, top+118), frac 0.5
         g = modal_geom(0.5)
         c0 = st(page)["coins"]
-        page.mouse.click(g["cx"], g["top"] + 100)
+        page.mouse.click(g["cx"], g["top"] + 118)
         page.wait_for_timeout(400)
         s = st(page)
         assert s["coins"] > c0 and s["dailyStreak"] == 1, "daily claim failed"
@@ -160,28 +160,43 @@ def main():
         close_modal(page)
         browser.close()
 
-        # ---------- IAP demo section ----------
+        # ---------- Donate (gems) + exchange + boost ----------
         browser, page = new_page(pw, chrome, query="?demo_pay=1")
-        open_modal(page, "openShop")
-        # scroll down to reveal IAP section
-        page.mouse.move(W / 2, H * 0.62)
-        page.mouse.down()
-        page.mouse.move(W / 2, H * 0.25, steps=12)
-        page.mouse.up()
-        page.wait_for_timeout(400)
-        shot(page, "ext_11_iap_demo.png")
-        # buy first IAP product: rows start at y0+52 below upgrades; click lowest blue button approx
-        # compute: upgrades 7 rows*(56+6)=434; y0=top+14+434+6; row0 center=y0+52+28
-        g = modal_geom(0.78)
-        y0 = g["top"] + 14 + 7 * 62 + 6
-        buy_y_visible = y0 + 52 + 28 + (-(H * 0.37))  # scrolled up by drag distance
-        c0 = st(page)["coins"]
-        page.mouse.click(g["right"] - 52, buy_y_visible)
+        open_modal(page, "openDonate")
+        shot(page, "ext_11_donate.png")
+        g = modal_geom(0.72)
+        page.mouse.click(g["right"] - 52, g["top"] + 52 + 29)  # small pack DEMO buy
         page.wait_for_timeout(400)
         s = st(page)
-        assert s["coins"] == c0 + 10000, f"IAP demo buy failed: {c0} -> {s['coins']}"
-        print("[iap] demo purchase OK: +10000 coins")
-        shot(page, "ext_12_iap_bought.png")
+        assert s["gems"] == 10, f"IAP demo buy failed: gems={s['gems']}"
+        print("[iap] demo purchase OK: +10 gems")
+        shot(page, "ext_12_donate_bought.png")
+        # exchange 5 gems -> +1000 coins
+        c0 = s["coins"]
+        page.mouse.click(g["cx"], g["top"] + 52 + 3 * 66 + 26 + 16)
+        page.wait_for_timeout(400)
+        s = st(page)
+        assert s["gems"] == 5 and s["coins"] >= c0 + 1000, f"exchange failed: {s['gems']},{s['coins']}"  # >= : earn1 achievement (+150) may pop
+        print("[iap] exchange OK: 5 gems -> +1000 coins")
+        close_modal(page)
+        # boost modal: ad button grants x2
+        open_modal(page, "openBoost")
+        shot(page, "ext_13_boost.png")
+        g = modal_geom(0.55)
+        page.mouse.click(g["cx"], g["top"] + 6 + 108)
+        page.wait_for_timeout(400)
+        assert st(page)["boostUntil"] > 0, "ad boost failed"
+        print("[boost] ad boost OK")
+        # gem boost: 15 gems -> +5min
+        page.evaluate("window.__capy.state().gems = 50")
+        b0 = st(page)["boostUntil"]
+        page.mouse.click(g["cx"], g["top"] + 6 + 108 + 54)
+        page.wait_for_timeout(400)
+        s = st(page)
+        assert s["gems"] == 35 and s["boostUntil"] > b0, f"gem boost failed: {s['gems']}"
+        print("[boost] gem boost OK: 50 -> 35 gems")
+        shot(page, "ext_14_boost_active.png")
+        close_modal(page)
         browser.close()
 
     print("EXTENDED SUITE PASSED")

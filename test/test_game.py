@@ -83,10 +83,10 @@ def run_viewport(pw, chrome, width, height, tag, mobile=True):
     right = width / 2 + pw_ / 2 - 14
     buy_x = right - 52
     coins_before = page.evaluate("window.__capy.state().coins")
-    page.mouse.click(buy_x, top + 14)          # orange costs 15
-    page.wait_for_timeout(300)
-    page.mouse.click(buy_x, top + 14 + 62)     # grass costs 25
-    page.wait_for_timeout(300)
+    page.mouse.click(buy_x, top + 14 + 48)          # orange costs 15
+    page.wait_for_timeout(600)
+    page.mouse.click(buy_x, top + 14 + 48 + 62)     # grass costs 25
+    page.wait_for_timeout(600)
     st = page.evaluate("window.__capy.state()")
     print(f"[{tag}] after buys: upgrades={st['upgrades']} coins={st['coins']} (before {coins_before})")
     assert st["upgrades"].get("orange") == 1, "orange not bought"
