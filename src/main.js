@@ -43,13 +43,15 @@ function cpsBase() {
 function boostMult() { return STATE.boostUntil > Date.now() ? BOOST_MULT : 1; }
 function cps() { return cpsBase() * starMultiplier(STATE.stars) * boostMult(); }
 
-function pickBg() {
+function pickBg(W, H) {
   const now = new Date();
-  if (now.getMonth() === 11) return 'bg_winter'; // festive December
+  const land = W > H;
+  if (now.getMonth() === 11 && !land) return 'bg_winter'; // festive December
   const h = now.getHours();
-  if (h >= 20 || h < 6) return 'bg_night';
-  if ((h >= 6 && h < 8) || (h >= 17 && h < 20)) return 'bg_sunset';
-  return 'bg_day';
+  const p = land ? 'bgpc_' : 'bg_';
+  if (h >= 20 || h < 6) return p + 'night';
+  if ((h >= 6 && h < 8) || (h >= 17 && h < 20)) return p + 'sunset';
+  return p + 'day';
 }
 
 // ================================================================
@@ -72,7 +74,9 @@ class BootScene extends Phaser.Scene {
     this.load.image('btn_green', 'assets/ui/btn_green.png?v=3');
     this.load.image('btn_red', 'assets/ui/btn_red.png?v=3');
     this.load.image('icon_gift', 'assets/ui/icon_gift.png?v=3');
+    for (const k of ['coin_gold', 'strip_gold', 'mound', 'cloud', 'burst', 'heart_big', 'crown']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bg_' + b, `assets/backgrounds/bg_${b}.jpg?v=3`);
+    for (const b of ['day', 'sunset', 'night']) this.load.image('bgpc_' + b, `assets/backgrounds/bgpc_${b}.jpg?v=1`);
     this.load.image('part_coin', 'assets/particles/part_coin.png?v=3');
     this.load.image('part_spark', 'assets/particles/part_spark.png?v=3');
     this.load.image('part_heart', 'assets/particles/part_heart.png?v=3');
@@ -106,11 +110,15 @@ class GameScene extends Phaser.Scene {
 
     // ---- persistent world objects ----
     const W = this.scale.width, H = this.scale.height;
-    this.bg = this.add.image(W / 2, H / 2, pickBg());
-    this.shadow = this.add.ellipse(W / 2, H * 0.4, 100, 30, 0x0a2a12, 0.3);
+    this.bg = this.add.image(W / 2, H / 2, pickBg(W, H));
+    this.clouds = [];
+    for (let i = 0; i < 3; i++) this.clouds.push(this.add.image(-200, 100, 'cloud').setAlpha(0.92));
+    this.mound = this.add.image(W / 2, H * 0.4, 'mound');
     this.capy = this.add.image(W / 2, H * 0.38, 'capy_evo1');
     this.capy.setInteractive({ useHandCursor: true });
     this.capy.on('pointerdown', p => this.onCapyClick(p));
+    this.combo = 0; this.lastClickT = 0; this.comboTimer = null;
+    this.comboTxt = this.add.text(W / 2, H * 0.2, '', { fontFamily: FONT, fontSize: '12px', color: '#7dff8a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setVisible(false);
 
     this.emitterCoin = this.add.particles(0, 0, 'part_coin', {
       speed: { min: 80, max: 220 }, angle: { min: 200, max: 340 },
@@ -121,6 +129,8 @@ class GameScene extends Phaser.Scene {
       speed: { min: 50, max: 260 }, lifespan: 600, scale: { start: 1.4, end: 0 },
       emitting: false,
     });
+    this.emitterBurst = this.add.particles(0, 0, 'burst', { speed: { min: 100, max: 300 }, lifespan: 500, scale: { start: 1.2, end: 0 }, emitting: false });
+    this.emitterHeart = this.add.particles(0, 0, 'heart_big', { speed: { min: 60, max: 160 }, angle: { min: 230, max: 310 }, gravityY: -200, lifespan: 900, scale: { start: 0.8, end: 0.2 }, emitting: false });
 
     // quests init
     if (!STATE.quests || STATE.quests.length === 0) {
@@ -187,47 +197,57 @@ class GameScene extends Phaser.Scene {
 
   layout() {
     const W = this.scale.width, H = this.scale.height;
+    this.colW = W > 560 ? Math.min(480, W * 0.6) : W;
+    const CW = this.colW, cx = W / 2;
     this.clearUI();
     this.bg.setScale(Math.max(W / this.bg.width, H / this.bg.height)); // cover: crop, never stretch
-    const capySize = Math.min(W * 0.62, H * 0.30);
-    this.capy.setPosition(W / 2, H * 0.36).setDisplaySize(capySize, capySize);
+    const capySize = Math.min(CW * 0.62, H * 0.30);
+    this.capy.setPosition(cx, H * 0.36).setDisplaySize(capySize, capySize);
     this.capyBaseY = H * 0.36;
     this.capyBaseScaleX = this.capy.scaleX;
     this.capyBaseScaleY = this.capy.scaleY;
-    this.shadow.setPosition(W / 2, H * 0.36 + capySize * 0.42).setDisplaySize(capySize * 0.62, capySize * 0.2);
+    this.mound.setPosition(cx, H * 0.36 + capySize * 0.40).setDisplaySize(capySize * 1.15, capySize * 0.5);
+    this.comboTxt.setPosition(cx, H * 0.36 - capySize * 0.75);
     this.applyEvolutionSprite(false);
 
     // ---- top HUD ----
     const hudH = 96;
-    this.U(this.add.rectangle(W / 2, hudH / 2, W, hudH, 0x123a6a, 1));
-    this.U(this.add.rectangle(W / 2, hudH - 2, W, 4, 0x3a7ac9, 1));
-    this.txtCoins = this.U(this.add.text(W / 2, 26, '0', { fontFamily: FONT, fontSize: '20px', color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
-    this.coinIcon = this.U(this.add.image(0, 26, 'part_coin').setDisplaySize(22, 22));
-    this.txtCps = this.U(this.add.text(W / 2, 56, '', { fontFamily: FONT, fontSize: '9px', color: '#bfe3ff' }).setOrigin(0.5));
-    this.txtClick = this.U(this.add.text(W / 2, 74, '', { fontFamily: FONT, fontSize: '9px', color: '#ffe9b0' }).setOrigin(0.5));
-    this.txtStars = this.U(this.add.text(W - 10, 12, '', { fontFamily: FONT, fontSize: '10px', color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(1, 0));
+    this.U(this.add.rectangle(cx, hudH / 2, CW, hudH, 0x123a6a, 1));
+    this.U(this.add.rectangle(cx, hudH - 2, CW, 4, 0x3a7ac9, 1));
+    this.txtCoins = this.U(this.add.text(cx, 26, '0', { fontFamily: FONT, fontSize: '20px', color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
+    this.coinIcon = this.U(this.add.image(0, 26, 'coin_gold').setDisplaySize(24, 24));
+    this.txtCps = this.U(this.add.text(cx, 56, '', { fontFamily: FONT, fontSize: '9px', color: '#bfe3ff' }).setOrigin(0.5));
+    this.txtClick = this.U(this.add.text(cx, 74, '', { fontFamily: FONT, fontSize: '9px', color: '#ffe9b0' }).setOrigin(0.5));
+    this.txtStars = this.U(this.add.text(cx + CW / 2 - 10, 12, '', { fontFamily: FONT, fontSize: '10px', color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(1, 0));
 
     // ---- bottom bar ----
     const barH = 64;
-    this.U(this.add.rectangle(W / 2, H - barH / 2, W, barH, 0x123a6a, 1));
-    this.U(this.add.rectangle(W / 2, H - barH + 2, W, 4, 0x3a7ac9, 1));
+    this.U(this.add.rectangle(cx, H - barH / 2, CW, barH, 0x123a6a, 1));
+    this.U(this.add.rectangle(cx, H - barH + 2, CW, 4, 0x3a7ac9, 1));
+    if (CW < W) { // PC side decor: dimmed wings with gold edges
+      const edge = (W - CW) / 2;
+      this.U(this.add.rectangle(edge / 2, H / 2, edge, H, 0x0a1a33, 0.88));
+      this.U(this.add.rectangle(W - edge / 2, H / 2, edge, H, 0x0a1a33, 0.88));
+      this.U(this.add.rectangle(edge, H / 2, 3, H, 0xffd24a, 0.5));
+      this.U(this.add.rectangle(W - edge, H / 2, 3, H, 0xffd24a, 0.5));
+    }
     const btns = [
       { key: 'shop', icon: 'icon_orange', cb: () => this.openShop() },
       { key: 'quests', icon: 'icon_grass', cb: () => this.openQuests() },
       { key: 'daily', icon: 'icon_gift', cb: () => this.openDaily() },
       { key: 'boost', icon: 'part_spark', cb: () => this.tryBoost() },
-      { key: 'prestige', icon: 'icon_leafgold', cb: () => this.openPrestige() },
+      { key: 'prestige', icon: 'crown', cb: () => this.openPrestige() },
       { key: 'settings', icon: 'icon_duck', cb: () => this.openSettings() },
     ];
     const n = btns.length;
-    const bw = Math.min(56, (W - 16) / n - 6);
+    const bw = Math.min(56, (CW - 16) / n - 6);
     btns.forEach((b, i) => {
-      const x = W / 2 + (i - (n - 1) / 2) * (bw + 8);
+      const x = cx + (i - (n - 1) / 2) * (bw + 8);
       const y = H - barH / 2;
       const zone = this.U(this.add.zone(x, y, bw + 8, barH).setInteractive({ useHandCursor: true }));
-      this.U(this.add.circle(x, y - 6, bw * 0.42, 0x0d2c55, 1));
-      const img = this.U(this.add.image(x, y - 6, b.icon).setDisplaySize(bw * 0.62, bw * 0.62));
-      const lbl = this.U(this.add.text(x, y + 18, t('tabs')[b.key], { fontFamily: FONT, fontSize: '6px', color: '#bfe3ff' }).setOrigin(0.5));
+      this.U(this.add.circle(x, y - 8, bw * 0.34, 0x0d2c55, 1));
+      const img = this.U(this.add.image(x, y - 8, b.icon).setDisplaySize(bw * 0.56, bw * 0.56));
+      const lbl = this.U(this.add.text(x, y + 20, t('tabs')[b.key], { fontFamily: FONT, fontSize: '6px', color: '#bfe3ff' }).setOrigin(0.5));
       zone.on('pointerdown', () => { SFX.ui(); b.cb(); });
       this['bar_' + b.key] = { zone, img, lbl, x, y };
     });
@@ -235,6 +255,13 @@ class GameScene extends Phaser.Scene {
     this.dailyBadge = this.U(this.add.circle(0, 0, 6, 0xff4a6a).setVisible(false));
     this.prestigeBadge = this.U(this.add.circle(0, 0, 6, 0xffd24a).setVisible(false));
     this.boostTimer = this.U(this.add.text(0, 0, '', { fontFamily: FONT, fontSize: '8px', color: '#7dff8a', stroke: '#000', strokeThickness: 3 }).setVisible(false));
+    // clouds spread
+    const cloudY = [0.12, 0.2, 0.27];
+    this.clouds.forEach((c, i) => {
+      const s = Math.min(W * 0.3, 170) * (0.7 + i * 0.2);
+      c.setDisplaySize(s, s * 0.5).setPosition(W * (0.15 + 0.35 * i), H * cloudY[i % 3]);
+      c.setData('sp', 0.25 + i * 0.15);
+    });
 
     this.updateHud();
   }
@@ -263,12 +290,20 @@ class GameScene extends Phaser.Scene {
   // ---------------- clicks & earn ----------------
   onCapyClick(p) {
     unlockAudio();
-    const gain = clickPower();
+    // juice: combo chain (1.1s window) + 5% crit x5
+    const now = this.time.now;
+    this.combo = (now - (this.lastClickT || 0) < 1100) ? (this.combo + 1) : 1;
+    this.lastClickT = now;
+    if (this.comboTimer) this.comboTimer.remove();
+    this.comboTimer = this.time.delayedCall(1100, () => { this.combo = 0; this.comboTxt.setVisible(false); });
+    const comboMult = 1 + Math.min(this.combo, 100) * 0.01;
+    const crit = Math.random() < 0.05;
+    const gain = clickPower() * comboMult * (crit ? 5 : 1);
     STATE.totalClicks++;
     this.earn(gain, true);
     this.questProgress('clicks', 1);
-    SFX.click();
-    this.capySetHappy(140);
+    if (crit) SFX.crit(); else SFX.click();
+    this.capySetHappy(crit ? 300 : 140);
     // squash (kill previous tween + reset to base scale: rapid clicks must not compound)
     this.tweens.killTweensOf(this.capy);
     this.capy.setScale(this.capyBaseScaleX, this.capyBaseScaleY);
@@ -280,9 +315,15 @@ class GameScene extends Phaser.Scene {
       onComplete: () => this.capy.setScale(this.capyBaseScaleX, this.capyBaseScaleY),
     });
     // particles
-    this.emitterCoin.explode(3, this.capy.x, this.capy.y - this.capy.displayHeight * 0.3);
+    this.emitterCoin.explode(crit ? 10 : 3, this.capy.x, this.capy.y - this.capy.displayHeight * 0.3);
+    if (crit) {
+      this.emitterBurst.explode(6, p.x || this.capy.x, p.y || this.capy.y);
+      this.cameras.main.shake(120, 0.004);
+    }
+    if (this.combo >= 5) this.comboTxt.setVisible(true).setText(t('combo') + ' x' + this.combo);
+    if (this.combo > 0 && this.combo % 25 === 0) this.emitterHeart.explode(8, this.capy.x, this.capy.y);
     // floating text
-    const ft = this.add.text(p.x || this.capy.x, (p.y || this.capy.y) - 30, '+' + fmt(gain), { fontFamily: FONT, fontSize: '12px', color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
+    const ft = this.add.text(p.x || this.capy.x, (p.y || this.capy.y) - 30, (crit ? t('crit') + ' +' : '+') + fmt(gain), { fontFamily: FONT, fontSize: crit ? '18px' : '12px', color: crit ? '#ff6a3d' : '#ffd24a', stroke: '#000', strokeThickness: crit ? 5 : 3 }).setOrigin(0.5);
     this.tweens.add({ targets: ft, y: ft.y - 60, alpha: 0, duration: 700, onComplete: () => ft.destroy() });
     this.updateHud();
   }
@@ -337,6 +378,13 @@ class GameScene extends Phaser.Scene {
     // joyful blink every few seconds
     this.time.addEvent({ delay: 8000, loop: true, callback: () => {
       if (this.capyMood === 'base') this.capySetHappy(170);
+    }});
+    this.time.addEvent({ delay: 50, loop: true, callback: () => {
+      const W = this.scale.width;
+      for (const c of this.clouds) {
+        c.x += c.getData('sp');
+        if (c.x - c.displayWidth / 2 > W) c.x = -c.displayWidth / 2;
+      }
     }});
   }
 
@@ -419,7 +467,7 @@ class GameScene extends Phaser.Scene {
     cb.on('pointerdown', () => { SFX.ui(); this.closeModal(); });
     const closeTxt = this.add.text(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 44, 'X', { fontFamily: FONT, fontSize: '8px', color: '#ff8899' }).setOrigin(0.5);
     const inner = this.add.rectangle(W / 2, H / 2, pw - 10, ph - 10, 0x000000, 0).setStrokeStyle(2, 0x3a7ac9, 0.9);
-    const under = this.add.rectangle(W / 2, H / 2 - ph / 2 + 42, 120, 3, 0xffd24a, 1);
+    const under = this.add.image(W / 2, H / 2 - ph / 2 + 42, 'strip_gold').setDisplaySize(140, 12);
     m.add([dim, panel, inner, title, under, cb, closeTxt]);
     this.modal = { container: m, W, H, pw, ph, cx: W / 2, cy: H / 2, add: (o) => { m.add(o); return o; } };
     builder(this.modal, { top: H / 2 - ph / 2 + 60, left: W / 2 - pw / 2 + 14, right: W / 2 + pw / 2 - 14, width: pw - 28, height: ph - 80 });
@@ -431,6 +479,7 @@ class GameScene extends Phaser.Scene {
       if (this.modalCleanup) { this.modalCleanup(); this.modalCleanup = null; }
       this.modal.container.destroy();
       this.modal = null;
+      this.shopRows = null;
       Y.gameplayStart();
     }
   }
@@ -441,9 +490,15 @@ class GameScene extends Phaser.Scene {
     const img = this.add.image(x, y, TEX[style] || TEX.orange).setDisplaySize(w, h).setInteractive({ useHandCursor: true });
     const txt = this.add.text(x, y, label, { fontFamily: FONT, fontSize: fontSize + 'px', color: INK[style] || INK.orange, stroke: '#ffffff', strokeThickness: 0 }).setOrigin(0.5);
     img.on('pointerdown', () => cb && cb(img, txt));
-    img.on('pointerover', () => img.setTint(0xffe0c0));
-    img.on('pointerout', () => img.clearTint());
+    img.on('pointerover', () => { if (!img.getData('disabled')) img.setTint(0xffe0c0); });
+    img.on('pointerout', () => { img.clearTint(); if (img.getData('disabled')) img.setTint(0x888888); });
     return { img, txt };
+  }
+
+  setDisabled(btn, off) {
+    btn.img.setData('disabled', off);
+    if (off) btn.img.setTint(0x888888); else btn.img.clearTint();
+    btn.txt.setAlpha(off ? 0.7 : 1);
   }
 
   // ---------------- SHOP ----------------
@@ -466,10 +521,12 @@ class GameScene extends Phaser.Scene {
         const btn = this.makeButton(area.right - 52, 0, 84, 34, fmt(cost), null, 'orange', 8);
         btn.img.removeAllListeners('pointerdown');
         btn.img.on('pointerdown', () => this.buyUpgrade(u, btn.txt, desc));
+        this.setDisabled(btn, STATE.coins < cost);
         row.add([bgRow, accent, icon, name, desc, btn.img, btn.txt]);
         rows.push({ row, btn, u, y });
         content.add(row);
       });
+      this.shopRows = rows;
       let contentH = UPGRADES.length * (rowH + 6);
       // ---- IAP (gems) section: real Yandex Payments, or ?demo_pay=1 mock preview ----
       {
@@ -491,7 +548,7 @@ class GameScene extends Phaser.Scene {
             const row = this.add.container(0, y);
             const bgRow = this.add.rectangle(m.cx, 0, area.width, rowH, 0x2a1a5a, 0.85);
             const accent = this.add.rectangle(area.left + 2, 0, 4, rowH - 10, 0x7df9ff, 0.9);
-            const icon = this.add.image(area.left + 26, 0, 'part_coin').setDisplaySize(36, 36);
+            const icon = this.add.image(area.left + 26, 0, 'coin_gold').setDisplaySize(36, 36);
             const name = this.add.text(area.left + 54, -10, '+' + fmt(p.coins) + ' ' + t('coins'), { fontFamily: FONT, fontSize: '8px', color: '#ffd24a' });
             const desc = this.add.text(area.left + 54, 6, demoPay ? 'DEMO' : 'YANDEX', { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff' });
             const btn = this.makeButton(area.right - 52, 0, 84, 34, priceOf(p), null, 'blue', 7);
@@ -547,6 +604,7 @@ class GameScene extends Phaser.Scene {
     STATE.cpsBase = cpsBase();
     this.questProgress('buy', 1);
     SFX.buy();
+    if (this.shopRows) for (const r of this.shopRows) this.setDisabled(r.btn, STATE.coins < upgradeCost(r.u, STATE.upgrades[r.u.id] || 0));
     if (txt) txt.setText(fmt(upgradeCost(u, owned + 1)));
     if (desc) desc.setText(`${t('up_' + u.id + '_d')}  ${t('level')}:${owned + 1}`);
     this.updateHud();
@@ -592,7 +650,7 @@ class GameScene extends Phaser.Scene {
             this.updateHud();
             this.closeModal();
             this.openQuests();
-          }, 'orange', 8);
+          }, 'green', 8);
           m.add([b.img, b.txt]);
         } else if (q.claimed) {
           m.add(this.add.text(area.right - 55, y + 8, t('claimed'), { fontFamily: FONT, fontSize: '7px', color: '#7dff8a' }).setOrigin(0.5));
@@ -684,6 +742,10 @@ class GameScene extends Phaser.Scene {
       m.add(this.add.text(m.cx, area.top + 110, t('prestigeStars') + ': ' + pend, { fontFamily: FONT, fontSize: '9px', color: pend > 0 ? '#7dff8a' : '#ff8899' }).setOrigin(0.5));
       if (pend <= 0) {
         m.add(this.add.text(m.cx, area.top + 140, t('prestigeNeed') + ': ' + fmt(PRESTIGE_MIN), { fontFamily: FONT, fontSize: '8px', color: '#9fd0ff' }).setOrigin(0.5));
+        const db = this.makeButton(m.cx, area.top + 190, 200, 44, t('prestigeNow') + ' +0*', null, 'red', 9);
+        this.setDisabled(db, true);
+        db.img.disableInteractive();
+        m.add([db.img, db.txt]);
       } else {
         const b = this.makeButton(m.cx, area.top + 150, 200, 44, t('prestigeNow') + ' +' + pend + '*', () => this.doPrestige(pend), 'red', 9);
         m.add([b.img, b.txt]);

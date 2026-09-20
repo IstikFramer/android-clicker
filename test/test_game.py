@@ -68,7 +68,8 @@ def run_viewport(pw, chrome, width, height, tag, mobile=True):
 
     # ---- open shop ----
     n = 6
-    bw = min(56, (width - 16) / n - 6)
+    colW = min(480, width * 0.6) if width > 560 else width
+    bw = min(56, (colW - 16) / n - 6)
     shop_x = width / 2 + (0 - (n - 1) / 2) * (bw + 8)
     shop_y = height - 32
     page.mouse.click(shop_x, shop_y)

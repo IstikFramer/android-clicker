@@ -77,6 +77,10 @@ export const SFX = {
   quest() {
     [784, 988, 1175].forEach((f, i) => setTimeout(() => blip(f, 0.1, 'square', 0.1), i * 70));
   },
+  crit() {
+    [880, 1175, 1568].forEach((f, i) => setTimeout(() => blip(f, 0.1, 'square', 0.12), i * 50));
+    noise(0.15, 0.08);
+  },
   ui() {
     blip(700, 0.05, 'square', 0.06);
   },
