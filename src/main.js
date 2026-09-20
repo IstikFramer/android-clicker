@@ -55,15 +55,16 @@ class BootScene extends Phaser.Scene {
     const fill = this.add.rectangle(W / 2 - 98, H * 0.56, 4, 6, 0xffd24a).setOrigin(0, 0.5);
     this.load.on('progress', p => { fill.width = Math.max(4, 196 * p); });
     // sprites
-    for (let i = 1; i <= 5; i++) this.load.image('capy_evo' + i, `assets/sprites/capy_evo${i}.png`);
-    for (const u of UPGRADES) this.load.image(u.icon, `assets/ui/${u.icon}.png`);
-    this.load.image('btn_orange', 'assets/ui/btn_orange.png');
-    this.load.image('btn_blue', 'assets/ui/btn_blue.png');
-    this.load.image('bg_meadow', 'assets/backgrounds/bg_meadow.png');
-    this.load.image('part_coin', 'assets/particles/part_coin.png');
-    this.load.image('part_spark', 'assets/particles/part_spark.png');
-    this.load.image('part_heart', 'assets/particles/part_heart.png');
-    this.load.image('icon_star', 'assets/particles/part_spark.png');
+    for (let i = 1; i <= 5; i++) this.load.image('capy_evo' + i, `assets/sprites/capy_evo${i}.png?v=2`);
+    for (let i = 1; i <= 5; i++) this.load.image('capy_evo' + i + '_b', `assets/sprites/capy_evo${i}_b.png?v=2`);
+    for (const u of UPGRADES) this.load.image(u.icon, `assets/ui/${u.icon}.png?v=2`);
+    this.load.image('btn_orange', 'assets/ui/btn_orange.png?v=2');
+    this.load.image('btn_blue', 'assets/ui/btn_blue.png?v=2');
+    this.load.image('bg_meadow', 'assets/backgrounds/bg_meadow.png?v=2');
+    this.load.image('part_coin', 'assets/particles/part_coin.png?v=2');
+    this.load.image('part_spark', 'assets/particles/part_spark.png?v=2');
+    this.load.image('part_heart', 'assets/particles/part_heart.png?v=2');
+    this.load.image('icon_star', 'assets/particles/part_spark.png?v=2');
     this.load.once('complete', () => {
       this.time.delayedCall(300, () => this.scene.start('game'));
     });
@@ -114,6 +115,7 @@ class GameScene extends Phaser.Scene {
     }
 
     this.layout();
+    this.startCapyIdle();
     this.scale.on('resize', () => this.layout());
 
     // ---- income tick ----
@@ -176,6 +178,7 @@ class GameScene extends Phaser.Scene {
     this.bg.setDisplaySize(W, H);
     const capySize = Math.min(W * 0.62, H * 0.30);
     this.capy.setPosition(W / 2, H * 0.36).setDisplaySize(capySize, capySize);
+    this.capyBaseY = H * 0.36;
     this.capyBaseScaleX = this.capy.scaleX;
     this.capyBaseScaleY = this.capy.scaleY;
     this.applyEvolutionSprite(false);
@@ -246,6 +249,7 @@ class GameScene extends Phaser.Scene {
     this.earn(gain, true);
     this.questProgress('clicks', 1);
     SFX.click();
+    this.capySetHappy(140);
     // squash (kill previous tween + reset to base scale: rapid clicks must not compound)
     this.tweens.killTweensOf(this.capy);
     this.capy.setScale(this.capyBaseScaleX, this.capyBaseScaleY);
@@ -292,6 +296,8 @@ class GameScene extends Phaser.Scene {
     if (this.capy && this.capy.texture.key !== key) {
       this.capy.setTexture(key);
     }
+    this.capyMood = 'base';
+    if (this.happyTimer) { this.happyTimer.remove(); this.happyTimer = null; }
     if (celebrate) {
       SFX.evolve();
       this.emitterSpark.explode(40, this.capy.x, this.capy.y);
@@ -299,6 +305,34 @@ class GameScene extends Phaser.Scene {
       this.flash();
       Y.showInterstitial();
     }
+  }
+
+  startCapyIdle() {
+    if (this.bobTween) return;
+    this.capyMood = 'base';
+    const bob = { v: 0 };
+    this.bobTween = this.tweens.add({
+      targets: bob, v: 8, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      onUpdate: () => { if (this.capy) this.capy.y = this.capyBaseY + bob.v; },
+    });
+    // joyful blink every few seconds
+    this.time.addEvent({ delay: 3600, loop: true, callback: () => {
+      if (this.capyMood === 'base') this.capySetHappy(170);
+    }});
+  }
+
+  capySetHappy(ms) {
+    if (!this.capy) return;
+    this.capy.setTexture(EVOLUTIONS[this.evoIdx || 0].sprite + '_b');
+    this.capyMood = 'happy';
+    if (this.happyTimer) this.happyTimer.remove();
+    const evo = this.evoIdx;
+    this.happyTimer = this.time.delayedCall(ms, () => {
+      if (this.evoIdx === evo && this.capyMood === 'happy') {
+        this.capy.setTexture(EVOLUTIONS[this.evoIdx || 0].sprite);
+        this.capyMood = 'base';
+      }
+    });
   }
 
   flash() {

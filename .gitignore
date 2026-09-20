@@ -42,3 +42,6 @@ dist/
 
 # Intermediate generated art (final assets live in public/assets/)
 assets_gen/
+
+__pycache__/
+*.pyc
