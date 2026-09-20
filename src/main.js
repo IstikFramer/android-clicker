@@ -43,6 +43,15 @@ function cpsBase() {
 function boostMult() { return STATE.boostUntil > Date.now() ? BOOST_MULT : 1; }
 function cps() { return cpsBase() * starMultiplier(STATE.stars) * boostMult(); }
 
+function pickBg() {
+  const now = new Date();
+  if (now.getMonth() === 11) return 'bg_winter'; // festive December
+  const h = now.getHours();
+  if (h >= 20 || h < 6) return 'bg_night';
+  if ((h >= 6 && h < 8) || (h >= 17 && h < 20)) return 'bg_sunset';
+  return 'bg_day';
+}
+
 // ================================================================
 class BootScene extends Phaser.Scene {
   constructor() { super('boot'); }
@@ -55,16 +64,19 @@ class BootScene extends Phaser.Scene {
     const fill = this.add.rectangle(W / 2 - 98, H * 0.56, 4, 6, 0xffd24a).setOrigin(0, 0.5);
     this.load.on('progress', p => { fill.width = Math.max(4, 196 * p); });
     // sprites
-    for (let i = 1; i <= 5; i++) this.load.image('capy_evo' + i, `assets/sprites/capy_evo${i}.png?v=2`);
-    for (let i = 1; i <= 5; i++) this.load.image('capy_evo' + i + '_b', `assets/sprites/capy_evo${i}_b.png?v=2`);
-    for (const u of UPGRADES) this.load.image(u.icon, `assets/ui/${u.icon}.png?v=2`);
-    this.load.image('btn_orange', 'assets/ui/btn_orange.png?v=2');
-    this.load.image('btn_blue', 'assets/ui/btn_blue.png?v=2');
-    this.load.image('bg_meadow', 'assets/backgrounds/bg_meadow.png?v=2');
-    this.load.image('part_coin', 'assets/particles/part_coin.png?v=2');
-    this.load.image('part_spark', 'assets/particles/part_spark.png?v=2');
-    this.load.image('part_heart', 'assets/particles/part_heart.png?v=2');
-    this.load.image('icon_star', 'assets/particles/part_spark.png?v=2');
+    for (let i = 1; i <= 5; i++) this.load.image('capy_evo' + i, `assets/sprites/capy_evo${i}.png?v=3`);
+    for (let i = 1; i <= 5; i++) this.load.image('capy_evo' + i + '_b', `assets/sprites/capy_evo${i}_b.png?v=3`);
+    for (const u of UPGRADES) this.load.image(u.icon, `assets/ui/${u.icon}.png?v=3`);
+    this.load.image('btn_orange', 'assets/ui/btn_orange.png?v=3');
+    this.load.image('btn_blue', 'assets/ui/btn_blue.png?v=3');
+    this.load.image('btn_green', 'assets/ui/btn_green.png?v=3');
+    this.load.image('btn_red', 'assets/ui/btn_red.png?v=3');
+    this.load.image('icon_gift', 'assets/ui/icon_gift.png?v=3');
+    for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bg_' + b, `assets/backgrounds/bg_${b}.jpg?v=3`);
+    this.load.image('part_coin', 'assets/particles/part_coin.png?v=3');
+    this.load.image('part_spark', 'assets/particles/part_spark.png?v=3');
+    this.load.image('part_heart', 'assets/particles/part_heart.png?v=3');
+    this.load.image('icon_star', 'assets/particles/part_spark.png?v=3');
     this.load.once('complete', () => {
       this.time.delayedCall(300, () => this.scene.start('game'));
     });
@@ -94,7 +106,7 @@ class GameScene extends Phaser.Scene {
 
     // ---- persistent world objects ----
     const W = this.scale.width, H = this.scale.height;
-    this.bg = this.add.image(W / 2, H / 2, 'bg_meadow');
+    this.bg = this.add.image(W / 2, H / 2, pickBg());
     this.capy = this.add.image(W / 2, H * 0.38, 'capy_evo1');
     this.capy.setInteractive({ useHandCursor: true });
     this.capy.on('pointerdown', p => this.onCapyClick(p));
@@ -186,7 +198,9 @@ class GameScene extends Phaser.Scene {
     // ---- top HUD ----
     const hudH = 96;
     this.U(this.add.rectangle(W / 2, hudH / 2, W, hudH, 0x123a6a, 1));
+    this.U(this.add.rectangle(W / 2, hudH - 2, W, 4, 0x3a7ac9, 1));
     this.txtCoins = this.U(this.add.text(W / 2, 26, '0', { fontFamily: FONT, fontSize: '20px', color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
+    this.coinIcon = this.U(this.add.image(0, 26, 'part_coin').setDisplaySize(22, 22));
     this.txtCps = this.U(this.add.text(W / 2, 56, '', { fontFamily: FONT, fontSize: '9px', color: '#bfe3ff' }).setOrigin(0.5));
     this.txtClick = this.U(this.add.text(W / 2, 74, '', { fontFamily: FONT, fontSize: '9px', color: '#ffe9b0' }).setOrigin(0.5));
     this.txtStars = this.U(this.add.text(W - 10, 12, '', { fontFamily: FONT, fontSize: '10px', color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(1, 0));
@@ -194,10 +208,11 @@ class GameScene extends Phaser.Scene {
     // ---- bottom bar ----
     const barH = 64;
     this.U(this.add.rectangle(W / 2, H - barH / 2, W, barH, 0x123a6a, 1));
+    this.U(this.add.rectangle(W / 2, H - barH + 2, W, 4, 0x3a7ac9, 1));
     const btns = [
       { key: 'shop', icon: 'icon_orange', cb: () => this.openShop() },
       { key: 'quests', icon: 'icon_grass', cb: () => this.openQuests() },
-      { key: 'daily', icon: 'part_heart', cb: () => this.openDaily() },
+      { key: 'daily', icon: 'icon_gift', cb: () => this.openDaily() },
       { key: 'boost', icon: 'part_spark', cb: () => this.tryBoost() },
       { key: 'prestige', icon: 'icon_leafgold', cb: () => this.openPrestige() },
       { key: 'settings', icon: 'icon_duck', cb: () => this.openSettings() },
@@ -208,7 +223,8 @@ class GameScene extends Phaser.Scene {
       const x = W / 2 + (i - (n - 1) / 2) * (bw + 8);
       const y = H - barH / 2;
       const zone = this.U(this.add.zone(x, y, bw + 8, barH).setInteractive({ useHandCursor: true }));
-      const img = this.U(this.add.image(x, y - 6, b.key === 'shop' || b.key === 'prestige' || b.key === 'quests' ? b.icon : b.icon).setDisplaySize(bw * 0.62, bw * 0.62));
+      this.U(this.add.circle(x, y - 6, bw * 0.42, 0x0d2c55, 1));
+      const img = this.U(this.add.image(x, y - 6, b.icon).setDisplaySize(bw * 0.62, bw * 0.62));
       const lbl = this.U(this.add.text(x, y + 18, t('tabs')[b.key], { fontFamily: FONT, fontSize: '6px', color: '#bfe3ff' }).setOrigin(0.5));
       zone.on('pointerdown', () => { SFX.ui(); b.cb(); });
       this['bar_' + b.key] = { zone, img, lbl, x, y };
@@ -224,6 +240,7 @@ class GameScene extends Phaser.Scene {
   updateHud() {
     if (!this.txtCoins) return;
     this.txtCoins.setText(fmt(STATE.coins) + ' ' + t('coins'));
+    if (this.coinIcon) this.coinIcon.setPosition(this.scale.width / 2 - this.txtCoins.width / 2 - 24, 26);
     this.txtCps.setText(fmt(cps()) + ' ' + t('perSec'));
     this.txtClick.setText('+' + fmt(clickPower()) + ' ' + t('perClick'));
     this.txtStars.setText(STATE.stars > 0 ? '*' + STATE.stars : '');
@@ -316,7 +333,7 @@ class GameScene extends Phaser.Scene {
       onUpdate: () => { if (this.capy) this.capy.y = this.capyBaseY + bob.v; },
     });
     // joyful blink every few seconds
-    this.time.addEvent({ delay: 3600, loop: true, callback: () => {
+    this.time.addEvent({ delay: 8000, loop: true, callback: () => {
       if (this.capyMood === 'base') this.capySetHappy(170);
     }});
   }
@@ -399,7 +416,9 @@ class GameScene extends Phaser.Scene {
     const cb = this.add.image(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 24, 'part_heart').setDisplaySize(20, 20).setInteractive({ useHandCursor: true }).setTint(0xff2244);
     cb.on('pointerdown', () => { SFX.ui(); this.closeModal(); });
     const closeTxt = this.add.text(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 44, 'X', { fontFamily: FONT, fontSize: '8px', color: '#ff8899' }).setOrigin(0.5);
-    m.add([dim, panel, title, cb, closeTxt]);
+    const inner = this.add.rectangle(W / 2, H / 2, pw - 10, ph - 10, 0x000000, 0).setStrokeStyle(2, 0x3a7ac9, 0.9);
+    const under = this.add.rectangle(W / 2, H / 2 - ph / 2 + 42, 120, 3, 0xffd24a, 1);
+    m.add([dim, panel, inner, title, under, cb, closeTxt]);
     this.modal = { container: m, W, H, pw, ph, cx: W / 2, cy: H / 2, add: (o) => { m.add(o); return o; } };
     builder(this.modal, { top: H / 2 - ph / 2 + 60, left: W / 2 - pw / 2 + 14, right: W / 2 + pw / 2 - 14, width: pw - 28, height: ph - 80 });
     return this.modal;
@@ -415,8 +434,10 @@ class GameScene extends Phaser.Scene {
   }
 
   makeButton(x, y, w, h, label, cb, style = 'orange', fontSize = 9) {
-    const img = this.add.image(x, y, style === 'orange' ? 'btn_orange' : 'btn_blue').setDisplaySize(w, h).setInteractive({ useHandCursor: true });
-    const txt = this.add.text(x, y, label, { fontFamily: FONT, fontSize: fontSize + 'px', color: style === 'orange' ? '#5a2b0e' : '#0e2a5a', stroke: '#ffffff', strokeThickness: 0 }).setOrigin(0.5);
+    const TEX = { orange: 'btn_orange', blue: 'btn_blue', green: 'btn_green', red: 'btn_red' };
+    const INK = { orange: '#5a2b0e', blue: '#0e2a5a', green: '#0e4a1a', red: '#5a0e1a' };
+    const img = this.add.image(x, y, TEX[style] || TEX.orange).setDisplaySize(w, h).setInteractive({ useHandCursor: true });
+    const txt = this.add.text(x, y, label, { fontFamily: FONT, fontSize: fontSize + 'px', color: INK[style] || INK.orange, stroke: '#ffffff', strokeThickness: 0 }).setOrigin(0.5);
     img.on('pointerdown', () => cb && cb(img, txt));
     img.on('pointerover', () => img.setTint(0xffe0c0));
     img.on('pointerout', () => img.clearTint());
@@ -433,7 +454,8 @@ class GameScene extends Phaser.Scene {
       UPGRADES.forEach((u, i) => {
         const y = area.top + 14 + i * (rowH + 6);
         const row = this.add.container(0, y);
-        const bgRow = this.add.rectangle(m.cx, 0, area.width, rowH, 0x0d2c55, 0.8);
+        const bgRow = this.add.rectangle(m.cx, 0, area.width, rowH, i % 2 ? 0x0d2c55 : 0x14386a, 0.85);
+        const accent = this.add.rectangle(area.left + 2, 0, 4, rowH - 10, 0xffd24a, 0.9);
         const icon = this.add.image(area.left + 26, 0, u.icon).setDisplaySize(40, 40);
         const owned = STATE.upgrades[u.id] || 0;
         const name = this.add.text(area.left + 54, -14, t('up_' + u.id), { fontFamily: FONT, fontSize: '8px', color: '#ffffff' });
@@ -442,7 +464,7 @@ class GameScene extends Phaser.Scene {
         const btn = this.makeButton(area.right - 52, 0, 84, 34, fmt(cost), null, 'orange', 8);
         btn.img.removeAllListeners('pointerdown');
         btn.img.on('pointerdown', () => this.buyUpgrade(u, btn.txt, desc));
-        row.add([bgRow, icon, name, desc, btn.img, btn.txt]);
+        row.add([bgRow, accent, icon, name, desc, btn.img, btn.txt]);
         rows.push({ row, btn, u, y });
         content.add(row);
       });
@@ -466,13 +488,14 @@ class GameScene extends Phaser.Scene {
             const y = y0 + 52 + j * (rowH + 6) + rowH / 2;
             const row = this.add.container(0, y);
             const bgRow = this.add.rectangle(m.cx, 0, area.width, rowH, 0x2a1a5a, 0.85);
+            const accent = this.add.rectangle(area.left + 2, 0, 4, rowH - 10, 0x7df9ff, 0.9);
             const icon = this.add.image(area.left + 26, 0, 'part_coin').setDisplaySize(36, 36);
             const name = this.add.text(area.left + 54, -10, '+' + fmt(p.coins) + ' ' + t('coins'), { fontFamily: FONT, fontSize: '8px', color: '#ffd24a' });
             const desc = this.add.text(area.left + 54, 6, demoPay ? 'DEMO' : 'YANDEX', { fontFamily: FONT, fontSize: '7px', color: '#9fd0ff' });
             const btn = this.makeButton(area.right - 52, 0, 84, 34, priceOf(p), null, 'blue', 7);
             btn.img.removeAllListeners('pointerdown');
             btn.img.on('pointerdown', () => this.buyIAP(p));
-            row.add([bgRow, icon, name, desc, btn.img, btn.txt]);
+            row.add([bgRow, accent, icon, name, desc, btn.img, btn.txt]);
             content.add(row);
           });
           contentH += 6 + 52 + IAP_PRODUCTS.length * (rowH + 6);
@@ -623,7 +646,7 @@ class GameScene extends Phaser.Scene {
           this.updateHud();
           saveState(STATE, true);
           this.closeModal();
-        }, 'orange', 9);
+        }, 'green', 9);
         m.add([b.img, b.txt]);
       } else {
         m.add(this.add.text(m.cx, yBtn, t('dailyComeBack'), { fontFamily: FONT, fontSize: '9px', color: '#9fd0ff' }).setOrigin(0.5));
@@ -660,7 +683,7 @@ class GameScene extends Phaser.Scene {
       if (pend <= 0) {
         m.add(this.add.text(m.cx, area.top + 140, t('prestigeNeed') + ': ' + fmt(PRESTIGE_MIN), { fontFamily: FONT, fontSize: '8px', color: '#9fd0ff' }).setOrigin(0.5));
       } else {
-        const b = this.makeButton(m.cx, area.top + 150, 200, 44, t('prestigeNow') + ' +' + pend + '*', () => this.doPrestige(pend), 'orange', 9);
+        const b = this.makeButton(m.cx, area.top + 150, 200, 44, t('prestigeNow') + ' +' + pend + '*', () => this.doPrestige(pend), 'red', 9);
         m.add([b.img, b.txt]);
       }
     }, 0.55);
@@ -720,7 +743,7 @@ class GameScene extends Phaser.Scene {
       y += 40;
       m.add(this.add.text(area.left + 10, y, `${t('bestScore')}: ${fmt(STATE.bestScore)}`, { fontFamily: FONT, fontSize: '8px', color: '#9fd0ff' }));
       y += 20;
-      m.add(this.add.text(area.left + 10, y, `v1.0 | Yandex Games`, { fontFamily: FONT, fontSize: '7px', color: '#5f8fbf' }));
+      m.add(this.add.text(area.left + 10, y, `v1.1 | Yandex Games`, { fontFamily: FONT, fontSize: '7px', color: '#5f8fbf' }));
     }, 0.6);
   }
 
@@ -744,7 +767,7 @@ class GameScene extends Phaser.Scene {
             this.updateHud();
             this.closeModal();
             saveState(STATE, true);
-          }, 'orange', 9);
+          }, 'green', 9);
           m.add([b.img, b.txt]);
         }, 0.5);
       });
