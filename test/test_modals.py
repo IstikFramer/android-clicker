@@ -109,8 +109,8 @@ def main():
         shot(page, "ext_03_settings_en.png")
         close_modal(page)
 
-        # evolution: grant 60k -> stage idx 2 (Cool)
-        page.evaluate("window.__capy.scene().earn(60000)")
+        # evolution: grant 150k -> stage idx 2 (Cool)
+        page.evaluate("window.__capy.scene().earn(150000)")
         page.wait_for_timeout(700)
         tex = page.evaluate("window.__capy.scene().capy.texture.key")
         assert tex == "capy_evo3", f"expected capy_evo3, got {tex}"

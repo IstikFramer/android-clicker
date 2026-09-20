@@ -116,7 +116,7 @@ class GameScene extends Phaser.Scene {
 
     this.layout();
     this.startCapyIdle();
-    this.scale.on('resize', () => this.layout());
+    this.scale.on('resize', () => { this.closeModal(); this.layout(); });
 
     // ---- income tick ----
     this.time.addEvent({ delay: 100, loop: true, callback: () => {
@@ -145,7 +145,6 @@ class GameScene extends Phaser.Scene {
     this.input.once('pointerdown', () => {
       unlockAudio();
       if (STATE.settings.music) startMusic();
-      Y.gameplayStart();
     });
 
     // offline income & daily check
@@ -158,6 +157,7 @@ class GameScene extends Phaser.Scene {
     };
 
     this.updateHud();
+    Y.gameplayStart(); // hide Yandex loader: game is ready
   }
 
   questCtx() {
@@ -441,7 +441,7 @@ class GameScene extends Phaser.Scene {
         const cost = upgradeCost(u, owned);
         const btn = this.makeButton(area.right - 52, 0, 84, 34, fmt(cost), null, 'orange', 8);
         btn.img.removeAllListeners('pointerdown');
-        btn.img.on('pointerdown', () => this.buyUpgrade(u, btn.txt));
+        btn.img.on('pointerdown', () => this.buyUpgrade(u, btn.txt, desc));
         row.add([bgRow, icon, name, desc, btn.img, btn.txt]);
         rows.push({ row, btn, u, y });
         content.add(row);
@@ -453,6 +453,7 @@ class GameScene extends Phaser.Scene {
         if (Y.hasPayments() || demoPay) {
           let catalog = [];
           if (Y.hasPayments()) { try { catalog = await Y.getCatalog(); } catch (e) { catalog = []; } }
+          if (!this.modal) return; // closed while catalog was loading
           const priceOf = (p) => {
             const found = catalog.find(c => c.id === p.id);
             if (found && found.priceValue) return String(found.priceValue).replace(/\u00A0/g, ' ');
@@ -512,7 +513,7 @@ class GameScene extends Phaser.Scene {
     }, 0.78);
   }
 
-  buyUpgrade(u, txt) {
+  buyUpgrade(u, txt, desc) {
     const owned = STATE.upgrades[u.id] || 0;
     const cost = upgradeCost(u, owned);
     if (STATE.coins < cost) { SFX.error(); this.toast(t('notEnough')); return; }
@@ -522,6 +523,7 @@ class GameScene extends Phaser.Scene {
     this.questProgress('buy', 1);
     SFX.buy();
     if (txt) txt.setText(fmt(upgradeCost(u, owned + 1)));
+    if (desc) desc.setText(`${t('up_' + u.id + '_d')}  ${t('level')}:${owned + 1}`);
     this.updateHud();
     saveState(STATE, true);
   }
@@ -595,12 +597,14 @@ class GameScene extends Phaser.Scene {
     const can = this.canClaimDaily();
     this.openModal('dailyTitle', (m, area) => {
       // streak row: 7 days
-      const dayInCycle = ((STATE.dailyStreak % 7) + 7) % 7;
+      const nextS = can ? this.nextStreak() : STATE.dailyStreak;
+      const claimedCount = can ? (((nextS - 1) % 7 + 7) % 7) : ((((STATE.dailyStreak - 1) % 7 + 7) % 7) + 1);
+      const dayInCycle = can ? (((nextS - 1) % 7 + 7) % 7) : (claimedCount - 1);
       const cell = Math.min(52, (area.width - 20) / 7);
       for (let d = 0; d < 7; d++) {
         const x = area.left + 10 + d * cell + cell / 2;
         const y = area.top + 30;
-        const claimed = can ? d < dayInCycle : d <= dayInCycle;
+        const claimed = d < claimedCount;
         const cur = d === dayInCycle;
         m.add(this.add.rectangle(x, y, cell - 6, cell - 6, claimed ? 0x2f8f4f : 0x0d2c55, 1, cur ? 0xffd24a : 0x000000, cur ? 3 : 0));
         m.add(this.add.text(x, y - 8, String(d + 1), { fontFamily: FONT, fontSize: '8px', color: cur ? '#ffd24a' : '#9fd0ff' }).setOrigin(0.5));
@@ -696,8 +700,8 @@ class GameScene extends Phaser.Scene {
         m.add([b.img, b.txt]);
         y += 44;
       };
-      mkToggle('sound', () => STATE.settings.sound, v => { STATE.settings.sound = v; setSound(v); });
-      mkToggle('music', () => STATE.settings.music, v => { STATE.settings.music = v; setMusic(v); if (v) startMusic(); });
+      mkToggle('sound', () => STATE.settings.sound, v => { STATE.settings.sound = v; setSound(v); saveState(STATE, true); });
+      mkToggle('music', () => STATE.settings.music, v => { STATE.settings.music = v; setMusic(v); if (v) startMusic(); saveState(STATE, true); });
       m.add(this.add.text(area.left + 10, y, t('language'), { fontFamily: FONT, fontSize: '9px', color: '#ffffff' }));
       y += 26;
       LANGS.forEach((lng, i) => {
@@ -706,6 +710,7 @@ class GameScene extends Phaser.Scene {
         const b = this.makeButton(x, y, 60, 28, lng.toUpperCase(), () => {
           STATE.settings.lang = lng;
           setLanguage(lng);
+          saveState(STATE, true);
           this.layout();
           this.closeModal();
           this.openSettings();

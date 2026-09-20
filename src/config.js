@@ -3,8 +3,8 @@
 export const UPGRADES = [
   { id: 'orange',  icon: 'icon_orange',   type: 'click', value: 1,   baseCost: 15 },
   { id: 'grass',   icon: 'icon_grass',    type: 'cps',   value: 1,   baseCost: 25 },
-  { id: 'duck',    icon: 'icon_duck',     type: 'cps',   value: 5,   baseCost: 250 },
-  { id: 'friend',  icon: 'icon_friend',   type: 'cps',   value: 20,  baseCost: 1500 },
+  { id: 'duck',    icon: 'icon_duck',     type: 'cps',   value: 5,   baseCost: 300 },
+  { id: 'friend',  icon: 'icon_friend',   type: 'cps',   value: 20,  baseCost: 1800 },
   { id: 'spring',  icon: 'icon_spring',   type: 'cps',   value: 75,  baseCost: 10000 },
   { id: 'orchard', icon: 'icon_orchard',  type: 'cps',   value: 300, baseCost: 75000 },
   { id: 'leaf',    icon: 'icon_leafgold', type: 'mult',  value: 2,   baseCost: 5000, growth: 4 },
@@ -19,8 +19,8 @@ export function upgradeCost(u, owned) {
 // Evolution stages by TOTAL earned coins (this run)
 export const EVOLUTIONS = [
   { total: 0,        sprite: 'capy_evo1' },
-  { total: 1000,     sprite: 'capy_evo2' },
-  { total: 50000,    sprite: 'capy_evo3' },
+  { total: 2000,     sprite: 'capy_evo2' },
+  { total: 120000,   sprite: 'capy_evo3' },
   { total: 1000000,  sprite: 'capy_evo4' },
   { total: 50000000, sprite: 'capy_evo5' },
 ];
@@ -60,20 +60,20 @@ export const OFFLINE_CAP_SEC = 8 * 3600;
 export const INTERSTITIAL_COOLDOWN = 130; // seconds (spec: 120-150)
 
 export const ACHIEVEMENTS = [
-  { id: 'clicks1',    check: s => s.totalClicks >= 100,      reward: 500 },
-  { id: 'clicks2',    check: s => s.totalClicks >= 1000,     reward: 5000 },
-  { id: 'clicks3',    check: s => s.totalClicks >= 10000,    reward: 50000 },
-  { id: 'earn1',      check: s => s.totalEarnedAll >= 1000,     reward: 300 },
-  { id: 'earn2',      check: s => s.totalEarnedAll >= 100000,   reward: 20000 },
-  { id: 'earn3',      check: s => s.totalEarnedAll >= 10000000, reward: 1000000 },
-  { id: 'ups1',       check: s => totalUpgrades(s) >= 10,    reward: 2000 },
-  { id: 'ups2',       check: s => totalUpgrades(s) >= 50,    reward: 50000 },
-  { id: 'evo1',       check: s => s.maxEvolution >= 2,       reward: 5000 },
-  { id: 'evo2',       check: s => s.maxEvolution >= 4,       reward: 500000 },
-  { id: 'evo3',       check: s => s.maxEvolution >= 5,       reward: 5000000 },
+  { id: 'clicks1',    check: s => s.totalClicks >= 100,      reward: 150 },
+  { id: 'clicks2',    check: s => s.totalClicks >= 1000,     reward: 2500 },
+  { id: 'clicks3',    check: s => s.totalClicks >= 10000,    reward: 25000 },
+  { id: 'earn1',      check: s => s.totalEarnedAll >= 1000,     reward: 150 },
+  { id: 'earn2',      check: s => s.totalEarnedAll >= 100000,   reward: 10000 },
+  { id: 'earn3',      check: s => s.totalEarnedAll >= 10000000, reward: 500000 },
+  { id: 'ups1',       check: s => totalUpgrades(s) >= 10,    reward: 1000 },
+  { id: 'ups2',       check: s => totalUpgrades(s) >= 50,    reward: 25000 },
+  { id: 'evo1',       check: s => s.maxEvolution >= 2,       reward: 1500 },
+  { id: 'evo2',       check: s => s.maxEvolution >= 4,       reward: 250000 },
+  { id: 'evo3',       check: s => s.maxEvolution >= 5,       reward: 2500000 },
   { id: 'prestige1',  check: s => s.prestiges >= 1,          reward: 0 },
-  { id: 'daily1',     check: s => s.dailyTotal >= 3,         reward: 3000 },
-  { id: 'daily2',     check: s => s.dailyTotal >= 7,         reward: 25000 },
+  { id: 'daily1',     check: s => s.dailyTotal >= 3,         reward: 1500 },
+  { id: 'daily2',     check: s => s.dailyTotal >= 7,         reward: 12000 },
 ];
 
 export function totalUpgrades(s) {
@@ -89,14 +89,14 @@ export function makeQuest(state, slot) {
   if (type === 'clicks') {
     target = 50 + Math.floor(run / 500) * 25 + slot * 30;
     target = Math.min(target, 5000);
-    reward = Math.max(100, Math.ceil(target * (2 + state.cpsBase * 0.1)));
+    reward = Math.max(100, Math.ceil(target * (1 + state.cpsBase * 0.1)));
   } else if (type === 'coins') {
     target = Math.max(500, Math.ceil(run * 0.15)) * (slot + 1);
-    reward = Math.ceil(target * 0.2);
+    reward = Math.ceil(target * 0.15);
   } else {
     target = 3 + slot * 2 + Math.floor(state.prestiges);
     target = Math.min(target, 25);
-    reward = Math.max(200, Math.ceil((state.cpsBase + 1) * 60 * (slot + 1)));
+    reward = Math.max(200, Math.ceil((state.cpsBase + 1) * 30 * (slot + 1)));
   }
   return { type, target, reward, progress: 0, done: false, claimed: false };
 }
