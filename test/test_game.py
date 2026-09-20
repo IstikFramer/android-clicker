@@ -32,7 +32,7 @@ def shot(page, name):
     print("SHOT:", p)
 
 
-def run_viewport(pw, chrome, width, height, tag):
+def run_viewport(pw, chrome, width, height, tag, mobile=True):
     lib_dir = chrome.get("libDir", "")
     ld_path = lib_dir + (":" + os.environ["LD_LIBRARY_PATH"] if os.environ.get("LD_LIBRARY_PATH") else "")
     browser = pw.chromium.launch(
@@ -40,11 +40,12 @@ def run_viewport(pw, chrome, width, height, tag):
         args=chrome["args"] + ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
         env={**os.environ, "LD_LIBRARY_PATH": ld_path} if lib_dir else None,
     )
-    ctx = browser.new_context(
-        viewport={"width": width, "height": height},
-        device_scale_factor=2, is_mobile=True, has_touch=True,
-        user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-    )
+    ctx_args = dict(viewport={"width": width, "height": height},
+                    device_scale_factor=2 if mobile else 1,
+                    is_mobile=mobile, has_touch=True)
+    if mobile:
+        ctx_args["user_agent"] = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
+    ctx = browser.new_context(**ctx_args)
     page = ctx.new_page()
     page.goto(URL, wait_until="domcontentloaded")
     page.wait_for_function("window.__capy && window.__capy.state()", timeout=20000)
@@ -116,6 +117,7 @@ def main():
     with sync_playwright() as pw:
         run_viewport(pw, chrome, 375, 667, "m375")
         run_viewport(pw, chrome, 414, 896, "m414")
+        run_viewport(pw, chrome, 1280, 800, "pc1280", mobile=False)
     print("TEST SUITE PASSED")
 
 

@@ -107,6 +107,7 @@ class GameScene extends Phaser.Scene {
     // ---- persistent world objects ----
     const W = this.scale.width, H = this.scale.height;
     this.bg = this.add.image(W / 2, H / 2, pickBg());
+    this.shadow = this.add.ellipse(W / 2, H * 0.4, 100, 30, 0x0a2a12, 0.3);
     this.capy = this.add.image(W / 2, H * 0.38, 'capy_evo1');
     this.capy.setInteractive({ useHandCursor: true });
     this.capy.on('pointerdown', p => this.onCapyClick(p));
@@ -187,12 +188,13 @@ class GameScene extends Phaser.Scene {
   layout() {
     const W = this.scale.width, H = this.scale.height;
     this.clearUI();
-    this.bg.setDisplaySize(W, H);
+    this.bg.setScale(Math.max(W / this.bg.width, H / this.bg.height)); // cover: crop, never stretch
     const capySize = Math.min(W * 0.62, H * 0.30);
     this.capy.setPosition(W / 2, H * 0.36).setDisplaySize(capySize, capySize);
     this.capyBaseY = H * 0.36;
     this.capyBaseScaleX = this.capy.scaleX;
     this.capyBaseScaleY = this.capy.scaleY;
+    this.shadow.setPosition(W / 2, H * 0.36 + capySize * 0.42).setDisplaySize(capySize * 0.62, capySize * 0.2);
     this.applyEvolutionSprite(false);
 
     // ---- top HUD ----
