@@ -158,6 +158,7 @@ def check_world(page, problems):
       return { capy: { x: cm.tx, y: cm.ty, h: s.capy.displayHeight, top: cm.ty - s.capy.displayHeight / 2 },
                hat: { x: hm.tx, y: hm.ty, h: s.hat.displayHeight, w: s.hat.displayWidth,
                       bottom: hm.ty + s.hat.displayHeight / 2, top: hm.ty - s.hat.displayHeight / 2, vis: s.hat.visible },
+               art: s.hat.getData('art'),
                hills: s.layerHills ? { y0: s.layerHills.y - s.layerHills.height / 2, y1: s.layerHills.y + s.layerHills.height / 2,
                                        w: s.layerHills.width, tw: s.layerHills.texture.getSourceImage().width * s.layerHills.tileScaleX,
                                        vis: s.layerHills.visible } : null,
@@ -169,6 +170,9 @@ def check_world(page, problems):
     if not d:
         return
     c, h = d["capy"], d["hat"]
+    art = d.get("art")
+    if art:  # prefer the measured art box over the (padded) canvas box
+        h = dict(h, bottom=art["bottom"], top=art["top"], w=art["x1"] - art["x0"])
     if h["vis"]:
         # hat bottom must sit in the top 35% of the capybara, horizontally centred
         rel = (h["bottom"] - c["top"]) / c["h"]

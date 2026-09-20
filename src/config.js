@@ -143,22 +143,28 @@ export function offlineBonus(s) {
 export function critChance(s) { return 0.05 + perkLevel(s, 'crit') * 0.05; }
 
 // Cosmetics: hats worn by the capybara (permanent).
-// bb.bottom = y of the art's bottom edge inside the 96x96 canvas (used to sit the hat on the head)
+// bb = the art's bounding box inside the 96x96 canvas (measured from the PNG alpha):
+//   w/h = art size, bottom = y of the art's lower edge -> used to rest the hat on the head
 export const HATS = [
-  { id: 'none',    cost: 0,   bb: { bottom: 96 } },
-  { id: 'pumpkin', cost: 60,  bb: { bottom: 78 } },
-  { id: 'leaf',    cost: 120, bb: { bottom: 62 } },
-  { id: 'beanie',  cost: 200, bb: { bottom: 96 } },
+  { id: 'none',    cost: 0,   bb: { w: 96, h: 96, bottom: 96 } },
+  { id: 'pumpkin', cost: 60,  bb: { w: 96, h: 61, bottom: 78 } },
+  { id: 'leaf',    cost: 120, bb: { w: 96, h: 28, bottom: 62 } },
+  { id: 'beanie',  cost: 200, bb: { w: 96, h: 96, bottom: 96 } },
 ];
 
-// Measured head geometry per evolution sprite (128x128 units), used to seat hats
+// Head geometry per evolution, measured from the sprite alpha rows (128x128 units):
+//   top = first row of the head dome, cx = head centre, w = head width
 export const HEADS = [
-  { top: 4,  cx: 63,   w: 74 },
-  { top: 6,  cx: 63.5, w: 55 },
-  { top: 2,  cx: 62.5, w: 46 },
-  { top: 13, cx: 63,   w: 46 },
-  { top: 12, cx: 63,   w: 74 },
+  { top: 5,  cx: 63,   w: 75 },  // baby
+  { top: 5,  cx: 63.5, w: 56 },  // leafy
+  { top: 3,  cx: 62.5, w: 48 },  // cool
+  { top: 14, cx: 63,   w: 45 },  // king (crown spikes above the dome)
+  { top: 20, cx: 63,   w: 46 },  // legend (halo/wings above the dome)
 ];
+// hat fit rules (sprite units, relative to head width)
+export const HAT_W = 0.92;   // hat width  = head width * this
+export const HAT_MAX_H = 0.68; // hat height is clamped to head width * this (no skyscraper hats)
+export const HAT_BRIM = 0.26;  // brim sits this * head width below the top of the head
 
 // Coin packs: gems -> coins scaled to current CPS
 export const COIN_PACKS = [

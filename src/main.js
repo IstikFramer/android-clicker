@@ -7,7 +7,7 @@ import {
   OFFLINE_RATE, OFFLINE_CAP_SEC, ACHIEVEMENTS, totalUpgrades, makeQuest, IAP_PRODUCTS,
   GEM_BOOST_COST, GEM_BOOST_DURATION, EXCHANGE_GEMS, EXCHANGE_COINS, DAILY_GEMS_DAY7,
   REWARDED_COOLDOWN, PERKS, perkLevel, autoClickRate, offlineBonus, critChance,
-  HATS, COIN_PACKS, packCoins, HEADS,
+  HATS, COIN_PACKS, packCoins, HEADS, HAT_W, HAT_MAX_H, HAT_BRIM,
   EVENT, eventActive, eventDaysLeft, PASS_TIERS, PASS_PREMIUM_COST, passTierReached,
   EVENT_TASKS, dayKey, makeEventTasks,
 } from './config.js';
@@ -82,6 +82,7 @@ class BootScene extends Phaser.Scene {
     for (const k of ['coin_gold', 'strip_gold', 'mound', 'cloud', 'burst', 'heart_big', 'crown']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const k of ['icon_boost', 'icon_gem', 'chest_closed', 'chest_open', 'firework', 'star_big', 'icon_medal', 'trophy', 'icon_tv']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const k of ['layer_hills', 'layer_trees', 'pumpkin', 'hat_pumpkin', 'hat_leaf', 'hat_beanie', 'pedestal', 'bar_frame', 'banner']) this.load.image(k, `assets/ui/${k}.png?v=2`);
+    for (const k of ['row_plate', 'row_plate_alt', 'cell_plate', 'hud_frame', 'dock_frame', 'btn_close', 'tab_plate', 'banner_small', 'strip_divider', 'pedestal_glow']) this.load.image(k, `assets/ui/${k}.png?v=1`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bg_' + b, `assets/backgrounds/bg_${b}.jpg?v=3`);
     for (const b of ['day', 'sunset', 'night', 'winter']) this.load.image('bgpc_' + b, `assets/backgrounds/bgpc_${b}.jpg?v=1`);
     this.load.image('bgpc_autumn', 'assets/backgrounds/bgpc_autumn.jpg?v=1');
@@ -266,7 +267,7 @@ class GameScene extends Phaser.Scene {
     // ---- top HUD ----
     const hudH = 96;
     this.U(this.add.rectangle(cx, hudH / 2, CW, hudH, 0x123a6a, 1));
-    this.U(this.add.rectangle(cx, hudH - 2, CW, 4, 0x3a7ac9, 1));
+    this.U(this.add.nineslice(cx, hudH / 2, 'hud_frame', undefined, CW, hudH + 8, 24, 24, 20, 20));
     this.txtCoins = this.U(this.add.text(cx, 26, '0', { fontFamily: FONT, fontSize: '20px', padding: { x: 2, y: 7 }, color: '#ffd24a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
     this.coinIcon = this.U(this.add.image(0, 26, 'coin_gold').setDisplaySize(24, 24));
     this.txtCps = this.U(this.add.text(cx, 56, '', { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#bfe3ff' }).setOrigin(0.5));
@@ -287,7 +288,7 @@ class GameScene extends Phaser.Scene {
     // ---- bottom bar ----
     const barH = 64;
     this.U(this.add.rectangle(cx, H - barH / 2, CW, barH, 0x123a6a, 1));
-    this.U(this.add.rectangle(cx, H - barH + 2, CW, 4, 0x3a7ac9, 1));
+    this.U(this.add.nineslice(cx, H - barH / 2, 'dock_frame', undefined, CW, barH + 8, 24, 24, 16, 16));
     if (CW < W) { // PC side decor: dimmed wings with gold edges
       const edge = (W - CW) / 2;
       this.U(this.add.rectangle(edge / 2, H / 2, edge, H, 0x0a1a33, 0.88));
@@ -309,7 +310,7 @@ class GameScene extends Phaser.Scene {
       const x = cx + (i - (n - 1) / 2) * (bw + 8);
       const y = H - barH / 2;
       const zone = this.U(this.add.zone(x, y, bw + 8, barH).setInteractive({ useHandCursor: true }));
-      this.U(this.add.circle(x, y - 8, bw * 0.34, 0x0d2c55, 1));
+      this.U(this.add.image(x, y - 8, 'tab_plate').setDisplaySize(bw * 0.80, bw * 0.80));
       const img = this.U(this.add.image(x, y - 8, b.icon).setDisplaySize(bw * 0.56, bw * 0.56));
       const lbl = this.U(this.add.text(x, y + 20, t('tabs')[b.key], { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#bfe3ff' }).setOrigin(0.5));
       zone.on('pointerdown', () => { SFX.ui(); b.cb(); const s0 = img.scaleX; this.tweens.killTweensOf(img); img.setScale(s0); this.tweens.add({ targets: img, scaleX: s0 * 0.85, scaleY: s0 * 0.85, duration: 90, yoyo: true }); });
@@ -558,12 +559,11 @@ class GameScene extends Phaser.Scene {
     const panel = this.add.rectangle(W / 2, H / 2, pw, ph, 0x1c4f8f, 0.97).setStrokeStyle(4, 0x0d2c55);
     const title = this.add.text(W / 2, H / 2 - ph / 2 + 26, t(titleKey), { fontFamily: FONT, fontSize: '13px', padding: { x: 2, y: 5 }, color: '#ffd24a', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
     // close btn
-    const cb = this.add.image(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 24, 'part_heart').setDisplaySize(20, 20).setInteractive({ useHandCursor: true }).setTint(0xff2244);
+    const cb = this.add.image(W / 2 + pw / 2 - 24, H / 2 - ph / 2 + 24, 'btn_close').setDisplaySize(28, 28).setInteractive({ useHandCursor: true });
     cb.on('pointerdown', () => { SFX.ui(); this.closeModal(); });
-    const closeTxt = this.add.text(W / 2 + pw / 2 - 26, H / 2 - ph / 2 + 44, 'X', { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ff8899' }).setOrigin(0.5);
     const inner = this.add.rectangle(W / 2, H / 2, pw - 10, ph - 10, 0x000000, 0).setStrokeStyle(2, 0x3a7ac9, 0.9);
-    const under = this.add.image(W / 2, H / 2 - ph / 2 + 42, 'strip_gold').setDisplaySize(140, 12);
-    m.add([dim, panel, inner, title, under, cb, closeTxt]);
+    const under = this.add.image(W / 2, H / 2 - ph / 2 + 42, 'strip_divider').setDisplaySize(168, 18);
+    m.add([dim, panel, inner, title, under, cb]);
     this.modal = { container: m, W, H, pw, ph, cx: W / 2, cy: H / 2, add: (o) => { m.add(o); return o; } };
     builder(this.modal, { top: H / 2 - ph / 2 + 60, left: W / 2 - pw / 2 + 14, right: W / 2 + pw / 2 - 14, width: pw - 28, height: ph - 80 });
     // pop-in: panel scale + contents fade
@@ -628,8 +628,7 @@ class GameScene extends Phaser.Scene {
       UPGRADES.forEach((u, i) => {
         const y = area.top + 14 + 48 + i * (rowH + 6);
         const row = this.add.container(0, y);
-        const bgRow = this.add.rectangle(m.cx, 0, area.width, rowH, i % 2 ? 0x0d2c55 : 0x14386a, 0.85);
-        const accent = this.add.rectangle(area.left + 2, 0, 4, rowH - 10, 0xffd24a, 0.9);
+        const bgRow = this.add.nineslice(m.cx, 0, i % 2 ? 'row_plate_alt' : 'row_plate', undefined, area.width, rowH, 16, 16, 12, 12);
         const icon = this.add.image(area.left + 26, 0, u.icon).setDisplaySize(40, 40);
         const owned = STATE.upgrades[u.id] || 0;
         const name = this.add.text(area.left + 54, -14, t('up_' + u.id), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffffff' });
@@ -639,7 +638,7 @@ class GameScene extends Phaser.Scene {
         btn.img.removeAllListeners('pointerdown');
         btn.img.on('pointerdown', () => this.buyUpgrade(u, btn.txt, desc));
         this.setDisabled(btn, STATE.coins < cost);
-        row.add([bgRow, accent, icon, name, desc, btn.img, btn.txt]);
+        row.add([bgRow, icon, name, desc, btn.img, btn.txt]);
         rows.push({ row, btn, u, y });
         content.add(row);
       });
@@ -691,7 +690,7 @@ class GameScene extends Phaser.Scene {
       const rowY = (j) => area.top + 52 + j * (rowH + 8) + rowH / 2;
       const addRow = (y, icon, title, desc, btnLabel, style, cb) => {
         m.add(this.add.rectangle(m.cx, y, area.width, rowH, 0x2a1a5a, 0.9));
-        m.add(this.add.rectangle(area.left + 2, y, 4, rowH - 10, 0x7df9ff, 0.9));
+        m.add(this.add.nineslice(m.cx, y, 'row_plate_alt', undefined, area.width, rowH, 16, 16, 12, 12));
         m.add(this.add.image(area.left + 28, y, icon).setDisplaySize(38, 38));
         m.add(this.add.text(area.left + 56, y - 10, title, { fontFamily: FONT, fontSize: '9px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
         m.add(this.add.text(area.left + 56, y + 6, desc, { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
@@ -836,22 +835,35 @@ class GameScene extends Phaser.Scene {
 
   applyHat() { return this.placeHat(); }
 
-  // seats the hat on the capybara's head using measured per-evolution head geometry
+  // seats the hat on the capybara's head from measured per-evolution head geometry
   placeHat() {
     if (!this.hat || !this.capy) return;
     const id = (STATE.hats && STATE.hats.active) || 'none';
     if (id === 'none') { this.hat.setVisible(false); return; }
     this.hat.setTexture('hat_' + id).setVisible(true);
     const head = HEADS[Math.min(HEADS.length - 1, this.evoIdx || 0)];
-    const scale = this.capy.displayHeight / 128;
-    const headTopY = this.capy.y - this.capy.displayHeight / 2 + head.top * scale;
-    const headCx = this.capy.x + (head.cx - 64) * scale;
-    const size = Math.max(38, head.w * 1.05) * scale;
     const hat = HATS.find(h => h.id === id) || HATS[1];
-    const bottom = (hat.bb && hat.bb.bottom) || 96;
-    this.hat.setDisplaySize(size, size);
-    const targetY = headTopY + 10 * scale; // brim rests just onto the head
-    this.hat.setPosition(headCx, targetY - (bottom / 96 - 0.5) * size);
+    const bb = hat.bb || { w: 96, h: 96, bottom: 96 };
+    const scale = this.capy.displayHeight / 128;
+
+    // fit: width from the head, height clamped so the hat never towers over the sprite
+    let w = head.w * HAT_W;
+    let h = w * (bb.h / bb.w);
+    const maxH = head.w * HAT_MAX_H;
+    if (h > maxH) { w *= maxH / h; h = maxH; }
+    const size = w * 96 / bb.w;           // canvas size that makes the ART w units wide
+    const bottomOff = bb.bottom / 96 - 0.5; // art bottom offset from the canvas centre
+
+    const brimY = head.top + head.w * HAT_BRIM;                       // sprite row of the brim
+    const targetY = this.capy.y - this.capy.displayHeight / 2 + brimY * scale;
+    const cx = this.capy.x + (head.cx - 64) * scale;
+    this.hat.setDisplaySize(size * scale, size * scale);
+    this.hat.setPosition(cx, targetY - bottomOff * size * scale);
+    // expose the art box for the geometry audit
+    this.hat.setData('art', {
+      x0: cx - w * scale / 2, x1: cx + w * scale / 2,
+      top: targetY - h * scale, bottom: targetY, w: w, h: h,
+    });
   }
 
   // one consistent progress bar: frame below, fill inset, grows from the left edge
@@ -986,11 +998,13 @@ class GameScene extends Phaser.Scene {
       if (ev.premium) { this.setDisabled(pb, true); pb.img.disableInteractive(); }
       content.add([pb.img, pb.txt]);
       y += 40;
-      content.add(this.add.text(area.left + 4, y, t('tasks'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#7dff8a' }));
+      content.add(this.add.nineslice(m.cx, y + 6, 'banner_small', undefined, 150, 26, 40, 40, 8, 8));
+      content.add(this.add.text(m.cx, y + 6, t('tasks'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }).setOrigin(0.5));
       y += 20;
       for (const tk of ev.tasks) {
         const done = tk.progress >= tk.target;
         content.add(this.add.rectangle(m.cx, y + 17, area.width, 34, 0x0d2c55, 0.85));
+        content.add(this.add.nineslice(m.cx, y + 17, 'row_plate_alt', undefined, area.width, 34, 16, 16, 10, 10));
         content.add(this.add.text(area.left + 10, y + 4, t('task_' + tk.id), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#ffffff' }));
         content.add(this.add.text(area.left + 10, y + 20, fmt(tk.progress) + '/' + fmt(tk.target), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: done ? '#7dff8a' : '#9fd0ff' }));
         const frac = Math.min(1, tk.progress / tk.target);
@@ -1002,14 +1016,15 @@ class GameScene extends Phaser.Scene {
         y += 40;
       }
       y += 10;
-      content.add(this.add.text(area.left + 4, y, t('tier') + ' | ' + t('dailyClaim'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }));
+      content.add(this.add.nineslice(m.cx, y + 6, 'banner_small', undefined, 210, 26, 40, 40, 8, 8));
+      content.add(this.add.text(m.cx, y + 6, t('tier') + ' | ' + t('dailyClaim'), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffd24a' }).setOrigin(0.5));
       y += 20;
       PASS_TIERS.forEach((tr, i) => {
         const reached = ev.pumpkins >= tr.need;
         const gotF = ev.claimedFree.includes(i);
         const gotP = ev.claimedPrem.includes(i);
-        content.add(this.add.rectangle(m.cx, y + 19, area.width, 38, i % 2 ? 0x0d2c55 : 0x14386a, 0.85));
-        if (reached) content.add(this.add.rectangle(area.left + 2, y + 19, 4, 30, 0xffb347, 0.9));
+        content.add(this.add.nineslice(m.cx, y + 19, i % 2 ? 'row_plate_alt' : 'row_plate', undefined, area.width, 38, 16, 16, 10, 10));
+        if (reached) content.add(this.add.image(area.left + 12, y + 19, 'pumpkin').setDisplaySize(14, 14));
         content.add(this.add.text(area.left + 12, y + 4, (i + 1) + '. ' + fmt(tr.need), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: reached ? '#ffb347' : '#5f8fbf' }));
         content.add(this.add.text(area.left + 12, y + 22, fmt(ev.pumpkins) + '/' + fmt(tr.need), { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
         const bxF = area.left + 118, bxP = area.left + 236;
@@ -1073,6 +1088,7 @@ class GameScene extends Phaser.Scene {
       STATE.quests.forEach((q, i) => {
         const y = area.top + 30 + i * 92;
         m.add(this.add.rectangle(m.cx, y, area.width, 82, 0x0d2c55, 0.8));
+        m.add(this.add.nineslice(m.cx, y, 'row_plate', undefined, area.width, 82, 16, 16, 12, 12));
         const typeKey = 'quest_' + q.type;
         m.add(this.add.text(area.left + 10, y - 26, t(typeKey) + ': ' + fmt(q.target), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: '#ffffff' }));
         m.add(this.add.text(area.left + 10, y - 6, t('questProgress') + ': ' + fmt(Math.floor(q.progress)) + '/' + fmt(q.target), { fontFamily: FONT, fontSize: '7px', padding: { x: 2, y: 3 }, color: '#9fd0ff' }));
@@ -1126,14 +1142,19 @@ class GameScene extends Phaser.Scene {
         const y = area.top + 30;
         const claimed = d < claimedCount;
         const cur = d === dayInCycle;
-        m.add(this.add.rectangle(x, y, cell - 6, cell - 6, claimed ? 0x2f8f4f : 0x0d2c55, 1, cur ? 0xffd24a : 0x000000, cur ? 3 : 0));
+        const cellPlate = this.add.image(x, y, 'cell_plate').setDisplaySize(cell - 6, cell - 6);
+        if (claimed) cellPlate.setTint(0x8fe8a4);
+        m.add(cellPlate);
+        if (cur) m.add(this.add.rectangle(x, y, cell - 2, cell - 2, 0x000000, 0).setStrokeStyle(3, 0xffd24a));
         m.add(this.add.text(x, y - 8, String(d + 1), { fontFamily: FONT, fontSize: '8px', padding: { x: 2, y: 3 }, color: cur ? '#ffd24a' : '#9fd0ff' }).setOrigin(0.5));
         m.add(this.add.text(x, y + 10, fmt(dailyReward(d + 1, cpsBase())), { fontFamily: FONT, fontSize: '6px', padding: { x: 2, y: 3 }, color: '#ffffff' }).setOrigin(0.5));
       }
       const chestY = area.top + 116;
-      const ped = this.add.image(m.cx, chestY + 56, 'pedestal').setDisplaySize(150, 62);
-      const chest = this.add.image(m.cx, chestY, can ? 'chest_closed' : 'chest_open').setDisplaySize(104, 104);
-      m.add([ped, chest]);
+      const glow = this.add.image(m.cx, chestY + 62, 'pedestal_glow').setDisplaySize(210, 94);
+      const ped = this.add.image(m.cx, chestY + 60, 'pedestal').setDisplaySize(162, 66);
+      const chest = this.add.image(m.cx, chestY, can ? 'chest_closed' : 'chest_open').setDisplaySize(122, 122);
+      m.add([glow, ped, chest]);
+      this.tweens.add({ targets: glow, alpha: { from: 0.75, to: 1 }, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
       const yBtn = area.top + 226;
       if (can) {
         const nextStreak = this.nextStreak();
