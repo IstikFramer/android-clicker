@@ -44,7 +44,6 @@ fov = 44.0
 offset_left = 36.0
 offset_top = 38.0
 offset_right = 440.0
-[node name="CountryPicker" parent="HUD" instance=ExtResource("Countries")]
 [node name="Back" type="Button" parent="HUD"]
 unique_name_in_owner = true
 anchor_left = 1.0
@@ -81,3 +80,4 @@ offset_top = 65.0
 visible = false
 text = "PAUSED"
 theme_override_font_sizes/font_size = 40
+[node name="CountryPicker" parent="HUD" instance=ExtResource("Countries")]

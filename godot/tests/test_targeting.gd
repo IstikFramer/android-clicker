@@ -14,9 +14,9 @@ func check(world, expect: Callable) -> void:
 	expect.call(TargetRegistry.definition(&"earth").population == 8000000000,"int64 fictional population")
 	expect.call(not world.picker.buttons[&"sun"].visible,"Sun hidden for railgun")
 	expect.call(not world.picker.buttons.has(&"jupiter"),"Jupiter is decor")
-	var list: ItemList = world.countries.get_node("Body/List")
+	var list: ItemList = world.countries.get_node("%List")
 	world.picker.get_node("Body/Region").pressed.emit()
-	world.countries.get_node("Body/Search").text = "Tokyo"
+	world.countries.get_node("%Search").text = "Tokyo"
 	world.countries.filter_rows("Japan")
 	expect.call(list.item_count == 1 and list.get_item_metadata(0).code == "JP","searchable localized list")
 	list.item_selected.emit(0)
