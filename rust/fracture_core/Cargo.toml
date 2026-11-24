@@ -1,0 +1,14 @@
+[package]
+name = "fracture_core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+glam.workspace = true
+serde.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

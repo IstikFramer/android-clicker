@@ -1,0 +1,19 @@
+name: Windows packaging dry run
+on: workflow_dispatch
+env:
+  PYTHONUTF8: "1"
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tools/setup_windows.ps1 -Templates
+      - run: ./tools/export_windows.ps1
+      - run: ./tools/package_windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: space-die-stage01-windows-x64
+          path: dist/SPACE-DIE-0.1.0-win64.zip

@@ -1,0 +1,38 @@
+name: Stage 01
+on: [push, pull_request, workflow_dispatch]
+env:
+  PYTHONUTF8: "1"
+permissions:
+  contents: read
+jobs:
+  foundation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - if: runner.os == 'Linux'
+        run: tools/setup_linux.sh
+      - if: runner.os == 'Windows'
+        run: ./tools/setup_windows.ps1
+      - name: Rust checks
+        shell: bash
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --locked --workspace --all-targets
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          cargo test --locked --workspace
+          cargo build --locked --workspace
+      - if: runner.os == 'Linux'
+        run: |
+          tools/build_native.sh debug
+          tools/smoke_linux.sh
+      - if: runner.os == 'Windows'
+        run: |
+          ./tools/build_native.ps1 debug
+          python tools/check_godot.py --godot .tools/bin/Godot_v4.7.2-stable_win64_console.exe

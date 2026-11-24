@@ -1,0 +1,72 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/settings_menu.gd" id="Script"]
+[ext_resource type="Shader" path="res://shaders/stars.gdshader" id="Sky"]
+
+[sub_resource type="ShaderMaterial" id="Material"]
+shader = ExtResource("Sky")
+
+[node name="SettingsMenu" type="Control"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("Script")
+
+[node name="Sky" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+material = SubResource("Material")
+mouse_filter = 2
+
+[node name="Stack" type="VBoxContainer" parent="."]
+anchor_left = 0.067
+anchor_right = 0.067
+anchor_top = 0.5
+anchor_bottom = 0.5
+offset_right = 820.0
+grow_vertical = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="Stack"]
+text = "SETTINGS"
+theme_override_font_sizes/font_size = 64
+
+
+[node name="Grid" type="GridContainer" parent="Stack"]
+unique_name_in_owner = true
+columns = 2
+theme_override_constants/h_separation = 50
+theme_override_constants/v_separation = 8
+
+[node name="Note" type="Label" parent="Stack"]
+text = "LATER_OPTIONS"
+theme_override_font_sizes/font_size = 20
+theme_override_colors/font_color = Color(0.90,0.73,0.59,1)
+unique_name_in_owner = true
+autowrap_mode = 3
+
+[node name="Actions" type="HBoxContainer" parent="Stack"]
+theme_override_constants/separation = 10
+
+[node name="Apply" type="Button" parent="Stack/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 60)
+text = "APPLY"
+theme_type_variation = &"PrimaryButton"
+
+[node name="Defaults" type="Button" parent="Stack/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 60)
+text = "DEFAULTS"
+
+[node name="Back" type="Button" parent="Stack/Actions"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 60)
+text = "BACK"

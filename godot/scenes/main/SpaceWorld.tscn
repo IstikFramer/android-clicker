@@ -1,0 +1,85 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/core/world_controller.gd" id="World"]
+[ext_resource type="Script" path="res://scripts/core/camera_director.gd" id="Camera"]
+[ext_resource type="Shader" path="res://shaders/planet_surface.gdshader" id="Surface"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.022,0.033,0.049,1)
+ambient_light_source = 2
+ambient_light_color = Color(0.46,0.56,0.74,1)
+ambient_light_energy = 0.45
+
+[sub_resource type="ShaderMaterial" id="Mat"]
+shader = ExtResource("Surface")
+
+[sub_resource type="SphereMesh" id="Sphere"]
+radius = 1.6
+height = 3.2
+material = SubResource("Mat")
+
+
+[node name="SpaceWorld" type="Node3D"]
+script = ExtResource("World")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-26,-55,0)
+light_color = Color(1,0.88,0.72,1)
+light_energy = 1.4
+
+[node name="Targets" type="Node3D" parent="."]
+
+
+[node name="Sample" type="MeshInstance3D" parent="Targets"]
+mesh = SubResource("Sphere")
+
+[node name="Weapons" type="Node3D" parent="."]
+
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("Camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+position = Vector3(0,0,5.9)
+fov = 45.0
+
+[node name="VFX" type="Node3D" parent="."]
+
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+
+[node name="Stack" type="VBoxContainer" parent="HUD"]
+offset_left = 80.0
+offset_top = 70.0
+theme_override_constants/separation = 12
+
+[node name="Mode" type="Label" parent="HUD/Stack"]
+text = "DEV_FOUNDATION"
+theme_override_font_sizes/font_size = 23
+theme_override_colors/font_color = Color(0.97,0.65,0.42,1)
+
+
+[node name="Object" type="Label" parent="HUD/Stack"]
+text = "SAMPLE"
+theme_override_font_sizes/font_size = 48
+
+
+[node name="Orbit" type="Label" parent="HUD/Stack"]
+text = "ORBIT_HELP"
+theme_override_font_sizes/font_size = 24
+
+
+[node name="Paused" type="Label" parent="HUD/Stack"]
+text = "PAUSED"
+theme_override_font_sizes/font_size = 30
+visible = false
+
+[node name="Back" type="Button" parent="HUD/Stack"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(210, 60)
+text = "TO_MENU"

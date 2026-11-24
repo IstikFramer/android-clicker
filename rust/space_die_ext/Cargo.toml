@@ -1,0 +1,13 @@
+[package]
+name = "space_die_ext"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+name = "space_die_ext"
+crate-type = ["cdylib"]
+
+[dependencies]
+godot.workspace = true
+glam.workspace = true
+fracture_core = { path = "../fracture_core" }

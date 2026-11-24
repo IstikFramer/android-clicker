@@ -1,0 +1,52 @@
+[gd_resource type="Theme" format=3]
+
+[sub_resource type="SystemFont" id="Font"]
+font_names = PackedStringArray("Inter", "Noto Sans", "DejaVu Sans")
+
+[sub_resource type="StyleBoxFlat" id="Normal"]
+bg_color = Color(0.09, 0.12, 0.15, 0.96)
+border_width_bottom = 1
+border_color = Color(0.23, 0.28, 0.32, 1)
+content_margin_left = 22.0
+content_margin_right = 22.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="Hover"]
+bg_color = Color(0.19,0.24,0.28,1)
+content_margin_left = 22.0
+content_margin_right = 22.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="Accent"]
+bg_color = Color(0.98, 0.64, 0.36, 1)
+content_margin_left = 22.0
+content_margin_right = 22.0
+content_margin_top = 8.0
+content_margin_bottom = 8.0
+
+[sub_resource type="StyleBoxFlat" id="Focus"]
+draw_center = false
+border_color = Color(1, 0.80, 0.60, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+
+[resource]
+default_font = SubResource("Font")
+default_font_size = 25
+Label/colors/font_color = Color(0.91, 0.92, 0.90, 1)
+Button/styles/normal = SubResource("Normal")
+Button/styles/hover = SubResource("Hover")
+Button/styles/pressed = SubResource("Hover")
+Button/styles/focus = SubResource("Focus")
+OptionButton/styles/normal = SubResource("Normal")
+OptionButton/styles/hover = SubResource("Hover")
+PrimaryButton/base_type = &"Button"
+PrimaryButton/styles/normal = SubResource("Accent")
+PrimaryButton/styles/hover = SubResource("Accent")
+PrimaryButton/colors/font_color = Color(0.07,0.06,0.05,1)
+PrimaryButton/colors/font_focus_color = Color(0.07,0.06,0.05,1)
+PrimaryButton/colors/font_hover_color = Color(0.07,0.06,0.05,1)

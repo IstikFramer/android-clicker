@@ -1,0 +1,8 @@
+[package]
+name = "bake_cli"
+version.workspace = true
+edition.workspace = true
+[dependencies]
+fracture_core = { path = "../fracture_core" }
+serde_json.workspace = true
+serde.workspace = true

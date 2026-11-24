@@ -1,0 +1,7 @@
+.godot/
+rust/target/
+godot/native/bin/
+dist/
+.tools/
+*.log
+__pycache__/

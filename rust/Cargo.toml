@@ -1,0 +1,20 @@
+[workspace]
+members = ["fracture_core", "space_die_ext", "bake_cli"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+godot = { version = "=0.5.5", features = ["api-4-7"] }
+glam = { version = "0.30", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.9"
+rand_chacha = "0.9"
+thiserror = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,32 @@
+keys,ru,en
+SUBTITLE,Песочница разрушения планет,Planetary destruction sandbox
+START,Начать,Start
+SETTINGS,Настройки,Settings
+CREDITS,Авторы,Credits
+EXIT,Выход,Exit
+BACK,Назад,Back
+TO_MENU,В меню,Main menu
+DEFAULTS,По умолчанию,Defaults
+APPLY,Применить,Apply
+RESOLUTION,Разрешение окна,Window resolution
+QUALITY,Качество,Quality
+PARTICLES,Частицы,Particles
+VSYNC,Вертикальная синхронизация,VSync
+FULLSCREEN,Полный экран,Fullscreen
+FPS,Лимит кадров,Frame rate limit
+SHADOWS,Тени,Shadows
+LANGUAGE,Язык,Language
+LOW,Низкое,Low
+MEDIUM,Среднее,Medium
+HIGH,Высокое,High
+ON,Вкл.,On
+OFF,Выкл.,Off
+UNCAPPED,Без лимита,Uncapped
+LATER_OPTIONS,Профили качества и частиц сохраняются для этапов 02 / 07 / 08.,Quality and particle profiles are saved for stages 02 / 07 / 08.
+SAVE_FAILED,Не удалось сохранить настройки.,Settings could not be saved.
+LOADING,Загрузка орбиты…,Loading orbit…
+DEV_FOUNDATION,ДЕМОНСТРАЦИЯ · ЭТАП 01,DEV FOUNDATION · STAGE 01
+SAMPLE,Пробная планета,Sample planet
+ORBIT_HELP,ПКМ — орбита · Колесо — зум\nEsc — пауза · R — сброс,RMB drag to orbit · Scroll to zoom\nEsc to pause · R to reset
+PAUSED,Пауза,Paused
+CREDIT_BODY,SPACE DIE создана на Godot с расширением на Rust. Планета и звёздное небо построены процедурно.,SPACE DIE runs on Godot with a Rust extension. The planet and star field are generated procedurally.
