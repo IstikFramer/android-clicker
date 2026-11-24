@@ -1,0 +1,37 @@
+# Этап 01 из 08 · SPACE DIE v0.1.0
+
+24 ноября 2026. Ветка `work`, базовый коммит `8d68d45`, проверенная реализация `53c3eac`. Репозиторий на старте содержал пустое дерево. В рабочую сборку входят демонстрационная орбита, меню и настройки ru/en, контракты выстрела и состояния, FractureBridge v1, скрипты сборки и CI. Разработка этапа 02 ожидает отдельного задания.
+
+## Выполнено в Linux x86_64
+
+| Команда или сценарий | Код | Наблюдение |
+| --- | ---: | --- |
+| `godot --version`, `blender --version` | 0 | 4.7.2.stable.official.ed1daf0bf, Blender 4.3.2 |
+| `rustc --version`, `cargo --version` | 0 | Оба 1.94.0 stable |
+| `tools/setup_linux.sh`, повторный запуск, вариант `--templates` | 0 | Установлены проверенный редактор, Rust и по запросу Windows x64 templates |
+| `cargo metadata --locked --format-version 1` | 0 | Среди декларирующих MSRV зависимостей максимум 1.94. godot 0.5.5 включает api-4-7 |
+| `cargo fmt --all -- --check` | 0 | Форматирование workspace |
+| `cargo check --locked --workspace --all-targets` | 0 | Все цели workspace |
+| `cargo clippy --locked --workspace --all-targets -- -D warnings` | 0 | Все цели workspace |
+| `cargo test --locked --workspace` | 0 | Один тест pure core проверил отбрасывание NaN, нулевого направления и приём единичного. Проверка gdext выполняется в Godot |
+| `cargo build --locked --workspace` | 0 | Все три crate |
+| `tools/build_native.sh debug` и `release` | 0 | Обе .so скопированы в соответствующие каталоги Godot |
+| `cargo run --locked -q -p bake_cli` | 0 / 1 | Для [0,1,0] получен JSON, для [0,0,0] получена ожидаемая ошибка |
+| `tools/smoke_linux.sh` | 0 | Импорт и smoke, включая сборку из чистых файлов индекса без кэша проекта |
+| `godot --headless --path godot --editor --import` и `--script res://tests/smoke.gd` | 0 | ClassDB, API v1, работающий JoltPhysicsDirectSpaceState3D, настройки, ru/en, меню → мир → меню, камера и тени |
+| Тесты контракта в том же smoke | 0 | Цели и мощности, страна/Ocean, направление, запрет FIRE, пауза, дубликат commit, устаревший token |
+| Временный Linux release-export и запуск `./space-die --headless --log-file smoke.log -- --verify-package` | 0 | Официальный release template с release .so и PCK прошёл тот же функциональный тест из каталога экспорта |
+| Оконный запуск через Xorg и Mesa llvmpipe | 0 | Наблюдались русское меню, процедурная сцена и настройки. Мышью выполнены переходы и выход |
+
+## Исправления при проверке
+
+Первый импорт обратился к переводам до обработки CSV. В checkout добавлены обе сгенерированные локали. При поздней загрузке gdext редактор на чистом кэше завершился с кодом 134. Скрипты сборки теперь создают начальный extension_list.cfg до первого импорта. Чистый импорт и smoke после этих изменений прошли.
+
+Официальный release template игнорировал редакторский аргумент `--script`. Проба завершилась по timeout с кодом 124. Для экспортированной игры проверка теперь запускается из обычной главной сцены аргументом `-- --verify-package`. В отдельном Linux-пакете получен маркер SPACE DIE SMOKE PASS и код 0.
+
+## Ограничения и следующий контроль
+
+- Сетевой прокси вернул HTTP 403 для страницы архива Godot, страницы features на docs.rs и сайта книги gdext. Версия и архивы подтверждены официальным GitHub-релизом и его SHA512-манифестом, feature и MSRV — индексом crates.io, entry point — исходником официальной книги и загрузкой через ClassDB.
+- У Windows release template изучены таблицы импорта через `objdump -p`. В его прямых зависимостях системные DLL, включая msvcrt.dll. Проверка собранной MSVC DLL и всего ZIP подготовлена в workflow. Windows runner, чистая Windows и удалённые GitHub Actions в этой сессии не запускались.
+- Аппаратного GPU в облачной машине нет. Программный драйвер сообщил об отсутствии переключения VSync. FPS на Ryzen 5 5600X / RX 470 требует отдельного аппаратного замера.
+- Linux-фундамент готов к разработке этапа 02. Открытая платформенная проверка — Windows CI и ручной packaging dry run. Чистая офлайн-машина и приёмка дистрибутива входят в release checklist.
