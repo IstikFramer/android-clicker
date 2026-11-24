@@ -9,6 +9,10 @@
 | Быстрый запуск | Независимый процесс проходит полностью автоматический выстрел при 50% по реальному таймеру, включая отложенный звук и завершение. В Linux headless цикл с загрузкой занял 11,14 с. |
 | Автономный Linux-экспорт | Исполняемый файл release template запустил тесты из упакованной игры. Пройдены серия из 20 сбросов, проверка последовательностей и отчётов. |
 | Рендер | OpenGL Compatibility на Mesa llvmpipe. Проверены низкое и высокое качество с одного ракурса, масштаб 67% и 100%, варп, зарядка, полёт, полный удар по Земле и три других атмосферы при одинаковой мощности. Аппаратный FPS на Radeon RX 470 ещё не измерен. [Орбита](screenshots/stage04-orbit.jpg) · [Марс, Венера, Сатурн при 50%](screenshots/stage04-atmospheres.jpg) |
+| Публикация Windows x64 | Релиз `v0.1.0-stage04`, игровой коммит `6ff60ca`. Windows Server 2022 собрал и распаковал ZIP, запустил headless-тест экспортированной игры. Прямая ссылка вернула 49 058 126 байт. Проверены CRC всех четырёх файлов, команда быстрого запуска и SHA256 `c6644ebd4791a904ba9ee39286a6d6b23e2aef4d6a670b4d91446af3ffa8d483`. [Скачать ZIP](https://github.com/IstikFramer/android-clicker/releases/download/v0.1.0-stage04/SPACE-DIE-0.1.0-win64.zip) · [Сборка и публикация](https://github.com/IstikFramer/android-clicker/actions/runs/45383867838) |
+| CI | Для ветки и тега успешно завершены проверки на Ubuntu 24.04 и Windows 2022. [Ветка](https://github.com/IstikFramer/android-clicker/actions/runs/45383839804) · [Тег](https://github.com/IstikFramer/android-clicker/actions/runs/45383867917) |
+
+[Игровая запись выстрела по Земле при 35%](screenshots/stage04-weather.webp)
 
 # Этап 03 из 08 · Разрушение и графика
 

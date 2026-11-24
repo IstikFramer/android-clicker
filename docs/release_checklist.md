@@ -1,6 +1,6 @@
 # Пробная упаковка Windows x64
 
-Ручной workflow Windows packaging dry run работает на Windows MSVC и сохраняет ZIP как артефакт задания. Публикация релиза запланирована на этап 08.
+Workflow Windows demo package собирает Windows x64 с MSVC и проверяет ZIP. Ручной запуск сохраняет артефакт задания. Теги демо, перечисленные в release.yml, публикуют проверенный архив в GitHub Releases.
 
 1. Установить Rustup и Visual Studio Build Tools с C++ workload. Выполнить `./tools/setup_windows.ps1 -Templates`.
 2. Выполнить `./tools/export_windows.ps1`. Скрипт проверяет debug-сборку и smoke, собирает release DLL с `+crt-static` и экспортирует в отдельный каталог внутри dist.
