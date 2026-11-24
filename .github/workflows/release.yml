@@ -1,5 +1,8 @@
-name: Windows packaging dry run
-on: workflow_dispatch
+name: Windows demo package
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v0.1.0-stage01"]
 env:
   PYTHONUTF8: "1"
 permissions:
@@ -17,3 +20,22 @@ jobs:
         with:
           name: space-die-stage01-windows-x64
           path: dist/SPACE-DIE-0.1.0-win64.zip
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.1.0-stage01'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: space-die-stage01-windows-x64
+      - name: Publish the tested demo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" SPACE-DIE-0.1.0-win64.zip \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
+            --title "SPACE DIE v0.1.0 · Демо для Windows" \
+            --notes "Распакуйте ZIP и откройте SPACE-DIE.exe. В демоверсии доступны меню, настройки и орбита вокруг планеты."
