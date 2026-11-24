@@ -5,8 +5,16 @@ func _ready() -> void:
 	# Release templates run package verification through the normal entry point.
 	if "--verify-package" in OS.get_cmdline_user_args():
 		add_child(load("res://tests/test_application.gd").new())
+	elif "--railgun-demo" in OS.get_cmdline_user_args():
+		start_railgun_demo.call_deferred()
 	elif "--test-impact" in OS.get_cmdline_user_args():
 		start_impact_demo.call_deferred()
+
+func start_railgun_demo() -> void:
+	await SceneRouter.show_world()
+	var world=$SceneHost/SpaceWorld
+	world.select_direction(Vector3(.83,.34,.43).normalized())
+	world.fire_rail()
 
 func start_impact_demo() -> void:
 	var args:=OS.get_cmdline_user_args()
@@ -24,6 +32,7 @@ func start_impact_demo() -> void:
 		return
 	await SceneRouter.show_world()
 	var world=$SceneHost/SpaceWorld
+	world.demo_power=power
 	world.choose_weapon(weapon)
 	world.choose_target(id)
 	SceneRouter.loading.show()
@@ -32,7 +41,7 @@ func start_impact_demo() -> void:
 		get_tree().quit(1)
 		return
 	SceneRouter.loading.hide()
-	world.demo_power=power
+	world.frame_view()
 	var token:=GameState.director.generation
 	await get_tree().create_timer(1.2).timeout
 	if not is_instance_valid(world) or token!=GameState.director.generation: return

@@ -10,11 +10,17 @@ uniform float density=.7;
 uniform float cover=0.;
 uniform float u_time=0.;
 uniform vec3 sun_dir_local=vec3(1,0,0);
+#include "res://shaders/weather_front.gdshaderinc"
 varying vec3 p;
-void vertex(){p=VERTEX;}
+void vertex(){p=VERTEX; VERTEX+=weather_lift(normalize(VERTEX))*length(VERTEX);}
 void fragment(){
 	vec3 n=normalize(p);
 	vec2 uv=globe_uv(n)+vec2(u_time*.0007,0);
+	if(weather_age>=0.){
+		float a=front_distance(n), f=arrival(a);
+		vec3 gust=weather_lift(n);
+		uv=globe_uv(normalize(n-gust*.57))+vec2(u_time*.0007+sin(n.y*13.+weather_age)*f*.007,0.);
+	}
 	float cloud=texture(cloud_map,uv,quality_level==0 ? 2.2 : 0.).a;
 	if(cover>.6 && quality_level>=1){
 		float wind=terrain(vec3(n.x*5.,n.y*13.+u_time*.005,n.z*5.));
@@ -34,10 +40,10 @@ void fragment(){
 			pigment+=vec3(.36,.112,.031)*exp(-9.*abs(mu-.06));
 		}
 	}
-	float scar=1.;
+	float scar=weather_cover(n,cloud);
 	if(impact_age>=0.) {
 		float angle=acos(clamp(dot(n,impact_dir),-1.,1.));
-		scar=smoothstep(.08+impact_power*.96,.24+impact_power*1.24,angle);
+		pigment+=vec3(.35,.46,.57)*exp(-17.*abs(angle-weather_age*(.82+stripping*1.8)))*exp(-weather_age*.9);
 		pigment+=vec3(.9,.51,.25)*surface_wave(n);
 	}
 	if(cover>.6 && quality_level>=2) pigment*=mix(vec3(.66,.42,.26),vec3(1.19,1.06,.86),cloud);

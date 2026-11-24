@@ -3,14 +3,19 @@ extends Node
 const PATH := "user://settings.cfg"
 const OPTIONS := {
 	"resolution": ["1280 × 720", "1600 × 900", "1920 × 1080"],
+	"render_scale": ["50%", "67%", "77%", "85%", "100%", "125%"],
+	"sharpness": ["OFF", "SOFT", "BALANCED", "CRISP"],
+	"reduced_motion": ["OFF", "ON"],
 	"quality": ["LOW", "MEDIUM", "HIGH", "ULTRA"],
 	"shadows": ["OFF", "ON"], "particles": ["LOW", "MEDIUM", "HIGH"],
 	"vsync": ["OFF", "ON"], "fullscreen": ["OFF", "ON"],
 	"fps": ["30", "60", "120", "UNCAPPED"], "language": ["Русский", "English"]
 }
 const SIZES := [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080)]
+const RENDER_SCALES := [.50,.67,.77,.85,1.,1.25]
+const SHARPNESS := [0.,.32,.67,1.]
 const CAPS := [30, 60, 120, 0]
-const DEFAULTS := {"resolution": 2, "quality": 1, "shadows": 1, "particles": 1,
+const DEFAULTS := {"resolution": 2, "render_scale":4,"sharpness":2,"reduced_motion":0,"quality": 2, "shadows": 1, "particles": 1,
 	"vsync": 1, "fullscreen": 0, "fps": 1, "language": 0}
 var values := DEFAULTS.duplicate()
 
@@ -37,6 +42,9 @@ func apply(candidate: Dictionary) -> void:
 	values = validated(candidate)
 	TranslationServer.set_locale(["ru", "en"][values.language])
 	Engine.max_fps = CAPS[values.fps]
+	var viewport:=get_tree().root
+	viewport.scaling_3d_mode=Viewport.SCALING_3D_MODE_BILINEAR
+	viewport.scaling_3d_scale=RENDER_SCALES[values.render_scale]
 	if DisplayServer.get_name() != "headless":
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if values.fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
 		if not values.fullscreen:

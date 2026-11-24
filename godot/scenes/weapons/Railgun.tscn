@@ -1,0 +1,22 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/weapons/railgun_platform.gd" id="Rail"]
+[ext_resource type="PackedScene" path="res://scenes/weapons/Warp.tscn" id="W"]
+[node name="Railgun" type="Node3D"]
+script = ExtResource("Rail")
+[node name="ChargeFX" type="Node3D" parent="."]
+[node name="Sparks" type="GPUParticles3D" parent="ChargeFX"]
+emitting = false
+amount = 36
+lifetime = 0.48
+[node name="WarpEngineFX" parent="." instance=ExtResource("W")]
+[node name="PulseLight" type="OmniLight3D" parent="."]
+light_color = Color(0.32,0.75,1,1)
+light_energy = 0.0
+omni_range = 5.0
+shadow_enabled = false
+[node name="ChargeAudio" type="AudioStreamPlayer3D" parent="."]
+max_distance = 140.0
+[node name="MuzzleAudio" type="AudioStreamPlayer3D" parent="."]
+max_distance = 160.0
+[node name="ImpactAudio" type="AudioStreamPlayer3D" parent="."]
+max_distance = 180.0

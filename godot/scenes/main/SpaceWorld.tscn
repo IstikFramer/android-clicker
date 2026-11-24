@@ -4,6 +4,11 @@
 [ext_resource type="Shader" path="res://shaders/stars.gdshader" id="Stars"]
 [ext_resource type="PackedScene" path="res://scenes/ui/TargetPicker.tscn" id="Targets"]
 [ext_resource type="PackedScene" path="res://scenes/ui/CountryPicker.tscn" id="Countries"]
+[ext_resource type="Shader" path="res://shaders/reconstruct.gdshader" id="Post"]
+[ext_resource type="Script" path="res://scripts/ui/aim_reticle.gd" id="Reticle"]
+[sub_resource type="ShaderMaterial" id="PostMat"]
+resource_local_to_scene = true
+shader = ExtResource("Post")
 [sub_resource type="ShaderMaterial" id="SkyMat"]
 shader = ExtResource("Stars")
 [sub_resource type="Sky" id="Sky"]
@@ -39,7 +44,25 @@ near = 0.1
 far = 1000.0
 fov = 44.0
 [node name="VFX" type="Node3D" parent="."]
+[node name="Presentation" type="CanvasLayer" parent="."]
+layer = 0
+[node name="Grade" type="ColorRect" parent="Presentation"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+material = SubResource("PostMat")
+[node name="Pulse" type="ColorRect" parent="Presentation"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.89,0.96,1,0)
 [node name="HUD" type="CanvasLayer" parent="."]
+[node name="AimReticle" type="Control" parent="HUD"]
+visible = false
+mouse_filter = 2
+offset_right = 50.0
+offset_bottom = 50.0
+script = ExtResource("Reticle")
 [node name="TargetPicker" parent="HUD" instance=ExtResource("Targets")]
 offset_left = 36.0
 offset_top = 38.0
@@ -73,6 +96,44 @@ theme_override_colors/font_color = Color(0.72,0.8,0.83,1)
 [node name="Lock" type="Button" parent="HUD/Readout/Row"]
 text = "LOCK_POINT"
 theme_type_variation = &"PrimaryButton"
+[node name="Fire" type="Button" parent="HUD/Readout/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(186,58)
+theme_type_variation = &"PrimaryButton"
+text = "FIRE_RAIL"
+[node name="Phase" type="VBoxContainer" parent="HUD"]
+visible = false
+anchor_left = 0.37
+anchor_right = 0.69
+anchor_top = 0.045
+anchor_bottom = 0.045
+mouse_filter = 2
+[node name="Title" type="Label" parent="HUD/Phase"]
+horizontal_alignment = 1
+[node name="Bar" type="ProgressBar" parent="HUD/Phase"]
+custom_minimum_size = Vector2(0,7)
+show_percentage = false
+mouse_filter = 2
+[node name="Report" type="PanelContainer" parent="HUD"]
+visible = false
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -414.0
+offset_right = -36.0
+offset_top = 113.0
+theme_override_styles/panel = SubResource("Card")
+[node name="Body" type="VBoxContainer" parent="HUD/Report"]
+theme_override_constants/separation = 10
+[node name="Title" type="Label" parent="HUD/Report/Body"]
+text = "REPORT_TITLE"
+theme_override_font_sizes/font_size = 28
+[node name="Stats" type="Label" parent="HUD/Report/Body"]
+theme_override_font_sizes/font_size = 21
+[node name="Rule" type="HSeparator" parent="HUD/Report/Body"]
+[node name="News" type="Label" parent="HUD/Report/Body"]
+autowrap_mode = 3
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.94,0.75,0.52,1)
 [node name="Paused" type="Label" parent="HUD"]
 anchor_left = 0.5
 anchor_right = 0.5

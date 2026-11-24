@@ -37,6 +37,7 @@ void fragment() {
 	}
 	vec2 uv=fragment_coords ? UV : globe_uv(n);
 	ALBEDO=tint.rgb*texture(day_map,uv).rgb*value;
+	if (geology!=0) ALBEDO=texture(day_map,uv).rgb*mix(.94,1.12,h)*(geology==2 ? vec3(1.24,1.,.97) : vec3(1.14,1.01,.90));
 	if (geology==2) { ALBEDO=mix(ALBEDO,vec3(.83,.79,.72),smoothstep(.89,.975,abs(n.y)+0.045*h)); }
 	if(impact_age>=0.) EMISSION=fissures(n);
 	ROUGHNESS=roughness;

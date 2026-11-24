@@ -29,3 +29,14 @@ func is_valid() -> bool:
 func is_known_country() -> bool:
 	CountryLookup.initialize()
 	return CountryLookup.by_code.has(country_id)
+
+func snapshot() -> ShotRequest:
+	var copy:=ShotRequest.new()
+	copy.shot_id=shot_id
+	copy.weapon_id=weapon_id
+	copy.target_id=target_id
+	copy.local_hit_dir=local_hit_dir
+	copy.power=power
+	copy.country_id=country_id
+	copy.seed=seed
+	return copy

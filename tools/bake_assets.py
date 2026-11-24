@@ -166,7 +166,14 @@ def earth_textures():
     sea = np.stack((.025+.03*blue, .09+.18*blue+.12*shelf, .17+.26*blue+.09*shelf),-1)
     ice = np.clip((atlas.min(axis=2)-.72)*5,0,1)[:,:,None]
     sea = sea*(1-ice)+atlas*ice
-    day = np.uint8(np.clip(dry*shore+sea*(1-shore),0,1)*255)
+    # The cloud-free satellite composite keeps the moving weather independent.
+    satellite = np.asarray(Image.open(ROOT/".tools/assets/bmng.jpg").convert("RGB")
+                           .resize((W,H),Image.Resampling.LANCZOS), dtype=np.float32)/255
+    base = dry*shore+sea*(1-shore)
+    weight = .79+.10*shore
+    day = np.uint8(np.clip(satellite*weight + base*(1-weight),0,1)*255)
+    for name in ["Mars","Venus","Jupiter","Saturn"]:
+        (TEX/(name.lower()+"_atlas.jpg")).write_bytes((ROOT/(".tools/assets/nasa-"+name+".jpg")).read_bytes())
     Image.fromarray(day).save(TEX/"earth_day.jpg",quality=94,subsampling=0)
     density = (field(h,w,49)**5)*np.clip(1.15-latitude,0,1)
     points = (rng.random((h,w)) < density*.17)*land

@@ -44,6 +44,7 @@ func check(world: Node, expect: Callable) -> void:
 		expect.call(f.remnant.mesh.get_surface_count()==1 and pool.get_child_count()==budget,"bounded nodes across resets")
 	print("FRACTURE STRESS PASS cycles=20 nodes=",budget," low_physics=48 load_ms=",loaded," peak_hit_ms=",longest)
 	for quality in [1,2,3]:
+		world.restore_target()
 		options.quality=quality
 		settings.apply(options)
 		world.choose_target(&"earth")

@@ -3,6 +3,7 @@ shader_type spatial;
 #include "res://shaders/impact_surface.gdshaderinc"
 uniform vec4 tint : source_color = vec4(.96,.78,.56,1.);
 uniform vec4 belt : source_color = vec4(.60,.36,.23,1.);
+uniform sampler2D atlas : source_color, filter_linear_mipmap;
 uniform bool storm=false;
 uniform float u_time=0.;
 varying vec3 p;
@@ -33,5 +34,7 @@ void fragment(){
 		float r=length(delta*vec2(13.,29.))+.1*eddy;
 		pigment=mix(pigment,vec3(.68,.23,.10)*(.8+.19*sin(r*20.)),1.-smoothstep(.48,.99,r));
 	}
-	ALBEDO=pigment; ROUGHNESS=.93;
+	vec2 advected=uv+vec2(.004*sin(lat*17.+u_time*.06),.0015*(eddy-.5));
+	vec3 mapped=texture(atlas,advected).rgb;
+	ALBEDO=mix(pigment,mapped*(.89+.18*v),storm ? .78 : .64); ROUGHNESS=.93;
 }

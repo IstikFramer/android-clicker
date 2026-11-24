@@ -16,7 +16,7 @@ func _ready() -> void:
 	var shell := MeshInstance3D.new()
 	shell.name = "InnerGasShells"
 	shell.mesh = sphere(1)
-	shell.material_override = material(GAS,{"tint":definition.accent,"belt":Color("#975e39")})
+	shell.material_override = material(GAS,{"tint":definition.accent,"belt":Color("#975e39"),"atlas":definition.day_map})
 	shell.scale = Vector3.ONE*definition.visual_radius*.90
 	shell.hide()
 	$SpinPivot.add_child(shell)

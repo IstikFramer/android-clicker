@@ -22,14 +22,14 @@ HIGH,Высокое,High
 ON,Вкл.,On
 OFF,Выкл.,Off
 UNCAPPED,Без лимита,Uncapped
-LATER_OPTIONS,Качество меняет детализацию планет и моделей. Частицы — в следующих этапах.,Quality controls planet and model detail. Particle effects arrive in later stages.
+LATER_OPTIONS,Масштаб 3D влияет только на сцену. Интерфейс сохраняет разрешение окна.,3D scale affects the scene. The interface retains the window resolution.
 SAVE_FAILED,Не удалось сохранить настройки.,Settings could not be saved.
 LOADING,Загрузка орбиты…,Loading orbit…
 DEV_FOUNDATION,ДЕМОНСТРАЦИЯ · ЭТАП 01,DEV FOUNDATION · STAGE 01
 SAMPLE,Пробная планета,Sample planet
 ORBIT_HELP,ПКМ — орбита · Колесо — зум\nEsc — пауза · R — сброс,RMB drag to orbit · Scroll to zoom\nEsc to pause · R to reset
 PAUSED,Пауза,Paused
-CREDIT_BODY,Мир SPACE DIE создан на Godot и Rust. География и рельеф Земли — Natural Earth. Облака и ночные огни созданы для игры.,Built with Godot and Rust. Earth geography and relief by Natural Earth. Clouds and night lights created for SPACE DIE.
+CREDIT_BODY,Мир SPACE DIE создан на Godot и Rust. Карты планет — NASA и Natural Earth. Облака и ночные огни созданы для игры.,Built with Godot and Rust. Planetary imagery by NASA and Natural Earth. Clouds and night lights created for SPACE DIE.
 ATLAS,Орбитальный атлас,Orbital atlas
 BODY_MERCURY,Меркурий,Mercury
 BODY_VENUS,Венера,Venus
@@ -65,3 +65,33 @@ AIM_HELP,ЛКМ — точка  ·  ПКМ — орбита  ·  Колесо �
 EMPTY_SPACE,За пределами диска · точка не выбрана,Empty space · no point selected
 POINT_COORDS,%s   /   шир. %.2f°   долг. %.2f°,%s   /   lat %.2f°   lon %.2f°
 ULTRA,Ультра,Ultra
+RENDER_SCALE,Масштаб 3D,3D render scale
+SHARPNESS,Резкость изображения,Image sharpening
+REDUCED_MOTION,Уменьшить вспышки и тряску,Reduce flashes and shake
+SOFT,Мягкая,Soft
+BALANCED,Умеренная,Balanced
+CRISP,Высокая,Crisp
+FIRE_RAIL,Огонь,Fire
+KINETIC,Кинетический,Kinetic
+RESTORE_TARGET,Восстановить цель,Restore target
+INTEGRITY_READ,Целостность · %d%%,Integrity · %d%%
+REPORT_TITLE,Сводка удара,Impact report
+READ_ENERGY,Индекс энергии · %.1f,Energy index · %.1f
+READ_CRATER,Радиус кратера · %.1f км,Crater radius · %.1f km
+READ_LOSS,Потери в игре · %s,Scenario losses · %s
+READ_DAMAGE,Отделённая масса · %.1f%%,Detached mass · %.1f%%
+READ_AIR,Атмосфера · %.1f%%,Atmosphere · %.1f%%
+PHASE_TRAVEL,Варп-переход,Warp transit
+PHASE_CHARGING,Зарядка,Charging
+PHASE_FIRING,Полёт снаряда,Projectile in flight
+PHASE_IMPACT,Удар,Impact
+PHASE_AFTERMATH,Наблюдение,Aftermath
+SIGNAL_LOST,Связь с целью потеряна.,Target signal lost.
+WIRE_EARTH,Орбитальная сеть зарегистрировала удар в этом регионе.,Orbital network confirms an impact in this region.
+WIRE_MERCURY,Пыль закрыла участок поверхности. Станция проверяет связь.,Regolith obscures the impact site. Station link check in progress.
+WIRE_VENUS,Датчики видят разрыв в облачном покрове.,Sensors report a break in the cloud deck.
+WIRE_MARS,Колонии отмечают приближение пылевого фронта.,Colonies report an approaching dust front.
+WIRE_SATURN,Орбитальные посты фиксируют возмущение газовых полос.,Orbital stations detect a disturbance in the cloud belts.
+HIT_LOCAL,Локальные повреждения,Localized damage
+HIT_EXTENSIVE,Обширные повреждения,Extensive damage
+HIT_LOST,Цель разрушена,Target destroyed

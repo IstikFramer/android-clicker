@@ -7,6 +7,7 @@ uniform sampler2D ocean_mask : filter_linear_mipmap;
 uniform sampler2D cloud_map : filter_linear_mipmap;
 uniform sampler2D damage_mask : hint_default_black;
 uniform float damage_strength=0.;
+#include "res://shaders/weather_front.gdshaderinc"
 uniform vec3 sun_dir_local=vec3(1,0,0);
 uniform float u_time=0.;
 varying vec3 p;
@@ -25,6 +26,7 @@ void fragment(){
 	if(quality_level>0){
 		vec2 offset=(globe_uv(normalize(n+.013*sun_dir_local))-globe_uv(n));
 		float shade=texture(cloud_map,uv+vec2(u_time*.0007,0)+offset).a;
+		shade*=weather_cover(n,shade);
 		ALBEDO*=1.-shade*(quality_level>1 ? .44 : .22)*smoothstep(-.1,.4,mu);
 		ROUGHNESS=mix(.82,.24,water);
 		float rim=pow(1.-clamp(dot(normalize(NORMAL),normalize(VIEW)),0.,1.),3.);

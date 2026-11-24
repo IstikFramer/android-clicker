@@ -33,10 +33,12 @@ func material(shader: Shader, parameters: Dictionary) -> ShaderMaterial:
 
 func make_surface() -> ShaderMaterial:
 	match definition.type:
-		"gas": return material(GAS, {"tint":definition.tint,"belt":definition.accent,"storm":definition.id == &"jupiter"})
+		"gas": return material(GAS, {"tint":definition.tint,"belt":definition.accent,"storm":definition.id == &"jupiter","atlas":definition.day_map})
 		"star": return material(SOLAR, {})
 	var style := 2 if definition.id == &"mars" else (1 if definition.id == &"venus" else 0)
-	return material(ROCK, {"tint":definition.tint,"geology":style})
+	var params:={"tint":definition.tint,"geology":style}
+	if definition.day_map: params.day_map=definition.day_map
+	return material(ROCK,params)
 
 func _ready() -> void:
 	var r := definition.visual_radius

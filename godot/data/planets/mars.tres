@@ -2,6 +2,8 @@
 [ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
 [ext_resource type="Texture2D" path="res://assets/textures/clouds.png" id="cloud_map"]
 
+[ext_resource type="Texture2D" path="res://assets/textures/mars_atlas.jpg" id="atlas"]
+
 [resource]
 script = ExtResource("Def")
 id = &"mars"
@@ -20,3 +22,4 @@ fracture_count = 280
 damage_resistance = 0.85
 news_channel = &"mars_wire"
 cloud_map = ExtResource("cloud_map")
+day_map = ExtResource("atlas")

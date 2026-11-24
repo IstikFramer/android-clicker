@@ -9,8 +9,10 @@ var free_visuals: Array[MeshInstance3D] = []
 var physical: Array[Dictionary] = []
 var cosmetic: Array[Dictionary] = []
 var gravity_clock := 0.0
+var quality_level: int
 
 func prepare(quality: int, count: int) -> void:
+	quality_level=quality
 	var limit := mini(count,LIMITS[clampi(quality,0,3)])
 	for i in limit:
 		var body := FRAGMENT.instantiate() as RigidBody3D
@@ -135,3 +137,10 @@ func _physics_process(delta: float) -> void:
 		node.position += item.velocity*delta
 		if item.speed>.001: node.rotate(item.axis,item.speed*delta)
 		if item.fading: node.scale = Vector3.ONE*maxf(.001,1.-item.age/item.life)
+
+func resize_idle(quality: int, count: int) -> void:
+	if quality==quality_level or not physical.is_empty() or not cosmetic.is_empty(): return
+	for child in get_children(): child.free()
+	free_bodies.clear()
+	free_visuals.clear()
+	prepare(quality,count)

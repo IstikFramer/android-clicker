@@ -21,6 +21,7 @@ def main():
     for flags, marker in [
         (["--editor", "--import"], None),
         (["--script", "res://tests/smoke.gd"], "SPACE DIE SMOKE PASS"),
+        (["--script","res://tests/test_demo_clock.gd","--","--railgun-demo"], "RAIL LIVE CLOCK PASS"),
     ]:
         proc = subprocess.run(
             [args.godot, "--headless", "--path", str(args.project), *flags],

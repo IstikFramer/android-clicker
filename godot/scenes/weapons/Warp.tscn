@@ -1,0 +1,26 @@
+[gd_scene format=3]
+[ext_resource type="Shader" path="res://shaders/warp.gdshader" id="W"]
+[sub_resource type="ShaderMaterial" id="Material"]
+resource_local_to_scene = true
+shader = ExtResource("W")
+[sub_resource type="CylinderMesh" id="Tunnel"]
+top_radius = 1.0
+bottom_radius = 8.5
+height = 26.0
+radial_segments = 84
+rings = 3
+cap_top = false
+cap_bottom = false
+[node name="Warp" type="Node3D"]
+visible = false
+[node name="Tunnel" type="MeshInstance3D" parent="."]
+position = Vector3(0,0,-7)
+rotation = Vector3(-1.5708,0,0)
+mesh = SubResource("Tunnel")
+material_override = SubResource("Material")
+cast_shadow = 0
+[node name="Stars" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 48
+lifetime = 0.65
+visibility_aabb = AABB(-12,-12,-25,24,24,50)

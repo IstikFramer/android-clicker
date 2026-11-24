@@ -36,11 +36,11 @@ func fire(request: ShotRequest, token: int) -> bool:
 		return false
 	if used_ids.has(request.shot_id):
 		return false
-	active = request
+	active = request.snapshot()
 	used_ids[request.shot_id] = true
 	committed = false
 	transition(State.CHARGING, token)
-	EventBus.shot_started.emit(request)
+	EventBus.shot_started.emit(active.snapshot())
 	return true
 
 func commit(report: ImpactReport, population: int, token: int) -> bool:

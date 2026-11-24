@@ -2,6 +2,8 @@
 [ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
 
 
+[ext_resource type="Texture2D" path="res://assets/textures/saturn_atlas.jpg" id="atlas"]
+
 [resource]
 script = ExtResource("Def")
 id = &"saturn"
@@ -19,3 +21,4 @@ rotation_rate = 0.027
 fracture_count = 0
 damage_resistance = 1.15
 news_channel = &"saturn_wire"
+day_map = ExtResource("atlas")

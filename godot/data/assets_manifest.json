@@ -32,6 +32,61 @@
       "sha256": "d8616f4753a9d4cb2e02e8e1e577c103f6009c5962a07a1e445d36507c3ca52a",
       "purpose": "4K shaded land relief and bathymetry",
       "provenance": "upstream"
+    },
+    {
+      "path": ".tools/assets/bmng.jpg",
+      "source_url": "https://github.com/NASAWorldWind/WorldWindJava/tree/9ccf6b8ed2ae452ef51e7b1739a7ffd4ef78a403/src/images",
+      "url": "https://raw.githubusercontent.com/NASAWorldWind/WorldWindJava/9ccf6b8ed2ae452ef51e7b1739a7ffd4ef78a403/src/images/BMNG_world.topo.bathy.200405.3.2048x1024.jpg",
+      "author": "NASA Earth Observatory",
+      "attribution": "NASA Blue Marble Next Generation, May 2004",
+      "license": "Public domain NASA imagery",
+      "sha256": "7405c39a220bc37519474eba54625a0d1a02b6ad954895147c103a1bc8dd61fb",
+      "purpose": "Cloud-free day mosaic",
+      "provenance": "upstream"
+    },
+    {
+      "path": ".tools/assets/nasa-Mars.jpg",
+      "source_url": "https://github.com/nasa/NASA-3D-Resources/tree/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Mars",
+      "url": "https://raw.githubusercontent.com/nasa/NASA-3D-Resources/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Mars/Mars.jpg",
+      "author": "NASA 3D Resources",
+      "attribution": "NASA 3D Resources",
+      "license": "Public domain NASA imagery",
+      "sha256": "12ec6bf02ebd42a246edc778cb2ce8c595b4d9f0892badf0bfff8abb2303c780",
+      "purpose": "Surface or cloud-band atlas",
+      "provenance": "upstream"
+    },
+    {
+      "path": ".tools/assets/nasa-Venus.jpg",
+      "source_url": "https://github.com/nasa/NASA-3D-Resources/tree/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Venus",
+      "url": "https://raw.githubusercontent.com/nasa/NASA-3D-Resources/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Venus/Venus.jpg",
+      "author": "NASA 3D Resources",
+      "attribution": "NASA 3D Resources",
+      "license": "Public domain NASA imagery",
+      "sha256": "e395bced59e95339efbdd002d4a0bbbf81fe323a6694f3a4039120560c80e789",
+      "purpose": "Surface or cloud-band atlas",
+      "provenance": "upstream"
+    },
+    {
+      "path": ".tools/assets/nasa-Jupiter.jpg",
+      "source_url": "https://github.com/nasa/NASA-3D-Resources/tree/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Jupiter",
+      "url": "https://raw.githubusercontent.com/nasa/NASA-3D-Resources/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Jupiter/Jupiter.jpg",
+      "author": "NASA 3D Resources",
+      "attribution": "NASA 3D Resources",
+      "license": "Public domain NASA imagery",
+      "sha256": "ac2d387f8ea56a59f45dea37993c779a730f49d7d9fdbc8d36c307a351b1f1a1",
+      "purpose": "Surface or cloud-band atlas",
+      "provenance": "upstream"
+    },
+    {
+      "path": ".tools/assets/nasa-Saturn.jpg",
+      "source_url": "https://github.com/nasa/NASA-3D-Resources/tree/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Saturn",
+      "url": "https://raw.githubusercontent.com/nasa/NASA-3D-Resources/11ebb4ee043715aefbba6aeec8a61746fad67fa7/Images%20and%20Textures/Saturn/Saturn.jpg",
+      "author": "NASA 3D Resources",
+      "attribution": "NASA 3D Resources",
+      "license": "Public domain NASA imagery",
+      "sha256": "d959a239e3d87630daf08e2a688dcbf315fe01b1fd474e55522770108f40aca7",
+      "purpose": "Surface or cloud-band atlas",
+      "provenance": "upstream"
     }
   ],
   "generated": [
@@ -51,8 +106,8 @@
     {
       "path": "godot/assets/textures/earth_day.jpg",
       "provenance": "derived",
-      "source": "Natural Earth II 1:50m shaded relief, water and land cover",
-      "sha256": "d381b30c2f9ebb625792cfffb75d2502cc1799d20573b0a287102d80f7d66dd4"
+      "source": "NASA Blue Marble Next Generation (May 2004) and Natural Earth II relief",
+      "sha256": "5bac65770532b87cdb53938bbfe5c55af6b1b665073b914cacc769dad6e69d9e"
     },
     {
       "path": "godot/assets/textures/earth_night.jpg",
@@ -197,6 +252,30 @@
       "source": "tools/bake_models.py (Blender 4.3.2)",
       "author": "SPACE DIE project",
       "sha256": "dc6ae59b7a7084eda801b093ef7afc6e92ee9675c3a4d818eb6c9f6720a5190c"
+    },
+    {
+      "path": "godot/assets/textures/mars_atlas.jpg",
+      "provenance": "upstream",
+      "source": "NASA 3D Resources Mars",
+      "sha256": "12ec6bf02ebd42a246edc778cb2ce8c595b4d9f0892badf0bfff8abb2303c780"
+    },
+    {
+      "path": "godot/assets/textures/venus_atlas.jpg",
+      "provenance": "upstream",
+      "source": "NASA 3D Resources Venus",
+      "sha256": "e395bced59e95339efbdd002d4a0bbbf81fe323a6694f3a4039120560c80e789"
+    },
+    {
+      "path": "godot/assets/textures/jupiter_atlas.jpg",
+      "provenance": "upstream",
+      "source": "NASA 3D Resources Jupiter",
+      "sha256": "ac2d387f8ea56a59f45dea37993c779a730f49d7d9fdbc8d36c307a351b1f1a1"
+    },
+    {
+      "path": "godot/assets/textures/saturn_atlas.jpg",
+      "provenance": "upstream",
+      "source": "NASA 3D Resources Saturn",
+      "sha256": "d959a239e3d87630daf08e2a688dcbf315fe01b1fd474e55522770108f40aca7"
     }
   ]
 }

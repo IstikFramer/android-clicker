@@ -4,9 +4,10 @@
 | --- | --- |
 | Страны и подписи ru/en | Natural Earth Admin-0 Countries 1:50m, версия 5.1.2. 242 записи, включая территории. Полигоны переведены в маску 4096×2048. |
 | Вода и линия берега | Natural Earth Land 1:50m той же версии. Производная бинарная маска 2048×1024. |
-| Земля днём | Natural Earth II 1:50m, shaded relief, water и land cover. Карта 4096×2048 сохраняет исходный рельеф, ледяные покровы и батиметрию. Цвет моря и растительности адаптирован для освещения в игре. [Исходный растр](https://github.com/nvkelso/natural-earth-raster/tree/f04832c819e7a203d159dffe93cd9245332d6b33/50m_rasters/NE2_50M_LC_SR_W) |
+| Земля днём | Безоблачная мозаика NASA Blue Marble Next Generation за май 2004 года, 2048×1024. При запекании в 4096×2048 добавляется рельеф Natural Earth II. [NASA WorldWind](https://github.com/NASAWorldWind/WorldWindJava/tree/9ccf6b8ed2ae452ef51e7b1739a7ffd4ef78a403/src/images) [Исходный растр](https://github.com/nvkelso/natural-earth-raster/tree/f04832c819e7a203d159dffe93cd9245332d6b33/50m_rasters/NE2_50M_LC_SR_W) |
 | Ночные огни и облака | Собственный детерминированный генератор SPACE DIE. Поле огней вымышленное. Облачные фронты формируются деформацией многомасштабного шума. |
-| Остальные планеты, небо, кольца | Оригинальные процедурные шейдеры, радиальная UV-сетка колец и локальные оболочки. |
+| Марс, Венера, Сатурн, Юпитер | Карты NASA 3D Resources использованы в материалах поверхности и газовых полос. Исходные JPG входят в игру. [Коллекция и условия использования](https://github.com/nasa/NASA-3D-Resources/tree/11ebb4ee043715aefbba6aeec8a61746fad67fa7) |
+| Меркурий, Солнце, небо, кольца | Оригинальные процедурные шейдеры, радиальная UV-сетка колец и локальные оболочки. |
 | Установки, снаряд, станции, купола и восемь камней | Оригинальные GLB, созданные tools/bake_models.py в Blender 4.3.2. Геометрия запечена с единичными масштабами, glTF Y-up. Продольная ось установки соответствует Godot −Z. Сокеты экспортируются отдельными узлами. |
 | Шрифты | Системный шрифт или встроенный шрифт Godot. |
 
@@ -14,6 +15,6 @@
 
 Границы отображают картографические решения Natural Earth выбранного выпуска. Подписи используются для игрового выбора региона. Они не выражают позицию о статусе спорных территорий. Bake обрабатывает части MultiPolygon отдельно, разворачивает долготу, обрезает копии по линии смены дат и сохраняет отверстия. Для очень малой территории резервируется пересекающий её пиксель с репрезентативной точкой внутри полигона. На берегах разрешение карты ограничивает точность выбора.
 
-Сетевой прокси вернул HTTP 403 для страниц Blue Marble, NASA Brand Center и Terms of Use Natural Earth. Лицензия и файлы Natural Earth проверены через репозиторий авторов. Данные NASA и логотипы NASA в сборку не входят. Для этапа 08 остаётся получить реальные day/night/cloud карты, проверить атрибуцию каждого файла и заменить иллюстрации. [Blue Marble](https://science.nasa.gov/earth/earth-observatory/the-blue-marble-true-color-global-imagery-at-1km-resolution/) · [Коллекция Visible Earth](https://visibleearth.nasa.gov/collection/1484/blue-marble) · [NASA Images and Media](https://www.nasa.gov/nasa-brand-center/images-and-media/)
+Все входные карты и их SHA256 закреплены в `godot/data/assets_manifest.json`. Облачная маска Земли и ночные огни созданы проектом. [Blue Marble](https://science.nasa.gov/earth/earth-observatory/the-blue-marble-true-color-global-imagery-at-1km-resolution/) · [Правила NASA для изображений и медиа](https://www.nasa.gov/nasa-brand-center/images-and-media/)
 
 Godot 4.7.2 standard распространяется под MIT и содержит сторонние компоненты. Нативный интерфейс использует godot-rust 0.5.5. Права на оригинальные материалы проекта определяет владелец репозитория. [Лицензии Godot](https://godotengine.org/license/) · [godot-rust](https://github.com/godot-rust/gdext)
