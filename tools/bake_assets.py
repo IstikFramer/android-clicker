@@ -152,30 +152,45 @@ def earth_textures():
     land = np.asarray(land) > 0
     Image.fromarray(np.uint8(~land)*255).save(TEX/"ocean.png")
     latitude = np.abs(np.linspace(1,-1,h)[:,None])
-    terrain = sum(amp*field(h,w,n) for n,amp in [(8,.45),(25,.31),(68,.15),(184,.09)])
-    dry = np.clip(1.5 - 5*np.abs(latitude-.29) + 2*(terrain-.58),0,1)
-    wet = np.array([42,82,66])
-    sand = np.array([195,154,101])
-    land_rgb = wet+(sand-wet)*dry[:,:,None]
-    land_rgb += ((terrain-.5)*78)[:,:,None]
-    ice = np.clip((latitude-.77)*6+(terrain-.5),0,1)[:,:,None]
-    land_rgb = land_rgb*(1-ice)+np.array([213,223,220])*ice
-    coast = np.exp(-distance_transform_edt(~land)/4)
-    sea = np.array([17,46,80])+coast[:,:,None]*np.array([11,58,52])+terrain[:,:,None]*12
-    pack_ice = np.clip((latitude-.84)*7+(terrain-.49)*.65,0,1)[:,:,None]
-    sea = sea*(1-pack_ice) + np.array([205,219,225])*pack_ice
-    day = np.uint8(np.clip(np.where(land[:,:,None],land_rgb,sea),0,255))
-    Image.fromarray(day).resize((W,H),Image.Resampling.BICUBIC).save(TEX/"earth_day.jpg",quality=92)
+    # Retain Natural Earth's shaded relief, bathymetry and permanent ice at 4K.
+    atlas = np.asarray(Image.open(ROOT/".tools/assets/earth-relief.tif")
+                       .convert("RGB").resize((W,H),Image.Resampling.LANCZOS), dtype=np.float32)/255
+    shore = np.asarray(Image.fromarray(np.uint8(land)*255).resize((W,H), Image.Resampling.BILINEAR),
+                       dtype=np.float32)[:,:,None]/255
+    dry = np.clip((atlas-.23)*1.33,0,1)
+    foliage = np.clip((atlas[:,:,1]-atlas[:,:,0])*7,0,1)[:,:,None]
+    dry *= (1-.40*foliage)*np.array([.94,.94,.92],dtype=np.float32)
+    blue = np.clip((atlas[:,:,2]-.46)*2.0,0,1)
+    shelf = np.asarray(Image.fromarray(np.float32(np.exp(-distance_transform_edt(~land)/4)))
+                       .resize((W,H),Image.Resampling.BILINEAR))
+    sea = np.stack((.025+.03*blue, .09+.18*blue+.12*shelf, .17+.26*blue+.09*shelf),-1)
+    ice = np.clip((atlas.min(axis=2)-.72)*5,0,1)[:,:,None]
+    sea = sea*(1-ice)+atlas*ice
+    day = np.uint8(np.clip(dry*shore+sea*(1-shore),0,1)*255)
+    Image.fromarray(day).save(TEX/"earth_day.jpg",quality=94,subsampling=0)
     density = (field(h,w,49)**5)*np.clip(1.15-latitude,0,1)
     points = (rng.random((h,w)) < density*.17)*land
     glow = np.clip(points*.8 + gaussian_filter(points.astype(float),1.2)*2.1,0,1)
     Image.fromarray(np.uint8(glow[:,:,None]*np.array([255,194,108]))).save(TEX/"earth_night.jpg",quality=95)
-    swirl = field(h,w,8)
+    # Warp several cloud scales together. Rotating a bounded weather system
+    # winds its fibres into fronts that taper continuously into surrounding air.
     y,x=np.mgrid[:h,:w].astype("float32")
-    cloud = .50*field(h,w,17)+.3*field(h,w,52)+.2*field(h,w,128)
-    cloud = map_coordinates(cloud,[y+24*np.sin(swirl*7),x+45*swirl],order=1,mode="grid-wrap")
-    polar_weight = np.clip((1-latitude)*9,0,1)
-    alpha = np.uint8(np.clip((cloud-.42)*2.25,0,1)*polar_weight*255)
+    dx = 35*np.sin(y*0.012+field(h,w,7)*4)
+    dy = 22*np.sin(x*0.006+field(h,w,9)*5)
+    for cx,cy,r,direction in [(0.31,.36,105,1),(.74,.68,120,-1),(.87,.39,117,1),
+                              (.43,.71,82,-1),(.18,.57,96,-1),(.60,.27,78,1)]:
+        px=(x-cx*w+w/2)%w-w/2
+        py=y-cy*h
+        rr=(px*px+py*py)/(r*r)
+        angle=direction*3.8*np.exp(-rr*1.3)
+        dx+=px*(np.cos(angle)-1)-py*np.sin(angle)
+        dy+=px*np.sin(angle)+py*(np.cos(angle)-1)
+    cloud=sum(weight*field(h,w,scale) for scale,weight in [(12,.39),(33,.23),(78,.18),(177,.12),(281,.08)])
+    eddies = field(h,w,63)-.5
+    cloud=map_coordinates(cloud,[(y+dy+eddies*5)*1.53,x+dx+eddies*9],order=1,mode="grid-wrap")
+    fibres = .6*field(h,w,229)+.4*field(h,w,399)-.5
+    cloud += fibres*(.13+.19*np.clip(cloud,0,1))
+    alpha=np.uint8(np.clip((cloud-.475)*3.75,0,1)*np.clip((1-latitude)*11,0,1)*255)
     clouds = Image.new("RGBA",(w,h),"white")
     clouds.putalpha(Image.fromarray(alpha))
     clouds.save(TEX/"clouds.png")
@@ -186,3 +201,5 @@ if __name__ == "__main__":
     TEX.mkdir(parents=True, exist_ok=True)
     country_maps()
     earth_textures()
+    from bake_fractures import build
+    build()

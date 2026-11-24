@@ -1,0 +1,12 @@
+[gd_scene format=3]
+[ext_resource type="Shader" path="res://shaders/shockwave.gdshader" id="S"]
+[sub_resource type="ShaderMaterial" id="M"]
+resource_local_to_scene = true
+shader = ExtResource("S")
+shader_parameter/shell = true
+[sub_resource type="SphereMesh" id="P"]
+[node name="FractureCloud" type="MeshInstance3D"]
+visible = false
+mesh = SubResource("P")
+material_override = SubResource("M")
+cast_shadow = 0

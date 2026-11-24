@@ -1,0 +1,11 @@
+[gd_scene format=3]
+[ext_resource type="Shader" path="res://shaders/crater.gdshader" id="S"]
+[sub_resource type="ShaderMaterial" id="M"]
+resource_local_to_scene = true
+shader = ExtResource("S")
+[sub_resource type="PlaneMesh" id="P"]
+[node name="Crater" type="MeshInstance3D"]
+visible = false
+mesh = SubResource("P")
+material_override = SubResource("M")
+cast_shadow = 0

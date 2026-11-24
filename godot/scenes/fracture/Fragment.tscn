@@ -1,0 +1,11 @@
+[gd_scene format=3]
+[node name="Fragment" type="RigidBody3D"]
+freeze = true
+gravity_scale = 0.0
+collision_layer = 0
+collision_mask = 0
+visible = false
+[node name="Skin" type="MeshInstance3D" parent="."]
+cast_shadow = 0
+[node name="Hull" type="CollisionShape3D" parent="."]
+disabled = true

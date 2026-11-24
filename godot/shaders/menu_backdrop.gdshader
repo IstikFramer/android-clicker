@@ -1,5 +1,6 @@
 shader_type canvas_item;
 render_mode unshaded;
+uniform int quality_level=1;
 
 // The backdrop uses viewport-height units so stars and the limb stay circular.
 float hash(vec2 p) {
@@ -35,7 +36,8 @@ void fragment() {
 		vec2 surface = vec2(atan(n.x,n.z)*2.0+TIME*0.012, latitude*5.0);
 		float eddy = grain_field(surface*vec2(2.4,2.1));
 		float belt = grain_field(vec2(surface.x*0.8, latitude*37.0+eddy*6.5));
-		float filaments = sin(latitude*139.0 + eddy*31.0) * 0.05;
+		if(quality_level>=2) belt+=.16*grain_field(vec2(surface.x*3.1,latitude*103.+eddy*17.))-.07;
+		float filaments = sin(latitude*139.0 + eddy*31.0) * (quality_level>=2 ? .094 : .025);
 		vec3 pigment = mix(vec3(0.38,0.15,0.09),vec3(1.0,0.83,0.62),smoothstep(0.12,0.9,belt+filaments));
 		float light = max(dot(n,normalize(vec3(-0.85,-0.36,0.32))),0.0);
 		col = pigment * (0.035 + pow(light,0.76)) + vec3(0.012,0.017,0.023);

@@ -44,4 +44,34 @@ impl FractureBridge {
             radius,
         ))
     }
+
+    #[func]
+    fn plan_impact(&self, fragments: Array<VarDictionary>, params: VarDictionary) -> VarDictionary {
+        crate::convert::plan(&fragments, &params)
+            .unwrap_or_else(|e| vdict! {"ok" => false,"error" => e.as_str()})
+    }
+
+    #[func]
+    fn gravity_step(
+        &self,
+        positions: PackedVector3Array,
+        masses: PackedFloat32Array,
+        params: VarDictionary,
+    ) -> PackedVector3Array {
+        let values = (
+            crate::convert::field(&params, "g_game"),
+            crate::convert::field(&params, "epsilon"),
+            crate::convert::field(&params, "max_acceleration"),
+        );
+        let (Ok(g), Ok(e), Ok(limit)) = values else {
+            return PackedVector3Array::new();
+        };
+        if positions.len() > 96 {
+            return PackedVector3Array::new();
+        }
+        let pos: Vec<_> = positions.as_slice().iter().copied().map(vector).collect();
+        fracture_core::gravity::accelerations(&pos, masses.as_slice(), g, e, limit)
+            .map(crate::convert::packed)
+            .unwrap_or_default()
+    }
 }

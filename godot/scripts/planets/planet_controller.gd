@@ -12,6 +12,8 @@ var rim: ShaderMaterial
 var marker: MeshInstance3D
 var local_hit_dir := Vector3.ZERO
 var destroyed := false
+var spin_locked := false
+var quality_level := -1
 static var spheres: Dictionary[Vector2, SphereMesh] = {}
 @onready var surface_mesh: MeshInstance3D = $SpinPivot/Surface
 const SEGMENTS := [32, 48, 96, 128]
@@ -73,6 +75,7 @@ func _ready() -> void:
 		if props.has(definition.id):
 			add_model(props[definition.id], $SpinPivot/Markers, Vector3(0.82,0.54,0.20).normalized()*r, 0.28)
 	set_detail(0 if is_backdrop else 2)
+	apply_quality(0 if is_backdrop else int(get_node("/root/Settings").values.quality))
 
 func setup_layer(node: MeshInstance3D, mat: Material, radius: float) -> void:
 	node.mesh = sphere(0,radius)
@@ -99,9 +102,18 @@ func set_detail(level: int) -> void:
 		if layer.material_override:
 			layer.mesh = sphere(level, layer.mesh.radius)
 
+func apply_quality(level: int) -> void:
+	if level==quality_level: return
+	quality_level=level
+	for mat in [surface,clouds,rim]:
+		if mat: mat.set_shader_parameter("quality_level",level)
+	if rim and definition.type!="star":
+		$SpinPivot/Atmosphere.scale=Vector3.ONE*(1.+.004*level)
+
 func update_lod(radius_pixels: float, quality: int) -> void:
 	if is_backdrop:
 		return
+	apply_quality(quality)
 	var next := detail
 	if radius_pixels < 76.0:
 		next = 1
@@ -111,7 +123,7 @@ func update_lod(radius_pixels: float, quality: int) -> void:
 		next = 3
 	elif radius_pixels < 230.0 and next == 3:
 		next = 2
-	set_detail(clampi(next,1,quality+1))
+	set_detail(clampi(next,1,mini(3,quality+1)))
 
 func make_marker() -> void:
 	var mat := StandardMaterial3D.new()
@@ -144,7 +156,7 @@ func world_direction(direction: Vector3) -> Vector3:
 
 func advance(delta: float, sun_dir: Vector3) -> void:
 	elapsed += delta
-	$SpinPivot.rotate_y(definition.rotation_rate*delta)
+	if not spin_locked: $SpinPivot.rotate_y(definition.rotation_rate*delta)
 	sun_local = ($SpinPivot.global_basis.inverse()*sun_dir).normalized()
 	if definition.type != "rocky":
 		surface.set_shader_parameter("u_time",elapsed)

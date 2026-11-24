@@ -17,6 +17,7 @@ foreach ($file in $files | Where-Object { $_.Extension -in ".dll", ".exe" }) {
     $deps | Out-Host
     if ($LASTEXITCODE -or ($deps -match '(?i)(?:vcruntime|msvcp|concrt)\d+.*\.dll')) { throw "Review runtime imports in $file" }
 }
+Copy-Item "$PSScriptRoot/Impact-Demo.cmd" "$out/Impact-Demo.cmd"
 Compress-Archive -Path "$out/*" -DestinationPath $zip -Force
 $probe = Join-Path ([IO.Path]::GetTempPath()) ([guid]::NewGuid().ToString())
 try {

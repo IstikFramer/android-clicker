@@ -29,7 +29,7 @@ DEV_FOUNDATION,ДЕМОНСТРАЦИЯ · ЭТАП 01,DEV FOUNDATION · STAGE 0
 SAMPLE,Пробная планета,Sample planet
 ORBIT_HELP,ПКМ — орбита · Колесо — зум\nEsc — пауза · R — сброс,RMB drag to orbit · Scroll to zoom\nEsc to pause · R to reset
 PAUSED,Пауза,Paused
-CREDIT_BODY,Мир SPACE DIE создан на Godot и Rust. География — Natural Earth. Рельеф Земли и ночное освещение — авторская иллюстрация.,Built with Godot and Rust. Geography by Natural Earth. Earth relief and night lights are original illustrations.
+CREDIT_BODY,Мир SPACE DIE создан на Godot и Rust. География и рельеф Земли — Natural Earth. Облака и ночные огни созданы для игры.,Built with Godot and Rust. Earth geography and relief by Natural Earth. Clouds and night lights created for SPACE DIE.
 ATLAS,Орбитальный атлас,Orbital atlas
 BODY_MERCURY,Меркурий,Mercury
 BODY_VENUS,Венера,Venus
@@ -64,3 +64,4 @@ POINT_STORED,Точка зафиксирована на поверхности,P
 AIM_HELP,ЛКМ — точка  ·  ПКМ — орбита  ·  Колесо — зум,Click to aim  ·  RMB to orbit  ·  Scroll to zoom
 EMPTY_SPACE,За пределами диска · точка не выбрана,Empty space · no point selected
 POINT_COORDS,%s   /   шир. %.2f°   долг. %.2f°,%s   /   lat %.2f°   lon %.2f°
+ULTRA,Ультра,Ultra

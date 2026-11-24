@@ -45,3 +45,56 @@ func _ready() -> void:
 	debris.name = "RingDebris"
 	debris.multimesh = grains
 	frame.add_child(debris)
+
+var ring_origins: Array[Transform3D] = []
+var gas_age := -1.
+var gas_power := 0.
+var dispersing := false
+var gas_direction := Vector3.UP
+
+func start_gas_impact(direction: Vector3, power: float, full: bool) -> void:
+	if ring_origins.is_empty():
+		var grains: MultiMesh=$SpinPivot/RingSystem/RingDebris.multimesh
+		for i in grains.instance_count: ring_origins.append(grains.get_instance_transform(i))
+	gas_age=0.
+	gas_power=power
+	gas_direction=direction
+	dispersing=full
+	$SpinPivot/RingSystem/RingMesh.visible=not full
+
+func advance(delta: float, sun_dir: Vector3) -> void:
+	super(delta,sun_dir)
+	if gas_age<0.: return
+	gas_age+=delta
+	var frame: Node3D=$SpinPivot/RingSystem
+	frame.get_node("RingMesh").rotation.x=sin(gas_age*2.2)*.14*gas_power*exp(-gas_age*.4)
+	var grains: MultiMesh=frame.get_node("RingDebris").multimesh
+	for i in grains.instance_count:
+		var at:=ring_origins[i]
+		var axis:=at.origin.normalized()
+		var drift:=(axis+gas_direction*.23+Vector3.UP*sin(i*13.7)*.42)*gas_power*(1.4+sin(i*.35))
+		at.origin+=drift*gas_age*(1. if dispersing else exp(-gas_age*.6))
+		grains.set_instance_transform(i,at)
+	if dispersing:
+		surface_mesh.scale=Vector3.ONE*maxf(.001,1.-gas_age*.72)
+		frame.get_node("Stations").hide()
+	if gas_age>=8.: finish_gas_impact()
+
+func finish_gas_impact() -> void:
+	gas_age=-1.
+	if dispersing:
+		surface_mesh.hide()
+		$SpinPivot/RingSystem.hide()
+	else: restore_gas()
+
+func restore_gas() -> void:
+	gas_age=-1.
+	dispersing=false
+	surface_mesh.scale=Vector3.ONE
+	surface_mesh.show()
+	$SpinPivot/RingSystem.show()
+	$SpinPivot/RingSystem/RingMesh.show()
+	$SpinPivot/RingSystem/RingMesh.rotation=Vector3.ZERO
+	$SpinPivot/RingSystem/Stations.show()
+	var grains: MultiMesh=$SpinPivot/RingSystem/RingDebris.multimesh
+	for i in ring_origins.size(): grains.set_instance_transform(i,ring_origins[i])

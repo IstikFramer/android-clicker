@@ -21,6 +21,17 @@
       "sha256": "e874b27a51d146452be360cafb3cc50c86001074a67d534113e6534682f9826b",
       "purpose": "Ocean mask and illustrative coastline",
       "provenance": "upstream"
+    },
+    {
+      "path": ".tools/assets/earth-relief.tif",
+      "source_url": "https://github.com/nvkelso/natural-earth-raster/tree/f04832c819e7a203d159dffe93cd9245332d6b33",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-raster/f04832c819e7a203d159dffe93cd9245332d6b33/50m_rasters/NE2_50M_LC_SR_W/NE2_50M_LC_SR_W.tif",
+      "author": "Natural Earth contributors, NACIS",
+      "attribution": "Made with Natural Earth",
+      "license": "Public domain",
+      "sha256": "d8616f4753a9d4cb2e02e8e1e577c103f6009c5962a07a1e445d36507c3ca52a",
+      "purpose": "4K shaded land relief and bathymetry",
+      "provenance": "upstream"
     }
   ],
   "generated": [
@@ -39,21 +50,21 @@
     },
     {
       "path": "godot/assets/textures/earth_day.jpg",
-      "provenance": "fallback",
-      "source": "Original illustrative relief over Natural Earth land",
-      "sha256": "2a41f88a6ce6b9949174a0251bcbc167e57720899d60e7a2e9370f8dbdb8c721"
+      "provenance": "derived",
+      "source": "Natural Earth II 1:50m shaded relief, water and land cover",
+      "sha256": "d381b30c2f9ebb625792cfffb75d2502cc1799d20573b0a287102d80f7d66dd4"
     },
     {
       "path": "godot/assets/textures/earth_night.jpg",
       "provenance": "fallback",
       "source": "Original illustrative settlement lights",
-      "sha256": "99a009219a90e07b5157ea60856a9dd4122cd0ffa2755d5d72653656bd3d4225"
+      "sha256": "8d0bfac527a2b493e50c6adf7103ebf44b7fb304f2fb37a742a626b469a1f136"
     },
     {
       "path": "godot/assets/textures/clouds.png",
       "provenance": "fallback",
       "source": "Original seeded cloud field",
-      "sha256": "9e920dc0d131f75832a91485b769978122475061b652cda86466206f1fe3c217"
+      "sha256": "aa614a74faba9093f5ea9667f13355e2d4fbdf2daa778827ded076c594eabd50"
     },
     {
       "path": "godot/data/countries.json",

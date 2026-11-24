@@ -5,6 +5,9 @@ var weapon: StringName = &"railgun"
 var launch_view := false
 var missed := false
 var station: Node3D
+var fracture: FractureController
+var demo_power := 0
+var demo_history: Dictionary = {}
 var confirmed: ShotRequest
 var current_region: Dictionary = {}
 @onready var picker = $HUD/TargetPicker
@@ -38,6 +41,10 @@ func accepts_input() -> bool:
 	return GameState.director.state in [ShotDirector.State.IDLE, ShotDirector.State.AIM]
 
 func load_target(id: StringName) -> void:
+	if is_instance_valid(fracture):
+		if demo_power and fracture.integrity<1.: demo_history[planet.definition.id]=fracture.save_damage()
+		fracture.free()
+		fracture=null
 	if is_instance_valid(planet):
 		$Targets.remove_child(planet)
 		planet.queue_free()
@@ -46,6 +53,8 @@ func load_target(id: StringName) -> void:
 	current_region = {}
 	missed = false
 	confirmed = null
+	if demo_power and prepare_fracture() and demo_history.has(id):
+		fracture.load_damage(demo_history[id])
 
 func load_station() -> void:
 	if is_instance_valid(station):
@@ -188,8 +197,13 @@ func apply_settings() -> void:
 func on_reset(_generation: int) -> void:
 	countries.hide()
 	launch_view = false
-	weapon = &"railgun"
-	load_target(&"earth")
+	if not demo_power: weapon = &"railgun"
+	if demo_power:
+		var target:=planet.definition.id
+		if fracture: fracture.restore()
+		demo_history.clear()
+		load_target(target)
+	else: load_target(&"earth")
 	load_station()
 	for body: PlanetController in $Backdrop.get_children():
 		body.elapsed = 0.0
@@ -216,12 +230,40 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.is_action_pressed("select"):
 		pick_screen(event.position)
 	elif event is InputEventKey and event.is_action_pressed("fire"):
-		confirm_aim()
+		if demo_power and fracture and accepts_input() and planet.local_hit_dir!=Vector3.ZERO:
+			demo_hit.call_deferred(planet.local_hit_dir,demo_power)
+		else: confirm_aim()
+	elif event.is_action_pressed("skip_cinematic") and fracture:
+		fracture.skip()
 	elif event.is_action_pressed("pause"):
 		GameState.director.toggle_pause()
+		if fracture: fracture.set_effects_paused(GameState.director.state==ShotDirector.State.PAUSED)
 		$HUD/Paused.visible = GameState.director.state == ShotDirector.State.PAUSED
 	elif event.is_action_pressed("reset"):
 		GameState.reset_world()
 	else:
 		return
 	get_viewport().set_input_as_handled()
+
+func prepare_fracture() -> bool:
+	if fracture: return true
+	fracture=FractureController.new()
+	$VFX.add_child(fracture)
+	if fracture.prepare(planet,Settings.values.quality): return true
+	fracture.free()
+	fracture=null
+	return false
+
+func demo_hit(direction: Vector3, power: int) -> Dictionary:
+	if not fracture or not accepts_input() or fracture.integrity<=0.: return {}
+	select_direction(direction)
+	confirm_aim()
+	if not confirmed: return {}
+	var request:=confirmed
+	request.power=power
+	var result:=fracture.apply_hit(request,rig.camera.global_position,GameState.director.generation)
+	confirmed=null
+	rig.locked=false
+	planet.set_hit(Vector3.ZERO)
+	refresh_readout()
+	return result

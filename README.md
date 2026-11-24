@@ -1,8 +1,10 @@
 # SPACE DIE · v0.1.0
 
-Одиночная офлайн-песочница кинематографического разрушения планет. В **этапе 02 из 08** работает орбитальный атлас. Выберите установку и планету, щёлкните по поверхности и нажмите «Зафиксировать». На Земле можно найти страну по названию или коду. Выбранная точка остаётся на вращающейся поверхности. Кнопка «Осмотреть установку» переносит камеру к модели. Выстрелы и разрушение появятся в следующих этапах.
+В **этапе 03 из 08** можно посмотреть удар по планете. В Windows распакуйте весь ZIP и дважды нажмите **Impact-Demo.cmd**. Через секунду Земля расколется при мощности 50%. Для обычного атласа и настроек откройте **SPACE-DIE.exe**. [Скачать демо для Windows x64](https://github.com/IstikFramer/android-clicker/releases/download/v0.1.0-stage03/SPACE-DIE-0.1.0-win64.zip)
 
-ЛКМ выбирает точку, ПКМ вращает камеру, колесо меняет расстояние, Esc ставит сцену на паузу, R сбрасывает атлас. Игровые данные населения и расстояния вымышлены. Версия Земли использует авторское изображение рельефа, облаков и огней поверх береговой линии Natural Earth.
+В настройках качества «Низкое» оставляет один упрощённый слой облаков и до 48 физических осколков. «Высокое» добавляет облачные тени, блики воды, детальный рельеф и до 160 физических осколков. «Ультра» позволяет физически моделировать все 480 ячеек Земли. [Низкое](docs/screenshots/stage03-low.jpg) · [Высокое](docs/screenshots/stage03-high.jpg) · [Удар](docs/screenshots/stage03-fracture.jpg)
+
+В атласе ЛКМ выбирает точку, ПКМ вращает камеру, колесо меняет расстояние. В демонстрации после первого удара можно выбрать следующую точку и нажать пробел. Enter пропускает эффекты, Esc ставит сцену на паузу, R восстанавливает тело. Цифры населения и масштабы повреждения игровые.
 
 ## Запуск на Linux x86_64
 
@@ -14,6 +16,7 @@ export PATH="$PWD/.tools/bin:${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
 tools/build_native.sh debug
 tools/smoke_linux.sh
 godot --path godot
+godot --path godot -- --test-impact earth 50
 ```
 
 Для headless-машины достаточно smoke. В редакторе запускайте Main клавишей F6 из открытой главной сцены или F5 из проекта. M переключает звук. Кнопка «В меню» закрывает атлас. Настройки сохраняются в `user://settings.cfg`. Русский язык выбран по умолчанию, English доступен в настройках.
@@ -29,7 +32,7 @@ python tools/check_godot.py --godot .tools/bin/Godot_v4.7.2-stable_win64_console
 & ./.tools/bin/Godot_v4.7.2-stable_win64.exe --path godot
 ```
 
-Windows-сборка для игрока будет распространяться в ZIP с EXE, PCK и нативными библиотеками. Порядок пробной упаковки и проверки описан в [release_checklist.md](docs/release_checklist.md).
+Для запуска другой демонстрации из каталога распакованной игры выполните, например, `.\SPACE-DIE.exe -- --test-impact saturn 100 gungnir`. Параметры принимают ID цели, мощность и необязательный ID установки. Порядок пробной упаковки и проверки описан в [release_checklist.md](docs/release_checklist.md).
 
 ## Пересборка ресурсов
 
@@ -40,6 +43,7 @@ python3 -m venv .tools/art-env
 .tools/art-env/bin/pip install -r tools/requirements-assets.txt
 .tools/art-env/bin/python tools/fetch_assets.py
 .tools/art-env/bin/python tools/bake_assets.py
+python3 tools/bake_fractures.py --check
 blender -b --python-exit-code 1 --python tools/bake_models.py
 .tools/art-env/bin/python tools/verify_assets.py
 ```

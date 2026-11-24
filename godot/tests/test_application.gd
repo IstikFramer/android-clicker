@@ -57,6 +57,7 @@ func run() -> void:
 	expect(TranslationServer.translate("START") == &"Начать", "Russian locale")
 	load("res://tests/test_assets.gd").new().check(expect)
 	load("res://tests/test_targeting.gd").new().check(world,expect)
+	await load("res://tests/test_fracture.gd").new().check(world,expect)
 	var state := root.get_node("GameState")
 	state.director.toggle_pause()
 	state.reset_world()

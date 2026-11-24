@@ -2,7 +2,7 @@ name: Windows demo package
 on:
   workflow_dispatch:
   push:
-    tags: ["v0.1.0-stage01"]
+    tags: ["v0.1.0-stage01", "v0.1.0-stage03"]
 env:
   PYTHONUTF8: "1"
 permissions:
@@ -18,11 +18,11 @@ jobs:
       - run: ./tools/package_windows.ps1
       - uses: actions/upload-artifact@v4
         with:
-          name: space-die-stage01-windows-x64
+          name: space-die-windows-x64
           path: dist/SPACE-DIE-0.1.0-win64.zip
 
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.1.0-stage01'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v0.1.0-stage')
     needs: package
     runs-on: ubuntu-latest
     permissions:
@@ -30,12 +30,12 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: space-die-stage01-windows-x64
+          name: space-die-windows-x64
       - name: Publish the tested demo
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" SPACE-DIE-0.1.0-win64.zip \
             --repo "$GITHUB_REPOSITORY" --verify-tag --prerelease \
-            --title "SPACE DIE v0.1.0 · Демо для Windows" \
-            --notes "Распакуйте ZIP и откройте SPACE-DIE.exe. В демоверсии доступны меню, настройки и орбита вокруг планеты."
+            --title "SPACE DIE ${{ github.ref_name }} · Демо для Windows" \
+            --notes "Распакуйте ZIP. Откройте Impact-Demo.cmd для демонстрации удара по Земле или SPACE-DIE.exe для меню и настроек графики."

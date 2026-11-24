@@ -3,7 +3,7 @@ extends Node
 const PATH := "user://settings.cfg"
 const OPTIONS := {
 	"resolution": ["1280 × 720", "1600 × 900", "1920 × 1080"],
-	"quality": ["LOW", "MEDIUM", "HIGH"],
+	"quality": ["LOW", "MEDIUM", "HIGH", "ULTRA"],
 	"shadows": ["OFF", "ON"], "particles": ["LOW", "MEDIUM", "HIGH"],
 	"vsync": ["OFF", "ON"], "fullscreen": ["OFF", "ON"],
 	"fps": ["30", "60", "120", "UNCAPPED"], "language": ["Русский", "English"]

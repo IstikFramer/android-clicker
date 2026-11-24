@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "algorithm_sha256": "8f9ae0a4806a3622583b75e3722c4ab931b57ff55d029b8d2950e7233766077e",
+  "partitions": {
+    "mercury": {
+      "count": 240,
+      "seed": 31001,
+      "sha256": "37126659ce3511f46c92bb397fc0f5a0fd0aaf847a32bc95b52e739fd66c84bc"
+    },
+    "venus": {
+      "count": 300,
+      "seed": 31002,
+      "sha256": "a6900d8329c6c577e3f03d96ab494c7540a7f6d2897634ca3e4168bc93738eba"
+    },
+    "earth": {
+      "count": 480,
+      "seed": 31003,
+      "sha256": "93b3f95e7acca4e6be65143e2ae9ce72554209104c24b29271b9a2b0c9ff7d3e"
+    },
+    "mars": {
+      "count": 280,
+      "seed": 31004,
+      "sha256": "086ad92ac57b23cc6db879a288aa30f03f77e17f528a2676a4ac6ce975984b82"
+    }
+  }
+}
