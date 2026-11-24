@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="PlanetDefinition" format=3]
+[ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
+
+
+[resource]
+script = ExtResource("Def")
+id = &"jupiter"
+name_key = &"BODY_JUPITER"
+type = "gas"
+visual_radius = 10.0
+reference_radius_km = 69911
+population = 0
+probes = 0
+distance_game_km = 400000
+atmosphere = &"GAS_LAYERS"
+tint = Color(0.94,0.8,0.68,1)
+accent = Color(0.6,0.31,0.21,1)
+rotation_rate = 0.03
+fracture_count = 0
+damage_resistance = -1
+news_channel = &""

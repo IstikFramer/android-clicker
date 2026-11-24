@@ -1,0 +1,191 @@
+{
+  "sources": [
+    {
+      "path": ".tools/assets/ne_50m_admin_0_countries.geojson",
+      "source_url": "https://github.com/nvkelso/natural-earth-vector/tree/v5.1.2",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_50m_admin_0_countries.geojson",
+      "author": "Natural Earth contributors, NACIS",
+      "attribution": "Made with Natural Earth",
+      "license": "Public domain",
+      "sha256": "3e458fc036ad0a66411f2c1e6cac49c5d7bfb81cb1123bc513b22511a2b7fdeb",
+      "purpose": "Admin-0 offline picking",
+      "provenance": "upstream"
+    },
+    {
+      "path": ".tools/assets/ne_50m_land.geojson",
+      "source_url": "https://github.com/nvkelso/natural-earth-vector/tree/v5.1.2",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_50m_land.geojson",
+      "author": "Natural Earth contributors, NACIS",
+      "attribution": "Made with Natural Earth",
+      "license": "Public domain",
+      "sha256": "e874b27a51d146452be360cafb3cc50c86001074a67d534113e6534682f9826b",
+      "purpose": "Ocean mask and illustrative coastline",
+      "provenance": "upstream"
+    }
+  ],
+  "generated": [
+    {
+      "path": "godot/data/country_mask.png",
+      "provenance": "derived",
+      "source": "Natural Earth Admin-0 5.1.2",
+      "format": "RGB8; id = R + 256*G",
+      "sha256": "cdaafed2229f4a53a1ca123c89e04e05a5fca531a2fc0137fb491e5bb44fa1fb"
+    },
+    {
+      "path": "godot/assets/textures/ocean.png",
+      "provenance": "derived",
+      "source": "Natural Earth 50m physical land",
+      "sha256": "fba514125b07aa39a2d5bd3d3285034206f6c5f0e638063ad5abc09282cf82dd"
+    },
+    {
+      "path": "godot/assets/textures/earth_day.jpg",
+      "provenance": "fallback",
+      "source": "Original illustrative relief over Natural Earth land",
+      "sha256": "2a41f88a6ce6b9949174a0251bcbc167e57720899d60e7a2e9370f8dbdb8c721"
+    },
+    {
+      "path": "godot/assets/textures/earth_night.jpg",
+      "provenance": "fallback",
+      "source": "Original illustrative settlement lights",
+      "sha256": "99a009219a90e07b5157ea60856a9dd4122cd0ffa2755d5d72653656bd3d4225"
+    },
+    {
+      "path": "godot/assets/textures/clouds.png",
+      "provenance": "fallback",
+      "source": "Original seeded cloud field",
+      "sha256": "9e920dc0d131f75832a91485b769978122475061b652cda86466206f1fe3c217"
+    },
+    {
+      "path": "godot/data/countries.json",
+      "provenance": "derived",
+      "source": "Natural Earth Admin-0 5.1.2",
+      "sha256": "45fab8134abb1470831f8bb4360046234f0bff3f3c075fc66de4441935d21e13"
+    },
+    {
+      "path": "godot/assets/models/Gungnir.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "b9d79aac8eed4a4ac109c2b66f749777f76a9a3acf9baac56f0d308139dad589"
+    },
+    {
+      "path": "godot/assets/models/GungnirProjectile.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "3edfca767c84fae412c5ee40374f76c67916bd3f36a4ba83cb1e983ee705a701"
+    },
+    {
+      "path": "godot/assets/models/MarsDomes.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "961d089b3ef9a20648f2b256209e5831bbf780531155a2676172d36e1dcebd6c"
+    },
+    {
+      "path": "godot/assets/models/MercuryStation.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "a43a2fe3978965efe10779aaf41f00a616e28eb3a31f1dd4ad50a7dd4db8ecf7"
+    },
+    {
+      "path": "godot/assets/models/Railgun.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "2e55f9ac498e1d243a4d7cf58a4becd229011a8af0e3bafdb9a2d00e4cab2da0"
+    },
+    {
+      "path": "godot/assets/models/RailgunMedium.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "06c8b6225bec5dc9385ad643d496c58a12a566138c282184da300c8cb88fdda2"
+    },
+    {
+      "path": "godot/assets/models/Rock00.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "5281b03fcbba1860f9992acc35552907f9846baa81aea8e2d2873bad61a992f8"
+    },
+    {
+      "path": "godot/assets/models/Rock01.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "46c29e3d4fba958aa113029a5ce3d37b45c39321f8a7411fc2453c3d43aea50a"
+    },
+    {
+      "path": "godot/assets/models/Rock02.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "febde620a5b09388bb3c3285f6561fc34125a3acce67e59e14d1515ed04fe322"
+    },
+    {
+      "path": "godot/assets/models/Rock03.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "118c5143747eefb529daac8ef5ecc249ae75af11d8c0ba7c24054bd6317aca51"
+    },
+    {
+      "path": "godot/assets/models/Rock04.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "cd0d7251f236f260878ffe7dee57cbe29a4ee5d9477e8bd6a474e6299734d9c2"
+    },
+    {
+      "path": "godot/assets/models/Rock05.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "44f4febaa2ff234cb73ea50eb06aeb2ff2efd04aea26b18d2cbe0b8525ecd0e1"
+    },
+    {
+      "path": "godot/assets/models/Rock06.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "51ca74285be21910c05d462361eb794493bc45f213998af23b4b097b453a73d4"
+    },
+    {
+      "path": "godot/assets/models/Rock07.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "bbca45585d8ab3500dedaaf8f934714441db5d331bcaf570595a57f507476d58"
+    },
+    {
+      "path": "godot/assets/models/SaturnRings.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "abb5018f71ffc008bd82ee9f1549b8f6519bafcf8a29eee64d9b2a90a5a26665"
+    },
+    {
+      "path": "godot/assets/models/SaturnStation.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "5ac2d44ccc2e358b8a03f43e5e9331678c2aa3543eab7644f70f13b48336a41e"
+    },
+    {
+      "path": "godot/assets/models/Vera.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "292c50f1bd8ba6cf35b7487ee04190949fe22b5256b09912140d66f64a2e80ea"
+    },
+    {
+      "path": "godot/assets/models/VeraMedium.glb",
+      "provenance": "original",
+      "source": "tools/bake_models.py (Blender 4.3.2)",
+      "author": "SPACE DIE project",
+      "sha256": "dc6ae59b7a7084eda801b093ef7afc6e92ee9675c3a4d818eb6c9f6720a5190c"
+    }
+  ]
+}

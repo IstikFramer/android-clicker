@@ -1,0 +1,8 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://scenes/planets/PlanetBase.tscn" id="Base"]
+[ext_resource type="Resource" path="res://data/planets/earth.tres" id="Def"]
+[ext_resource type="Script" path="res://scripts/planets/earth_controller.gd" id="Body"]
+
+[node name="Earth" instance=ExtResource("Base")]
+script = ExtResource("Body")
+definition = ExtResource("Def")

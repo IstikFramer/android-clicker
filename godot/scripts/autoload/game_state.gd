@@ -8,3 +8,5 @@ func reset_world() -> void:
 	director.reset()
 	registry.integrity_by_id = snapshot.starting_integrity.duplicate()
 	EventBus.world_reset.emit(director.generation)
+
+var next_shot_id := 1

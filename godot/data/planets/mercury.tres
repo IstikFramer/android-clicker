@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="PlanetDefinition" format=3]
+[ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
+
+
+[resource]
+script = ExtResource("Def")
+id = &"mercury"
+name_key = &"BODY_MERCURY"
+type = "rocky"
+visual_radius = 10.0
+reference_radius_km = 2439.7
+population = 12
+probes = 0
+distance_game_km = 630000
+atmosphere = &"VACUUM"
+tint = Color(0.68,0.65,0.61,1)
+accent = Color(0.4,0.37,0.33,1)
+rotation_rate = 0.014
+fracture_count = 240
+damage_resistance = 0.75
+news_channel = &"mercury_wire"

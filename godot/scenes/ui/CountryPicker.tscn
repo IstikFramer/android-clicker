@@ -1,0 +1,14 @@
+[gd_scene format=3]
+[ext_resource type="Script" path="res://scripts/ui/country_picker.gd" id="Script"]
+[node name="CountryPicker" type="PopupPanel"]
+size = Vector2i(480,590)
+script = ExtResource("Script")
+[node name="Body" type="VBoxContainer" parent="."]
+custom_minimum_size = Vector2(440,540)
+theme_override_constants/separation = 8
+[node name="Search" type="LineEdit" parent="Body"]
+placeholder_text = "SEARCH_COUNTRY"
+[node name="List" type="ItemList" parent="Body"]
+size_flags_vertical = 3
+[node name="Back" type="Button" parent="Body"]
+text = "BACK"

@@ -1,0 +1,7 @@
+[gd_scene format=3]
+[ext_resource type="PackedScene" path="res://scenes/planets/PlanetBase.tscn" id="Base"]
+[ext_resource type="Resource" path="res://data/planets/mercury.tres" id="Def"]
+
+
+[node name="Mercury" instance=ExtResource("Base")]
+definition = ExtResource("Def")

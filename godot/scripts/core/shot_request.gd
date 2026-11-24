@@ -16,7 +16,7 @@ func is_valid() -> bool:
 		return false
 	if target_id != &"earth" and not country_id.is_empty():
 		return false
-	if not country_id.is_empty() and country_id != "Ocean" and country_id not in TranslationServer.get_all_countries():
+	if not country_id.is_empty() and country_id != "Ocean" and not is_known_country():
 		return false
 	if target_id == &"earth" and weapon_id == &"railgun" and country_id.is_empty():
 		return false
@@ -25,3 +25,7 @@ func is_valid() -> bool:
 		&"gungnir": return power == 100
 		&"vera": return power >= 20 and power <= 100
 	return false
+
+func is_known_country() -> bool:
+	CountryLookup.initialize()
+	return CountryLookup.by_code.has(country_id)

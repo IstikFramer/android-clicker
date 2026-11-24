@@ -1,85 +1,83 @@
 [gd_scene format=3]
-
 [ext_resource type="Script" path="res://scripts/core/world_controller.gd" id="World"]
 [ext_resource type="Script" path="res://scripts/core/camera_director.gd" id="Camera"]
-[ext_resource type="Shader" path="res://shaders/planet_surface.gdshader" id="Surface"]
-
+[ext_resource type="Shader" path="res://shaders/stars.gdshader" id="Stars"]
+[ext_resource type="PackedScene" path="res://scenes/ui/TargetPicker.tscn" id="Targets"]
+[ext_resource type="PackedScene" path="res://scenes/ui/CountryPicker.tscn" id="Countries"]
+[sub_resource type="ShaderMaterial" id="SkyMat"]
+shader = ExtResource("Stars")
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
 [sub_resource type="Environment" id="Env"]
-background_mode = 1
-background_color = Color(0.022,0.033,0.049,1)
+background_mode = 2
+sky = SubResource("Sky")
 ambient_light_source = 2
-ambient_light_color = Color(0.46,0.56,0.74,1)
-ambient_light_energy = 0.45
-
-[sub_resource type="ShaderMaterial" id="Mat"]
-shader = ExtResource("Surface")
-
-[sub_resource type="SphereMesh" id="Sphere"]
-radius = 1.6
-height = 3.2
-material = SubResource("Mat")
-
-
+ambient_light_color = Color(0.52,0.61,0.73,1)
+ambient_light_energy = 0.24
+reflected_light_source = 1
+[sub_resource type="StyleBoxFlat" id="Card"]
+bg_color = Color(0.032,0.054,0.079,0.94)
+content_margin_left = 22.0
+content_margin_right = 22.0
+content_margin_top = 14.0
+content_margin_bottom = 14.0
 [node name="SpaceWorld" type="Node3D"]
 script = ExtResource("World")
-
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Env")
-
 [node name="KeyLight" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-26,-55,0)
-light_color = Color(1,0.88,0.72,1)
-light_energy = 1.4
-
+rotation_degrees = Vector3(-25,-12,0)
+light_color = Color(1,0.96,0.89,1)
+light_energy = 1.35
 [node name="Targets" type="Node3D" parent="."]
-
-
-[node name="Sample" type="MeshInstance3D" parent="Targets"]
-mesh = SubResource("Sphere")
-
+[node name="Backdrop" type="Node3D" parent="."]
 [node name="Weapons" type="Node3D" parent="."]
-
-
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("Camera")
-
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
-position = Vector3(0,0,5.9)
-fov = 45.0
-
+near = 0.1
+far = 1000.0
+fov = 44.0
 [node name="VFX" type="Node3D" parent="."]
-
-
 [node name="HUD" type="CanvasLayer" parent="."]
-
-
-[node name="Stack" type="VBoxContainer" parent="HUD"]
-offset_left = 80.0
-offset_top = 70.0
-theme_override_constants/separation = 12
-
-[node name="Mode" type="Label" parent="HUD/Stack"]
-text = "DEV_FOUNDATION"
-theme_override_font_sizes/font_size = 23
-theme_override_colors/font_color = Color(0.97,0.65,0.42,1)
-
-
-[node name="Object" type="Label" parent="HUD/Stack"]
-text = "SAMPLE"
-theme_override_font_sizes/font_size = 48
-
-
-[node name="Orbit" type="Label" parent="HUD/Stack"]
-text = "ORBIT_HELP"
-theme_override_font_sizes/font_size = 24
-
-
-[node name="Paused" type="Label" parent="HUD/Stack"]
-text = "PAUSED"
-theme_override_font_sizes/font_size = 30
-visible = false
-
-[node name="Back" type="Button" parent="HUD/Stack"]
+[node name="TargetPicker" parent="HUD" instance=ExtResource("Targets")]
+offset_left = 36.0
+offset_top = 38.0
+offset_right = 440.0
+[node name="CountryPicker" parent="HUD" instance=ExtResource("Countries")]
+[node name="Back" type="Button" parent="HUD"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(210, 60)
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -236.0
+offset_right = -36.0
+offset_top = 38.0
+offset_bottom = 92.0
 text = "TO_MENU"
+[node name="Readout" type="PanelContainer" parent="HUD"]
+anchor_left = 0.28
+anchor_top = 1.0
+anchor_right = 0.985
+anchor_bottom = 1.0
+offset_top = -135.0
+offset_bottom = -32.0
+theme_override_styles/panel = SubResource("Card")
+[node name="Row" type="HBoxContainer" parent="HUD/Readout"]
+theme_override_constants/separation = 16
+[node name="Info" type="VBoxContainer" parent="HUD/Readout/Row"]
+size_flags_horizontal = 3
+[node name="Point" type="Label" parent="HUD/Readout/Row/Info"]
+theme_override_font_sizes/font_size = 29
+[node name="Hint" type="Label" parent="HUD/Readout/Row/Info"]
+theme_override_font_sizes/font_size = 21
+theme_override_colors/font_color = Color(0.72,0.8,0.83,1)
+[node name="Lock" type="Button" parent="HUD/Readout/Row"]
+text = "LOCK_POINT"
+theme_type_variation = &"PrimaryButton"
+[node name="Paused" type="Label" parent="HUD"]
+anchor_left = 0.5
+anchor_right = 0.5
+offset_top = 65.0
+visible = false
+text = "PAUSED"
+theme_override_font_sizes/font_size = 40

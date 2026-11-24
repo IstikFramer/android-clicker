@@ -1,4 +1,4 @@
-name: Stage 01
+name: SPACE DIE checks
 on: [push, pull_request, workflow_dispatch]
 env:
   PYTHONUTF8: "1"
@@ -17,7 +17,7 @@ jobs:
       - if: runner.os == 'Linux'
         run: tools/setup_linux.sh
       - if: runner.os == 'Windows'
-        run: ./tools/setup_windows.ps1
+        run: ./tools/setup_windows.ps1 -Templates
       - name: Rust checks
         shell: bash
         working-directory: rust
@@ -34,5 +34,11 @@ jobs:
           tools/smoke_linux.sh
       - if: runner.os == 'Windows'
         run: |
-          ./tools/build_native.ps1 debug
-          python tools/check_godot.py --godot .tools/bin/Godot_v4.7.2-stable_win64_console.exe
+          ./tools/export_windows.ps1
+          ./tools/package_windows.ps1
+      - if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SPACE-DIE-stage02-win64
+          path: dist/SPACE-DIE-0.1.0-win64.zip
+          if-no-files-found: error

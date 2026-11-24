@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="PlanetDefinition" format=3]
+[ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
+[ext_resource type="Texture2D" path="res://assets/textures/earth_day.jpg" id="day_map"]
+[ext_resource type="Texture2D" path="res://assets/textures/earth_night.jpg" id="night_map"]
+[ext_resource type="Texture2D" path="res://assets/textures/ocean.png" id="ocean_mask"]
+[ext_resource type="Texture2D" path="res://assets/textures/clouds.png" id="cloud_map"]
+
+[resource]
+script = ExtResource("Def")
+id = &"earth"
+name_key = &"BODY_EARTH"
+type = "rocky"
+visual_radius = 10.0
+reference_radius_km = 6371
+population = 8000000000
+probes = 0
+distance_game_km = 750000
+atmosphere = &"TEMPERATE"
+tint = Color(1,1,1,1)
+accent = Color(0.24,0.6,1,1)
+rotation_rate = 0.021
+fracture_count = 480
+damage_resistance = 1
+news_channel = &"earth_wire"
+day_map = ExtResource("day_map")
+night_map = ExtResource("night_map")
+ocean_mask = ExtResource("ocean_mask")
+cloud_map = ExtResource("cloud_map")

@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="PlanetDefinition" format=3]
+[ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
+[ext_resource type="Texture2D" path="res://assets/textures/clouds.png" id="cloud_map"]
+
+[resource]
+script = ExtResource("Def")
+id = &"mars"
+name_key = &"BODY_MARS"
+type = "rocky"
+visual_radius = 10.0
+reference_radius_km = 3389.5
+population = 120000
+probes = 0
+distance_game_km = 1100000
+atmosphere = &"THIN"
+tint = Color(0.89,0.43,0.25,1)
+accent = Color(0.86,0.56,0.4,1)
+rotation_rate = 0.018
+fracture_count = 280
+damage_resistance = 0.85
+news_channel = &"mars_wire"
+cloud_map = ExtResource("cloud_map")

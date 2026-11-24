@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/credits.gd" id="Script"]
-[ext_resource type="Shader" path="res://shaders/stars.gdshader" id="Sky"]
+[ext_resource type="Shader" path="res://shaders/menu_backdrop.gdshader" id="Sky"]
 
 [sub_resource type="ShaderMaterial" id="Material"]
 shader = ExtResource("Sky")

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="PlanetDefinition" format=3]
+[ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
+
+
+[resource]
+script = ExtResource("Def")
+id = &"saturn"
+name_key = &"BODY_SATURN"
+type = "gas"
+visual_radius = 10.0
+reference_radius_km = 58232
+population = 2400
+probes = 0
+distance_game_km = 150000
+atmosphere = &"GAS_LAYERS"
+tint = Color(0.95,0.84,0.66,1)
+accent = Color(0.61,0.46,0.32,1)
+rotation_rate = 0.027
+fracture_count = 0
+damage_resistance = 1.15
+news_channel = &"saturn_wire"

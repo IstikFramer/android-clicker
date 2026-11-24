@@ -55,6 +55,8 @@ func run() -> void:
 	settings.apply(settings.DEFAULTS)
 	expect(world.get_node("KeyLight").shadow_enabled, "live shadow change")
 	expect(TranslationServer.translate("START") == &"Начать", "Russian locale")
+	load("res://tests/test_assets.gd").new().check(expect)
+	load("res://tests/test_targeting.gd").new().check(world,expect)
 	var state := root.get_node("GameState")
 	state.director.toggle_pause()
 	state.reset_world()

@@ -22,11 +22,45 @@ HIGH,Высокое,High
 ON,Вкл.,On
 OFF,Выкл.,Off
 UNCAPPED,Без лимита,Uncapped
-LATER_OPTIONS,Профили качества и частиц сохраняются для этапов 02 / 07 / 08.,Quality and particle profiles are saved for stages 02 / 07 / 08.
+LATER_OPTIONS,Качество меняет детализацию планет и моделей. Частицы — в следующих этапах.,Quality controls planet and model detail. Particle effects arrive in later stages.
 SAVE_FAILED,Не удалось сохранить настройки.,Settings could not be saved.
 LOADING,Загрузка орбиты…,Loading orbit…
 DEV_FOUNDATION,ДЕМОНСТРАЦИЯ · ЭТАП 01,DEV FOUNDATION · STAGE 01
 SAMPLE,Пробная планета,Sample planet
 ORBIT_HELP,ПКМ — орбита · Колесо — зум\nEsc — пауза · R — сброс,RMB drag to orbit · Scroll to zoom\nEsc to pause · R to reset
 PAUSED,Пауза,Paused
-CREDIT_BODY,SPACE DIE создана на Godot с расширением на Rust. Планета и звёздное небо построены процедурно.,SPACE DIE runs on Godot with a Rust extension. The planet and star field are generated procedurally.
+CREDIT_BODY,Мир SPACE DIE создан на Godot и Rust. География — Natural Earth. Рельеф Земли и ночное освещение — авторская иллюстрация.,Built with Godot and Rust. Geography by Natural Earth. Earth relief and night lights are original illustrations.
+ATLAS,Орбитальный атлас,Orbital atlas
+BODY_MERCURY,Меркурий,Mercury
+BODY_VENUS,Венера,Venus
+BODY_EARTH,Земля,Earth
+BODY_MARS,Марс,Mars
+BODY_SATURN,Сатурн,Saturn
+BODY_JUPITER,Юпитер,Jupiter
+BODY_SUN,Солнце,Sun
+VACUUM,Почти без атмосферы,Near vacuum
+DENSE,Плотная атмосфера,Dense atmosphere
+TEMPERATE,Атмосфера,Atmosphere
+THIN,Разреженная атмосфера,Thin atmosphere
+GAS_LAYERS,Газовые слои,Gas layers
+PLASMA,Плазма,Plasma
+ROCKY,Каменная планета,Rocky planet
+GAS,Газовый гигант,Gas giant
+STAR,Звезда,Star
+REF_RADIUS,Радиус · %s км,Radius · %s km
+GAME_DISTANCE,Игровая дистанция · %s км,Scenario distance · %s km
+GAME_POP,Жители в игре · %s,Population in scenario · %s
+PROBE_COUNT,Зонды · %d,Probes · %d
+COUNTRY_PICK,Выбрать страну…,Choose a country…
+SEARCH_COUNTRY,Название страны или код,Country name or code
+TO_STATION,Осмотреть установку,Inspect platform
+TO_PLANET,К планете,Return to target
+POSITION_VERA,Орбита · 150 000 км от центра Сатурна,Orbit · 150 000 km from Saturn’s center
+POSITION_RAILGUN,Рельсовая платформа · ПКМ для обзора,Twin-rail platform · RMB to orbit
+POSITION_GUNGNIR,Кольцевой ускоритель Юпитера · ПКМ для обзора,Jovian accelerator · RMB to orbit
+PICK_POINT,Укажите точку на поверхности,Pick a point on the surface
+LOCK_POINT,Зафиксировать,Lock point
+POINT_STORED,Точка зафиксирована на поверхности,Point locked to the rotating surface
+AIM_HELP,ЛКМ — точка  ·  ПКМ — орбита  ·  Колесо — зум,Click to aim  ·  RMB to orbit  ·  Scroll to zoom
+EMPTY_SPACE,За пределами диска · точка не выбрана,Empty space · no point selected
+POINT_COORDS,%s   /   шир. %.2f°   долг. %.2f°,%s   /   lat %.2f°   lon %.2f°

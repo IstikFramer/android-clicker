@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="PlanetDefinition" format=3]
+[ext_resource type="Script" path="res://scripts/planets/planet_definition.gd" id="Def"]
+
+
+[resource]
+script = ExtResource("Def")
+id = &"sun"
+name_key = &"BODY_SUN"
+type = "star"
+visual_radius = 10.0
+reference_radius_km = 695700
+population = 0
+probes = 0
+distance_game_km = 900000
+atmosphere = &"PLASMA"
+tint = Color(1,0.75,0.31,1)
+accent = Color(1,0.4,0.1,1)
+rotation_rate = 0.008
+fracture_count = 0
+damage_resistance = -1
+news_channel = &""
